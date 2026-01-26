@@ -1,0 +1,10 @@
+
+{
+  "name": "FreelanceOS",
+  "description": "The complete operating system for modern freelancers. Cloud-powered with Gemini AI intelligence.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
