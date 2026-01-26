@@ -12,12 +12,15 @@ interface SettingsProps {
 export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'system'>('profile');
   const [isSaving, setIsSaving] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | undefined>(user?.logoUrl);
   const [cloudStatus, setCloudStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+
+  const aiKeyStatus = process.env.API_KEY && process.env.API_KEY !== "undefined" ? 'Active' : 'Missing';
+  const repoUrl = "https://github.com/drpage76/FreelanceOS";
+  const liveUrl = "https://drpage76.github.io/FreelanceOS/";
 
   const checkCloud = async () => {
     setCloudStatus('checking');
@@ -68,9 +71,19 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
     } finally { setIsSaving(false); }
   };
 
-  const handleUpgrade = (plan: string) => {
-    // Placeholder for Stripe Checkout Integration
-    alert(`Redirecting to Stripe Checkout for ${plan} ${billingCycle}...`);
+  const handleUpgrade = async (plan: UserPlan) => {
+    setIsSaving(true);
+    try {
+      if (!user) return;
+      const updated: Tenant = { ...user, plan };
+      await DB.updateTenant(updated);
+      onRefresh();
+      alert(`Account Synchronized! You are now a ${plan} member.`);
+    } catch (err) {
+      alert("Billing sync interrupted.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const copyAdoptionScript = () => {
@@ -90,8 +103,8 @@ UPDATE clients SET tenant_id = '${email}' WHERE tenant_id IS NULL;`;
     <div className="space-y-8 max-w-6xl mx-auto pb-20 px-4">
       <header className="flex items-center justify-between">
         <div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight">Account Control</h2>
-          <p className="text-slate-500 font-medium">Manage your professional presence and cloud subscription.</p>
+          <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Settings</h2>
+          <p className="text-slate-500 font-medium mt-1">Manage your professional presence and cloud subscription.</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={onLogout} className="px-6 py-3 text-slate-400 hover:text-rose-600 font-black text-[10px] uppercase tracking-widest transition-all">
@@ -134,38 +147,58 @@ UPDATE clients SET tenant_id = '${email}' WHERE tenant_id IS NULL;`;
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase block px-1">Legal Representative</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase block px-1 tracking-widest">Legal Name</label>
                   <input name="name" defaultValue={user?.name} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase block px-1">Trading Name</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase block px-1 tracking-widest">Trading Name</label>
                   <input name="businessName" defaultValue={user?.businessName} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all" />
                 </div>
                 <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase block px-1">Business Registered Address</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase block px-1 tracking-widest">Billing Address</label>
                   <textarea name="businessAddress" defaultValue={user?.businessAddress} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none h-32 custom-scrollbar" />
                 </div>
                 <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase block px-1">Remittance Details (Bank/IBAN)</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase block px-1 tracking-widest">Bank Details</label>
                   <input name="bankDetails" defaultValue={user?.bankDetails} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-sm outline-none" placeholder="Sort Code: 00-00-00, Account: 00000000" />
                 </div>
               </div>
 
               <button type="submit" disabled={isSaving} className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-sm uppercase shadow-2xl hover:bg-black transition-all">
-                {isSaving ? 'Synchronizing...' : 'Save Profile Changes'}
+                {isSaving ? 'Synchronizing...' : 'Update Records'}
               </button>
             </form>
           </div>
-          <div className="lg:col-span-4 bg-indigo-600 p-8 rounded-[40px] text-white shadow-2xl h-fit">
-             <h3 className="text-xl font-black mb-4">Active Plan</h3>
-             <div className="bg-white/10 border border-white/20 p-6 rounded-3xl mb-6">
-                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">Tier</p>
-                <p className="text-2xl font-black">{user?.plan || 'Free Member'}</p>
-             </div>
-             <p className="text-xs font-medium text-indigo-100 leading-relaxed mb-8 opacity-70">
-               Your account is currently {user?.plan === UserPlan.FREE ? 'limited to local data' : 'active with full cloud synchronization'}.
-             </p>
-             <button onClick={() => setActiveTab('billing')} className="w-full py-4 bg-white text-indigo-600 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg">Manage Billing</button>
+          <div className="lg:col-span-4 space-y-6">
+            <div className="bg-indigo-600 p-8 rounded-[40px] text-white shadow-2xl h-fit">
+               <h3 className="text-xl font-black mb-4">Account Tier</h3>
+               <div className="bg-white/10 border border-white/20 p-6 rounded-3xl mb-6">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">Status</p>
+                  <p className="text-2xl font-black">{user?.plan || 'Standard User'}</p>
+               </div>
+               <p className="text-xs font-medium text-indigo-100 leading-relaxed mb-8 opacity-70">
+                 {user?.plan === UserPlan.FREE 
+                   ? "You are using the Lite edition. Cloud synchronization and AI features are restricted." 
+                   : "Pro features are active. You have full access to AI coaching and cloud multi-device sync."}
+               </p>
+               <button onClick={() => setActiveTab('billing')} className="w-full py-4 bg-white text-indigo-600 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg">Manage Subscription</button>
+            </div>
+
+            <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
+               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deployment Status</h3>
+               <div className="space-y-4">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Live Production URL</p>
+                    <a href={liveUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-indigo-600 break-all hover:underline">{liveUrl}</a>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Action Pipeline</p>
+                    <a href={`${repoUrl}/actions`} target="_blank" rel="noreferrer" className="text-xs font-bold text-slate-900 hover:text-indigo-600 flex items-center gap-2">
+                       <i className="fa-solid fa-code-branch"></i> GitHub Console <i className="fa-solid fa-arrow-up-right-from-square text-[8px]"></i>
+                    </a>
+                  </div>
+               </div>
+            </div>
           </div>
         </div>
       )}
@@ -174,7 +207,7 @@ UPDATE clients SET tenant_id = '${email}' WHERE tenant_id IS NULL;`;
         <div className="animate-in fade-in slide-in-from-bottom-2 space-y-8">
           <div className="bg-white rounded-[40px] border border-slate-200 p-12 shadow-sm text-center">
             <h3 className="text-3xl font-black text-slate-900 mb-2">Choose Your Scale</h3>
-            <p className="text-slate-500 font-medium mb-10">Professional tools for the solo-powerhouse.</p>
+            <p className="text-slate-500 font-medium mb-10">Scalable infrastructure for independent professionals.</p>
 
             <div className="flex items-center justify-center gap-4 mb-12">
               <span className={`text-[10px] font-black uppercase tracking-widest ${billingCycle === 'monthly' ? 'text-slate-900' : 'text-slate-400'}`}>Monthly</span>
@@ -185,37 +218,47 @@ UPDATE clients SET tenant_id = '${email}' WHERE tenant_id IS NULL;`;
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-              {/* Free Plan */}
-              <div className="bg-slate-50 border border-slate-200 p-8 rounded-[32px] flex flex-col items-center text-left">
-                <h4 className="text-lg font-black text-slate-900 mb-1 self-start">Lite</h4>
-                <p className="text-slate-500 text-xs mb-6 self-start">Essential for freelancers.</p>
+              <div className="bg-slate-50 border border-slate-200 p-8 rounded-[32px] flex flex-col items-start text-left">
+                <h4 className="text-lg font-black text-slate-900 mb-1 self-start">Lite Tier</h4>
+                <p className="text-slate-500 text-xs mb-6 self-start">Essential ledger tools.</p>
                 <div className="text-4xl font-black mb-8">£0 <span className="text-xs font-bold text-slate-400">/ forever</span></div>
                 <ul className="space-y-4 mb-10 w-full text-xs font-bold text-slate-600">
                   <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-500"></i> Full Invoicing & Quotes</li>
-                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-500"></i> Expense & Mileage Tracking</li>
-                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-500"></i> Local Data Records</li>
-                  <li className="flex items-center gap-2"><i className="fa-solid fa-xmark text-rose-300"></i> Cloud Sync & Multi-Device</li>
+                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-500"></i> Mileage Records</li>
+                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-500"></i> Local Data Isolation</li>
+                  <li className="flex items-center gap-2"><i className="fa-solid fa-xmark text-rose-300"></i> AI Strategic Coaching</li>
                 </ul>
-                <button disabled className="w-full py-4 bg-slate-200 text-slate-400 rounded-2xl font-black text-[10px] uppercase cursor-not-allowed">Active Plan</button>
+                <button 
+                  disabled={user?.plan === UserPlan.FREE} 
+                  onClick={() => handleUpgrade(UserPlan.FREE)}
+                  className="w-full py-4 bg-slate-200 text-slate-400 rounded-2xl font-black text-[10px] uppercase transition-all"
+                >
+                  {user?.plan === UserPlan.FREE ? 'Active Selection' : 'Downgrade to Lite'}
+                </button>
               </div>
 
-              {/* Pro Plan */}
-              <div className="bg-indigo-600 border border-indigo-700 p-8 rounded-[32px] flex flex-col items-center text-left text-white shadow-2xl shadow-indigo-200 relative overflow-hidden">
+              <div className="bg-indigo-600 border border-indigo-700 p-8 rounded-[32px] flex flex-col items-start text-left text-white shadow-2xl shadow-indigo-200 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-6 bg-white/10 rounded-bl-3xl">
                   <i className="fa-solid fa-bolt text-indigo-300"></i>
                 </div>
-                <h4 className="text-lg font-black mb-1 self-start">Business Pro</h4>
-                <p className="text-indigo-200 text-xs mb-6 self-start">Full power cloud business hub.</p>
+                <h4 className="text-lg font-black mb-1 self-start">Professional Cloud</h4>
+                <p className="text-indigo-200 text-xs mb-6 self-start">Full business OS suite.</p>
                 <div className="text-4xl font-black mb-8">
                   {billingCycle === 'monthly' ? '£19' : '£15'}<span className="text-xs font-bold text-indigo-300"> / month</span>
                 </div>
                 <ul className="space-y-4 mb-10 w-full text-xs font-bold text-indigo-100">
-                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Unlimited Cloud Sync</li>
-                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Gemini AI Strategy Hub</li>
-                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Google Maps Intelligence</li>
-                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Smart Calendar Integration</li>
+                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Unlimited Multi-Device Sync</li>
+                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Gemini AI Strategic Hub</li>
+                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Advanced Calendar Routing</li>
+                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Google Search Grounding</li>
                 </ul>
-                <button onClick={() => handleUpgrade('Pro')} className="w-full py-4 bg-white text-indigo-600 rounded-2xl font-black text-[10px] uppercase shadow-xl hover:scale-[1.02] transition-all">Upgrade Now</button>
+                <button 
+                  disabled={user?.plan !== UserPlan.FREE && user?.plan !== undefined}
+                  onClick={() => handleUpgrade(billingCycle === 'monthly' ? UserPlan.PRO_MONTHLY : UserPlan.PRO_YEARLY)} 
+                  className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase shadow-xl hover:scale-[1.02] transition-all ${user?.plan !== UserPlan.FREE ? 'bg-indigo-500 text-indigo-200 cursor-default' : 'bg-white text-indigo-600'}`}
+                >
+                  {user?.plan !== UserPlan.FREE ? 'Pro Tier Active' : 'Upgrade to Pro'}
+                </button>
               </div>
             </div>
           </div>
@@ -227,37 +270,47 @@ UPDATE clients SET tenant_id = '${email}' WHERE tenant_id IS NULL;`;
           <div className="bg-slate-900 rounded-[40px] p-10 text-white shadow-2xl border border-slate-700">
             <h3 className="text-xl font-black mb-6 flex items-center gap-3">
               <i className="fa-solid fa-microchip text-indigo-400"></i> 
-              Dev Intelligence
+              Infrastructure
             </h3>
-            <div className="space-y-6">
+            <div className="space-y-4">
+                <div className="flex justify-between items-center py-2 border-b border-white/5">
+                  <span className="text-xs font-bold text-slate-400">Cloud Sync (Supabase)</span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${cloudStatus === 'online' ? 'text-emerald-400' : 'text-rose-400'}`}>{cloudStatus}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-white/5">
+                  <span className="text-xs font-bold text-slate-400">AI Intelligence (Gemini)</span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${aiKeyStatus === 'Active' ? 'text-emerald-400' : 'text-amber-400'}`}>{aiKeyStatus}</span>
+                </div>
+            </div>
+            <div className="mt-8 space-y-4">
               <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                Realign ownership of records if you shifted from local to multi-user cloud recently.
+                Database Migration: If you have records from a local session, run this script in your Supabase SQL editor.
               </p>
               <button onClick={copyAdoptionScript} className="w-full py-4 bg-white/10 text-indigo-400 border border-indigo-400/20 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all">
-                Copy Adoption Script
+                Copy Migration Script
               </button>
             </div>
           </div>
 
           <div className="bg-white rounded-[40px] p-10 border border-slate-200 shadow-sm flex flex-col justify-between">
             <div>
-              <h3 className="text-xl font-black text-slate-900 mb-4">Infrastructure</h3>
+              <h3 className="text-xl font-black text-slate-900 mb-4">Version Info</h3>
               <div className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b border-slate-50">
-                  <span className="text-xs font-bold text-slate-500">Node Engine</span>
-                  <span className="text-[10px] font-black text-slate-900 uppercase">React 19 / Vite</span>
+                  <span className="text-xs font-bold text-slate-500">Core Engine</span>
+                  <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">React 19 / Vite</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-50">
-                  <span className="text-xs font-bold text-slate-500">Database</span>
-                  <span className="text-[10px] font-black text-indigo-600 uppercase">Supabase Cloud</span>
+                  <span className="text-xs font-bold text-slate-500">Security Policy</span>
+                  <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Auth RLS Active</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-50">
-                  <span className="text-xs font-bold text-slate-500">AI Core</span>
-                  <span className="text-[10px] font-black text-emerald-600 uppercase">Gemini 3.0 Flash</span>
+                  <span className="text-xs font-bold text-slate-500">Deployment</span>
+                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Continuous (GitHub Pages)</span>
                 </div>
               </div>
             </div>
-            <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mt-8">Build v3.0.4-stable</p>
+            <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mt-8">Build v3.2.5-stable</p>
           </div>
         </div>
       )}

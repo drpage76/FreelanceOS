@@ -100,7 +100,7 @@ const App: React.FC = () => {
       setIsSyncing(false);
       syncInProgress.current = false;
     }
-  }, [getLatestToken]); // removed isSyncing dependency to prevent infinite loop
+  }, [getLatestToken]);
 
   useEffect(() => {
     if (isInitializing.current) return;

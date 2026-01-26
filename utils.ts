@@ -14,13 +14,15 @@ import {
   addMonths, 
   subMonths,
   isWithinInterval,
-  parse
+  startOfYear,
+  differenceInDays
 } from 'date-fns';
 
 export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('en-GB', {
     style: 'currency',
     currency: 'GBP',
+    maximumFractionDigits: 0
   }).format(amount);
 };
 
@@ -41,12 +43,6 @@ export const generateJobId = (startDate: string, sequence: number): string => {
   return `${yy}${mm}${seq}`;
 };
 
-/**
- * Generates invoice ID in YYMMXX format
- * YY: Year (e.g. 25)
- * MM: Month (e.g. 01)
- * XX: Sequence (e.g. 01, 02...)
- */
 export const generateInvoiceId = (sequence: number): string => {
   const now = new Date();
   const yy = format(now, 'yy');
@@ -60,12 +56,26 @@ export const calculateDueDate = (startDate: string, terms: number): string => {
   return format(addDays(date, terms), 'yyyy-MM-dd');
 };
 
-export const isOverdue = (dueDate: string, paidDate?: string): boolean => {
-  if (paidDate) return false;
-  return isAfter(new Date(), parseISO(dueDate));
+export const calculateRevenueStats = (jobs: any[], goal: number = 50000) => {
+  const now = new Date();
+  const startYear = startOfYear(now);
+  const daysElapsed = Math.max(1, differenceInDays(now, startYear));
+  
+  const ytdRevenue = jobs
+    .filter(j => j.status !== 'Cancelled' && parseISO(j.startDate) >= startYear && parseISO(j.startDate) <= now)
+    .reduce((sum, j) => sum + j.totalRecharge, 0);
+
+  const projectedAnnual = (ytdRevenue / daysElapsed) * 365;
+  const percentOfGoal = Math.min(100, (ytdRevenue / goal) * 100);
+
+  return {
+    ytdRevenue,
+    projectedAnnual,
+    percentOfGoal,
+    dailyRunRate: ytdRevenue / daysElapsed
+  };
 };
 
-// Calendar Utilities
 export const getCalendarDays = (date: Date) => {
   const start = startOfWeek(startOfMonth(date), { weekStartsOn: 1 });
   const end = endOfWeek(endOfMonth(date), { weekStartsOn: 1 });
