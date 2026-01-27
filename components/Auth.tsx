@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { getSupabase } from '../services/db';
 
@@ -55,8 +54,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
     }
 
     try {
-      // FIX: Use the full current URL (including /FreelanceOS/) for the redirect
-      // This ensures Supabase knows to send the user back to the live site.
+      // Create a clean redirect URL for GitHub Pages
       const redirectTo = window.location.origin + window.location.pathname;
       
       const { error } = await (client.auth as any).signInWithOAuth({
