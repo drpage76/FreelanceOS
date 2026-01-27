@@ -1,6 +1,4 @@
-
 import React, { useState, useMemo } from 'react';
-// Fix: Use namespace import for react-router-dom to resolve exported member errors
 import * as ReactRouterDOM from 'react-router-dom';
 
 const { Link, useNavigate } = ReactRouterDOM;
@@ -16,26 +14,14 @@ interface JobsProps {
   onRefresh: () => void;
 }
 
-const ITEMS_PER_PAGE = 10;
-
 export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<JobStatus | 'All'>('All');
-  const [currentPage, setCurrentPage] = useState(1);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
   const [invoicePrompt, setInvoicePrompt] = useState<{job: Job, client: Client} | null>(null);
   const [promptDate, setPromptDate] = useState('');
-
-  const stats = useMemo(() => {
-    return {
-      total: state.jobs.length,
-      confirmed: state.jobs.filter(j => j.status === JobStatus.CONFIRMED).length,
-      pending: state.jobs.filter(j => j.status === JobStatus.PENCILLED || j.status === JobStatus.POTENTIAL).length,
-      revenue: state.jobs.reduce((sum, j) => sum + (j.status !== JobStatus.CANCELLED ? j.totalRecharge : 0), 0)
-    };
-  }, [state.jobs]);
 
   const filteredJobs = useMemo(() => {
     return state.jobs.filter(job => {
@@ -48,9 +34,6 @@ export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) =
       return matchesSearch && matchesFilter;
     }).sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   }, [state.jobs, state.clients, searchTerm, filter]);
-
-  const totalPages = Math.ceil(filteredJobs.length / ITEMS_PER_PAGE);
-  const paginatedJobs = filteredJobs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const startQuickInvoice = (jobId: string) => {
     const job = state.jobs.find(j => j.id === jobId);
@@ -89,21 +72,22 @@ export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) =
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 pb-20 px-4">
       {invoicePrompt && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
            <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200">
-              <h3 className="text-xl font-black text-slate-900 mb-2">Generate Project Invoice</h3>
-              <p className="text-sm text-slate-500 font-medium mb-6">Confirm issue date for {invoicePrompt.client.name}. Terms: {invoicePrompt.client.paymentTermsDays} Days.</p>
+              <h3 className="text-xl font-black text-slate-900 mb-2">Issue Project Invoice</h3>
+              <p className="text-sm text-slate-500 font-medium mb-6">Confirm issue date for {invoicePrompt.client.name}.</p>
               <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Issue Date</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Date of Issue</label>
                   <input type="date" value={promptDate} onChange={(e) => setPromptDate(e.target.value)} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button onClick={() => setInvoicePrompt(null)} className="flex-1 py-4 bg-slate-50 text-slate-400 rounded-2xl font-black text-[10px] uppercase border border-slate-100">Cancel</button>
                   <button onClick={handleFinalizeQuickInvoice} disabled={!!isProcessing} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2">
-                    {isProcessing ? <i className="fa-solid fa-spinner animate-spin"></i> : 'Create Draft'}
+                    {isProcessing ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-file-invoice-dollar"></i>}
+                    {isProcessing ? 'Handoff...' : 'Create Draft'}
                   </button>
                 </div>
               </div>
@@ -113,76 +97,81 @@ export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) =
 
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-900 leading-tight">Project Workspace</h2>
-          <p className="text-slate-400 font-bold uppercase text-[9px] tracking-[0.2em]">Full Ledger & Archives</p>
+          <h2 className="text-3xl font-black text-slate-900 leading-tight">Project Workspace</h2>
+          <p className="text-slate-400 font-bold uppercase text-[9px] tracking-[0.3em]">Full Operational Ledger</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <div className="relative">
-            <i className="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-xs"></i>
+            <i className="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 text-xs"></i>
             <input 
               value={searchTerm}
-              onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              onChange={e => setSearchTerm(e.target.value)}
               placeholder="Filter archives..." 
-              className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none w-full md:w-64"
+              className="pl-12 pr-6 py-3.5 bg-white border border-slate-200 rounded-2xl text-xs font-black outline-none w-full md:w-80 shadow-sm focus:ring-4 focus:ring-indigo-500/5 transition-all"
             />
           </div>
-          <button onClick={onNewJobClick} className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-black shadow-lg hover:bg-indigo-700 transition-all text-xs flex items-center justify-center">
+          <button onClick={onNewJobClick} className="bg-slate-900 text-white px-8 py-3.5 rounded-2xl font-black shadow-xl hover:bg-black transition-all text-[10px] uppercase tracking-widest flex items-center justify-center">
             <i className="fa-solid fa-plus mr-2"></i>Create New Job
           </button>
         </div>
       </header>
 
-      <div className="bg-white rounded-[24px] border border-slate-200 overflow-hidden shadow-sm flex flex-col h-full min-h-[600px]">
-        <div className="overflow-x-auto flex-1">
+      <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden min-h-[600px] flex flex-col">
+        <div className="overflow-x-auto flex-1 custom-scrollbar">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
+            <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-20">
               <tr>
-                <th className="p-6 text-[9px] font-black text-slate-400 uppercase tracking-widest">Client / Entity</th>
-                <th className="p-6 text-[9px] font-black text-slate-400 uppercase tracking-widest">Project & Venue</th>
-                <th className="p-6 text-[9px] font-black text-slate-400 uppercase tracking-widest">Production Date</th>
-                <th className="p-6 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                <th className="p-6 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Revenue</th>
-                <th className="p-6 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Manage</th>
+                <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest">Client Identity</th>
+                <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest">Project & Venue</th>
+                <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest">Production Date</th>
+                <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Recharge</th>
+                <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Manage</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {paginatedJobs.length === 0 ? (
+              {filteredJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">No matching records found</td>
+                  <td colSpan={6} className="p-32 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">No matching records in archive</td>
                 </tr>
               ) : (
-                paginatedJobs.map(job => {
+                filteredJobs.map(job => {
                   const client = state.clients.find(c => c.id === job.clientId);
                   const hasInvoice = state.invoices.some(inv => inv.jobId === job.id);
                   return (
                     <tr key={job.id} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="p-6">
-                        <span className="font-black text-slate-900 text-[13px] block">{client?.name || 'Unknown Client'}</span>
-                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">ID: {job.id}</span>
+                      <td className="p-8">
+                        <span className="font-black text-slate-900 text-sm block mb-1">{client?.name || 'Private Client'}</span>
+                        <span className="text-[9px] text-indigo-400 font-black uppercase tracking-widest">ID: {job.id}</span>
                       </td>
-                      <td className="p-6">
-                        <Link to={`/jobs/${job.id}`} className="font-black text-slate-900 hover:text-indigo-600 transition-colors block text-[13px] mb-1">{job.description}</Link>
-                        <span className="text-[10px] text-slate-400 font-black uppercase flex items-center gap-1">
-                          <i className="fa-solid fa-location-dot text-indigo-400"></i> {job.location || 'Location Not Set'}
+                      <td className="p-8">
+                        <Link to={`/jobs/${job.id}`} className="font-black text-slate-900 hover:text-indigo-600 transition-colors block text-[15px] mb-2">{job.description}</Link>
+                        <span className="text-[10px] text-slate-400 font-black uppercase flex items-center gap-2">
+                          <i className="fa-solid fa-location-dot text-indigo-400"></i> {job.location || 'TBD'}
                         </span>
                       </td>
-                      <td className="p-6">
-                        <p className="text-[11px] font-black text-slate-700">{formatDate(job.startDate)}</p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">TO {formatDate(job.endDate)}</p>
+                      <td className="p-8">
+                        <p className="text-xs font-black text-slate-900">{formatDate(job.startDate)}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight mt-1 italic">TO {formatDate(job.endDate)}</p>
                       </td>
-                      <td className="p-6">
-                        <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase border ${STATUS_COLORS[job.status]}`}>{job.status}</span>
+                      <td className="p-8">
+                        <span className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border ${STATUS_COLORS[job.status]}`}>{job.status}</span>
                       </td>
-                      <td className="p-6 text-right font-black text-slate-900 text-sm">{formatCurrency(job.totalRecharge)}</td>
-                      <td className="p-6">
-                        <div className="flex items-center justify-center gap-2">
-                          <Link to={`/jobs/${job.id}`} className="bg-slate-900 text-white w-9 h-9 flex items-center justify-center rounded-xl hover:bg-indigo-600 transition-all">
+                      <td className="p-8 text-right font-black text-slate-900 text-lg tracking-tight">{formatCurrency(job.totalRecharge)}</td>
+                      <td className="p-8">
+                        <div className="flex items-center justify-center gap-3">
+                          <Link to={`/jobs/${job.id}`} className="bg-slate-900 text-white w-11 h-11 flex items-center justify-center rounded-[18px] hover:bg-indigo-600 transition-all shadow-md" title="Open Workspace">
                             <i className="fa-solid fa-eye text-xs"></i>
                           </Link>
                           {!hasInvoice && job.status !== JobStatus.CANCELLED && (
-                            <button onClick={() => startQuickInvoice(job.id)} className="bg-emerald-50 text-emerald-600 border border-emerald-100 w-9 h-9 flex items-center justify-center rounded-xl hover:bg-emerald-600 hover:text-white transition-all">
+                            <button onClick={() => startQuickInvoice(job.id)} className="bg-emerald-50 text-emerald-600 border border-emerald-100 w-11 h-11 flex items-center justify-center rounded-[18px] hover:bg-emerald-600 hover:text-white transition-all shadow-sm" title="Issue Quick Invoice">
                               <i className="fa-solid fa-file-invoice-dollar text-xs"></i>
                             </button>
+                          )}
+                          {hasInvoice && (
+                             <div className="w-11 h-11 flex items-center justify-center rounded-[18px] bg-slate-50 text-slate-300 border border-slate-100">
+                               <i className="fa-solid fa-check-double text-xs"></i>
+                             </div>
                           )}
                         </div>
                       </td>
@@ -193,16 +182,6 @@ export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) =
             </tbody>
           </table>
         </div>
-        
-        {totalPages > 1 && (
-          <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between shrink-0">
-             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Showing Page {currentPage} of {totalPages}</p>
-             <div className="flex gap-2">
-                <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase hover:bg-slate-50 disabled:opacity-30">Prev</button>
-                <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase hover:bg-slate-50 disabled:opacity-30">Next</button>
-             </div>
-          </div>
-        )}
       </div>
     </div>
   );

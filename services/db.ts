@@ -1,4 +1,3 @@
-
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Client, Job, JobItem, Invoice, Tenant, UserPlan, MileageRecord, JobShift, SchedulingType, Quote } from '../types';
 
@@ -233,7 +232,9 @@ export const DB = {
   },
   saveJob: async (j: Job) => {
     await DB.call('jobs', 'upsert', j);
-    if (j.shifts) await DB.saveShifts(j.id, j.shifts);
+    if (j.shifts) {
+      await DB.saveShifts(j.id, j.shifts);
+    }
   },
   getQuotes: async () => DB.call('quotes', 'select'),
   saveQuote: async (q: Quote) => DB.call('quotes', 'upsert', q),
