@@ -105,6 +105,14 @@ const App: React.FC = () => {
     if (isInitializing.current) return;
     isInitializing.current = true;
 
+    // Failsafe: Force stop loading after 6 seconds if DB doesn't respond
+    const failsafe = setTimeout(() => {
+      if (isLoading) {
+        console.warn("Initialization taking too long. Forcing app start.");
+        setIsLoading(false);
+      }
+    }, 6000);
+
     const init = async () => {
       try {
         await DB.initializeSession();
@@ -118,6 +126,8 @@ const App: React.FC = () => {
       } catch (e) {
         console.error("Initialization Failed:", e);
         setIsLoading(false);
+      } finally {
+        clearTimeout(failsafe);
       }
     };
 
@@ -142,15 +152,19 @@ const App: React.FC = () => {
           setIsLoading(false);
         }
       });
-      return () => subscription.unsubscribe();
+      return () => {
+        subscription.unsubscribe();
+        clearTimeout(failsafe);
+      };
     }
-  }, [loadData]);
+  }, [loadData, isLoading]);
 
   if (isLoading) return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-6">
       <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
       <div className="text-center">
         <p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Establishing Secure Workspace</p>
+        <p className="text-slate-500 text-[8px] font-bold uppercase tracking-widest mt-4">Checking Cloud Protocols...</p>
       </div>
     </div>
   );

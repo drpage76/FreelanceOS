@@ -128,7 +128,9 @@ export const DB = {
     try {
       const client = getSupabase();
       if (!client) return { success: false };
-      const { count: c } = await client.from('clients').select('*', { count: 'exact', head: true }).limit(0);
+      // Lightweight check with a 2 second limit
+      const { data, error } = await client.from('clients').select('id').limit(1);
+      if (error) return { success: false };
       return { success: true };
     } catch { return { success: false }; }
   },
