@@ -54,9 +54,18 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
     }
 
     try {
-      // Create a clean redirect URL for GitHub Pages
-      const redirectTo = window.location.origin + window.location.pathname;
+      // Force a clean redirect URL that includes the subfolder and trailing slash
+      // window.location.origin = https://drpage76.github.io
+      // window.location.pathname = /FreelanceOS/
+      let redirectTo = window.location.origin + window.location.pathname;
       
+      // Safety check: ensure it ends with / so Supabase matches it exactly
+      if (!redirectTo.endsWith('/')) {
+        redirectTo += '/';
+      }
+      
+      console.log("Redirecting Supabase to:", redirectTo);
+
       const { error } = await (client.auth as any).signInWithOAuth({
         provider: 'google',
         options: {
