@@ -1,6 +1,4 @@
-
 import React, { useState, useMemo } from 'react';
-// Fix: Use namespace import for react-router-dom to resolve exported member errors
 import * as ReactRouterDOM from 'react-router-dom';
 
 const { useNavigate } = ReactRouterDOM;
@@ -100,29 +98,34 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
   };
 
   return (
-    <div className="bg-white rounded-[32px] border border-slate-200 shadow-xl overflow-hidden flex flex-col h-full max-h-[800px]">
-      <div className="px-6 py-4 flex items-center justify-between bg-white border-b border-slate-100 shrink-0">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3">
-             <h3 className="text-sm font-black text-slate-900 uppercase tracking-[0.2em]">
+    <div className="bg-white rounded-[40px] border border-slate-200 shadow-xl overflow-hidden flex flex-col h-full max-h-[800px]">
+      <div className="px-10 py-6 flex items-center justify-between bg-white border-b border-slate-100 shrink-0">
+        <div className="flex items-center gap-10">
+          <div className="flex items-center gap-4">
+             <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">
                {format(currentDate, 'MMMM yyyy')}
              </h3>
-             <div className="relative overflow-hidden w-8 h-8 flex items-center justify-center bg-slate-50 rounded-lg border border-slate-200 group cursor-pointer">
-                <i className="fa-solid fa-calendar-days text-[10px] text-slate-400 group-hover:text-indigo-600"></i>
-                <input type="month" onChange={e => e.target.value && setCurrentDate(parse(`${e.target.value}-01`, 'yyyy-MM-dd', new Date()))} className="absolute inset-0 opacity-0 cursor-pointer" />
+             <div className="relative overflow-hidden w-10 h-10 flex items-center justify-center bg-slate-50 rounded-xl border border-slate-200 group cursor-pointer transition-all hover:border-indigo-400">
+                <i className="fa-solid fa-calendar-day text-[14px] text-slate-400 group-hover:text-indigo-600"></i>
+                <input 
+                  type="month" 
+                  onChange={e => e.target.value && setCurrentDate(parse(`${e.target.value}-01`, 'yyyy-MM-dd', new Date()))} 
+                  className="absolute inset-0 opacity-0 cursor-pointer" 
+                  title="Jump to date"
+                />
              </div>
           </div>
-          <div className="flex bg-slate-50 p-1 rounded-2xl border border-slate-100">
-            <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="w-8 h-8 flex items-center justify-center hover:bg-white rounded-xl text-slate-400"><i className="fa-solid fa-chevron-left text-xs"></i></button>
-            <button onClick={() => setCurrentDate(new Date())} className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest mx-2">Today</button>
-            <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="w-8 h-8 flex items-center justify-center hover:bg-white rounded-xl text-slate-400"><i className="fa-solid fa-chevron-right text-xs"></i></button>
+          <div className="flex bg-slate-100 p-1 rounded-[20px] border border-slate-200">
+            <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl text-slate-400 transition-all"><i className="fa-solid fa-chevron-left text-xs"></i></button>
+            <button onClick={() => setCurrentDate(new Date())} className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest mx-2 shadow-lg shadow-indigo-100">Today</button>
+            <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl text-slate-400 transition-all"><i className="fa-solid fa-chevron-right text-xs"></i></button>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-7 bg-slate-50/50 border-b border-slate-100 shrink-0">
         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-          <div key={day} className="py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">{day}</div>
+          <div key={day} className="py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">{day}</div>
         ))}
       </div>
 
@@ -171,14 +174,14 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
               <div className="absolute inset-0 grid grid-cols-7 pointer-events-none">
                 {week.map((day, dIdx) => (
                   <div key={dIdx} className={`border-r border-slate-50 flex flex-col p-2 ${!isSameMonth(day, currentDate) ? 'bg-slate-50/20' : ''}`}>
-                    <span className={`text-[11px] font-black w-6 h-6 flex items-center justify-center rounded-lg ${isSameDay(day, new Date()) ? 'bg-indigo-600 text-white shadow-md' : isSameMonth(day, currentDate) ? 'text-slate-900' : 'text-slate-200'}`}>
+                    <span className={`text-[11px] font-black w-7 h-7 flex items-center justify-center rounded-xl ${isSameDay(day, new Date()) ? 'bg-indigo-600 text-white shadow-lg' : isSameMonth(day, currentDate) ? 'text-slate-900' : 'text-slate-200'}`}>
                       {format(day, 'd')}
                     </span>
                   </div>
                 ))}
               </div>
 
-              <div className="relative pt-10 pb-2 px-1 space-y-1">
+              <div className="relative pt-12 pb-2 px-1 space-y-1">
                 {lanes.map((lane, lIdx) => (
                   <div key={lIdx} className="grid grid-cols-7 gap-1 h-7 relative">
                     {week.map((day, dIdx) => {
@@ -212,7 +215,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
                           key={`${entry.id}-${wIdx}`}
                           onClick={() => entry.jobId && navigate(`/jobs/${entry.jobId}`)}
                           style={{ gridColumn: `${offset + 1} / span ${duration}`, backgroundColor: bgColor }}
-                          className={`h-6 rounded-lg shadow-sm flex items-center px-3 z-10 transition-all hover:brightness-105 hover:scale-[1.02] cursor-pointer ${textColor}`}
+                          className={`h-6 rounded-[10px] shadow-sm flex items-center px-4 z-10 transition-all hover:brightness-105 hover:scale-[1.02] cursor-pointer ${textColor}`}
                         >
                           <div className="flex items-center gap-2 overflow-hidden w-full">
                             {entry.type === 'external' && <i className="fa-brands fa-google text-[8px] opacity-70"></i>}
