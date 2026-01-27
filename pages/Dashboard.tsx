@@ -202,7 +202,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSy
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    {/* Fixed: Changed fontBold to fontWeight to satisfy SVGProps type requirements */}
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}} dy={10} />
                     <YAxis hide />
                     <Tooltip 

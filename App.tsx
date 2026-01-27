@@ -25,7 +25,6 @@ const App: React.FC = () => {
   const [isNewJobModalOpen, setIsNewJobModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [runtimeError, setRuntimeError] = useState<string | null>(null);
   
   const isInitializing = useRef(false);
   const hasLoadedOnce = useRef(false);
@@ -56,6 +55,7 @@ const App: React.FC = () => {
       if (!user) {
         setAppState(prev => ({ ...prev, user: null }));
         setCurrentUser(null);
+        setIsLoading(false);
         return;
       }
 
@@ -94,11 +94,10 @@ const App: React.FC = () => {
       hasLoadedOnce.current = true;
     } catch (err) {
       console.error("Critical Load Error:", err);
-      // No longer setting fatal runtime error to prevent infinite blue circle
     } finally {
       setIsSyncing(false);
       syncInProgress.current = false;
-      setIsLoading(false); // CRITICAL: Always release loading state
+      setIsLoading(false);
     }
   }, [getLatestToken]);
 
