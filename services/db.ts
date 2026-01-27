@@ -128,7 +128,6 @@ export const DB = {
     try {
       const client = getSupabase();
       if (!client) return { success: false };
-      // Lightweight check with a 2 second limit
       const { data, error } = await client.from('clients').select('id').limit(1);
       if (error) return { success: false };
       return { success: true };
@@ -233,6 +232,7 @@ export const DB = {
   },
   saveJob: async (j: Job) => {
     await DB.call('jobs', 'upsert', j);
+    // CRITICAL: Ensure shifts are saved explicitly if they exist on the job object
     if (j.shifts) {
       await DB.saveShifts(j.id, j.shifts);
     }
@@ -248,6 +248,7 @@ export const DB = {
   saveJobItems: async (jobId: string, items: JobItem[]) => DB.call('job_items', 'upsert', items),
   getShifts: async (jobId: string) => DB.call('job_shifts', 'select', null, { jobId }),
   saveShifts: async (jobId: string, shifts: JobShift[]) => {
+    // ALWAYS clear existing shifts for this job before saving new ones to ensure sync
     await DB.call('job_shifts', 'delete', null, { jobId });
     if (shifts && shifts.length > 0) {
       const tenantId = await DB.getTenantId() || LOCAL_USER_EMAIL;

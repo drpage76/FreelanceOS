@@ -1,18 +1,15 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 import { 
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  AreaChart, Area
+  PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip
 } from 'recharts';
+import { parseISO, isAfter, startOfDay, addDays, isBefore, isValid, format } from 'date-fns';
 
 const { Link } = ReactRouterDOM;
 
-import { AppState, JobStatus, InvoiceStatus, UserPlan } from '../types';
+import { AppState, JobStatus, InvoiceStatus } from '../types';
 import { formatCurrency, calculateRevenueStats } from '../utils';
 import { Calendar } from '../components/Calendar';
-import { parseISO, isAfter, startOfDay, isSameDay, isValid, format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
-import { getBusinessInsights } from '../services/gemini';
-import { GoogleGenAI } from "@google/genai";
 
 interface DashboardProps {
   state: AppState;
@@ -21,91 +18,52 @@ interface DashboardProps {
   isSyncing: boolean;
 }
 
+const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
+
 export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSyncCalendar, isSyncing }) => {
-  const [dailyBrief, setDailyBrief] = useState<string | null>(() => sessionStorage.getItem('daily_brief'));
-  const [growthInsight, setGrowthInsight] = useState<string>(() => sessionStorage.getItem('growth_insight') || "Analyzing your pipeline...");
-  const [isBriefLoading, setIsBriefLoading] = useState(false);
-  
-  const hasAnalyzed = useRef(false);
-  const isPro = state.user?.plan && state.user.plan !== UserPlan.FREE;
-
-  useEffect(() => {
-    if (!isPro || state.jobs.length === 0 || hasAnalyzed.current) return;
-    
-    const fetchBrief = async () => {
-      setIsBriefLoading(true);
-      hasAnalyzed.current = true;
-      try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const overdue = state.invoices.filter(i => i.status === InvoiceStatus.OVERDUE).length;
-        const upcoming = state.jobs.filter(j => j.status === JobStatus.CONFIRMED).length;
-        
-        const prompt = `Analyze: ${upcoming} upcoming jobs, ${overdue} overdue. One high-impact sentence for a freelancer's morning. No markdown.`;
-        const response = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: prompt });
-        
-        const text = response.text || "Focus on pipeline health.";
-        setDailyBrief(text);
-        sessionStorage.setItem('daily_brief', text);
-
-        const insight = await getBusinessInsights(state);
-        setGrowthInsight(insight);
-        sessionStorage.setItem('growth_insight', insight);
-      } catch (err) {
-        console.warn("AI Analysis Blipped:", err);
-      } finally {
-        setIsBriefLoading(false);
-      }
-    };
-    
-    fetchBrief();
-  }, [state.jobs.length, isPro]);
+  const [dueFilterDays, setDueFilterDays] = useState<number>(30);
 
   const revStats = useMemo(() => calculateRevenueStats(state.jobs, 60000), [state.jobs]);
 
-  const revenueData = useMemo(() => {
-    const months = Array.from({ length: 6 }).map((_, i) => {
-      const d = subMonths(new Date(), 5 - i);
-      return {
-        name: format(d, 'MMM'),
-        monthStart: startOfMonth(d),
-        monthEnd: endOfMonth(d),
-        total: 0
-      };
-    });
-
-    state.jobs.forEach(job => {
-      if (job.status === JobStatus.CANCELLED) return;
-      const jobDate = parseISO(job.startDate);
-      if (!isValid(jobDate)) return;
-      months.forEach(m => {
-        if (jobDate >= m.monthStart && jobDate <= m.monthEnd) {
-          m.total += job.totalRecharge;
-        }
-      });
-    });
-
-    return months;
-  }, [state.jobs]);
-
-  const upcomingAssignments = useMemo(() => {
+  const upcomingPayments = useMemo(() => {
     const today = startOfDay(new Date());
-    return (state.jobs || [])
-      .filter(job => {
-        if (!job.startDate) return false;
-        const startDate = parseISO(job.startDate);
-        return isValid(startDate) && (isAfter(startDate, today) || isSameDay(startDate, today)) && job.status !== JobStatus.CANCELLED;
+    const limitDate = addDays(today, dueFilterDays);
+    
+    return state.invoices
+      .filter(inv => {
+        if (inv.status === InvoiceStatus.PAID) return false;
+        const dueDate = parseISO(inv.dueDate);
+        return isValid(dueDate) && isAfter(dueDate, today) && isBefore(dueDate, limitDate);
       })
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+      .map(inv => {
+        const job = state.jobs.find(j => j.id === inv.jobId);
+        const client = state.clients.find(c => c.id === job?.clientId);
+        return { ...inv, job, client };
+      })
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  }, [state.invoices, state.jobs, state.clients, dueFilterDays]);
+
+  const jobDistributionData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    state.jobs.forEach(j => {
+      counts[j.status] = (counts[j.status] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [state.jobs]);
 
-  const unpaidInvoices = useMemo(() => {
-    return (state.invoices || [])
-      .filter(inv => inv.status !== InvoiceStatus.PAID)
-      .sort((a, b) => {
-        if (!a.dueDate || !b.dueDate) return 0;
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-      });
-  }, [state.invoices]);
+  const revenueByClientData = useMemo(() => {
+    const clientRev: Record<string, number> = {};
+    state.jobs.forEach(j => {
+      if (j.status === JobStatus.CANCELLED) return;
+      const client = state.clients.find(c => c.id === j.clientId);
+      const name = client?.name || 'Unknown';
+      clientRev[name] = (clientRev[name] || 0) + j.totalRecharge;
+    });
+    return Object.entries(clientRev)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5); // Top 5 clients
+  }, [state.jobs, state.clients]);
 
   return (
     <div className="flex flex-col gap-6 max-w-screen-2xl mx-auto pb-20 px-4">
@@ -125,143 +83,141 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSy
         </div>
       </header>
 
-      {isPro && (
-        <div className="bg-slate-900 rounded-[40px] p-2 flex items-center shadow-2xl relative overflow-hidden group">
-          <div className="w-14 h-14 bg-indigo-600 rounded-[32px] flex items-center justify-center shrink-0 ml-1">
-             <i className={`fa-solid ${isBriefLoading ? 'fa-spinner animate-spin' : 'fa-sparkles'} text-white text-lg`}></i>
-          </div>
-          <div className="px-8 py-4 flex-1">
-             <span className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-1 block">Live Strategy Brief</span>
-             <p className="text-lg font-bold text-white leading-tight">
-               {isBriefLoading ? 'Synthesizing...' : dailyBrief || 'Awaiting synchronization...'}
-             </p>
-          </div>
-          <Link to="/assistant" className="hidden md:flex px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors items-center gap-2">
-            Ask Coach <i className="fa-solid fa-arrow-right text-[8px]"></i>
-          </Link>
-          <div className="absolute top-0 right-0 w-64 h-full bg-gradient-to-l from-indigo-500/10 to-transparent pointer-events-none"></div>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm hover:shadow-md transition-all group">
+        <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm group">
            <div className="flex items-center justify-between mb-4">
-             <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Upcoming Tasks</p>
-             <i className="fa-solid fa-calendar-check text-slate-300 group-hover:text-indigo-600 transition-colors"></i>
+             <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Active Pipeline</p>
+             <i className="fa-solid fa-briefcase text-slate-300 group-hover:text-indigo-600 transition-colors"></i>
            </div>
-           <p className="text-4xl font-black text-slate-900">{upcomingAssignments.length}</p>
-           <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase">Scheduled Projects</p>
+           <p className="text-4xl font-black text-slate-900">{state.jobs.filter(j => j.status === JobStatus.CONFIRMED).length}</p>
+           <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase">Projects in progress</p>
         </div>
 
-        <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm hover:shadow-md transition-all group">
+        <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm group">
            <div className="flex items-center justify-between mb-4">
-             <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Unpaid Ledger</p>
-             <i className="fa-solid fa-credit-card text-slate-300 group-hover:text-rose-500 transition-colors"></i>
+             <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Awaiting Payment</p>
+             <i className="fa-solid fa-clock-rotate-left text-slate-300 group-hover:text-rose-500 transition-colors"></i>
            </div>
-           <p className="text-4xl font-black text-slate-900">{unpaidInvoices.length}</p>
-           <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase">Awaiting Settlement</p>
+           <p className="text-4xl font-black text-slate-900">{state.invoices.filter(i => i.status !== InvoiceStatus.PAID).length}</p>
+           <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase">Pending Settlements</p>
         </div>
 
         <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm">
-           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4">Year-to-Date Revenue</p>
+           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4">Year-to-Date Net</p>
            <p className="text-4xl font-black text-slate-900">{formatCurrency(revStats.ytdRevenue)}</p>
            <div className="w-full h-1 bg-slate-100 rounded-full mt-4 overflow-hidden">
              <div className="h-full bg-indigo-600" style={{ width: `${revStats.percentOfGoal}%` }}></div>
            </div>
         </div>
 
-        <div className="bg-indigo-600 p-6 rounded-[32px] shadow-xl text-white group hover:scale-[1.02] transition-transform">
+        <div className="bg-indigo-600 p-6 rounded-[32px] shadow-xl text-white">
            <p className="text-indigo-200 text-[10px] font-black uppercase tracking-widest mb-4">Projected Annual</p>
            <p className="text-4xl font-black">{formatCurrency(revStats.projectedAnnual)}</p>
-           <p className="text-[9px] font-bold text-indigo-300 mt-4 uppercase">Based on current run-rate</p>
+           <p className="text-[9px] font-bold text-indigo-300 mt-4 uppercase">Run-rate forecast</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8 flex flex-col gap-6">
-           <div className="bg-white rounded-[40px] border border-slate-200 p-10 shadow-sm">
-              <div className="flex items-center justify-between mb-10">
-                 <div>
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Revenue Velocity</h3>
-                    <p className="text-[10px] text-slate-400 font-bold mt-1">Rolling 6-Month Gross Billing</p>
+        <div className="lg:col-span-12 flex flex-col gap-6">
+           {/* Next Payment Due Section */}
+           <div className="bg-white rounded-[40px] border border-slate-200 p-8 shadow-sm">
+             <div className="flex items-center justify-between mb-8">
+               <div>
+                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Next Payments Due</h3>
+                 <p className="text-[10px] text-slate-400 font-bold mt-1">Cashflow forecasting ledger</p>
+               </div>
+               <div className="flex items-center gap-3">
+                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Forecast Range:</label>
+                 <select 
+                    value={dueFilterDays} 
+                    onChange={(e) => setDueFilterDays(Number(e.target.value))}
+                    className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-[10px] font-black uppercase outline-none"
+                 >
+                   <option value={7}>Next 7 Days</option>
+                   <option value={14}>Next 14 Days</option>
+                   <option value={30}>Next 30 Days</option>
+                   <option value={60}>Next 60 Days</option>
+                 </select>
+               </div>
+             </div>
+             
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+               {upcomingPayments.length === 0 ? (
+                 <div className="col-span-full py-12 bg-slate-50 rounded-3xl border border-dashed border-slate-200 text-center">
+                   <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No payments due within this window</p>
                  </div>
-                 <div className="flex gap-4 text-slate-400">
-                   <div className="flex items-center gap-2">
-                     <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
-                     <span className="text-[9px] font-black uppercase">Gross Profit</span>
+               ) : (
+                 upcomingPayments.map(inv => (
+                   <div key={inv.id} className="p-5 bg-slate-50 border border-slate-100 rounded-3xl flex items-center justify-between group hover:border-indigo-200 transition-colors">
+                     <div className="flex-1">
+                        <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">{inv.client?.name}</p>
+                        <p className="text-sm font-black text-slate-900 truncate">{inv.job?.description}</p>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase mt-2">Due in {Math.ceil((new Date(inv.dueDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24))} days</p>
+                     </div>
+                     <div className="text-right ml-4">
+                        <p className="text-lg font-black text-slate-900">{formatCurrency(inv.job?.totalRecharge || 0)}</p>
+                        <Link to={`/invoices`} className="text-[8px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors">View Link</Link>
+                     </div>
                    </div>
-                 </div>
-              </div>
-              <div className="h-[240px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={revenueData}>
-                    <defs>
-                      <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}} dy={10} />
-                    <YAxis hide />
-                    <Tooltip 
-                      contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
-                      formatter={(v: number) => [formatCurrency(v), 'Revenue']}
-                    />
-                    <Area type="monotone" dataKey="total" stroke="#6366f1" strokeWidth={4} fillOpacity={1} fill="url(#colorTotal)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+                 ))
+               )}
+             </div>
            </div>
-           
+
            <div className="h-[600px]">
               <Calendar jobs={state.jobs} externalEvents={state.externalEvents} clients={state.clients} />
            </div>
-        </div>
-        
-        <div className="lg:col-span-4 flex flex-col gap-6">
-           <div className="bg-indigo-600 rounded-[40px] p-10 shadow-2xl text-white relative overflow-hidden min-h-[450px] flex flex-col">
-              <div className="relative z-10 flex flex-col h-full flex-1">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-md border border-white/20">
-                    <i className="fa-solid fa-wand-magic-sparkles text-sm"></i>
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em]">Business Advisor</span>
-                </div>
-                <p className="text-2xl font-black leading-tight flex-1 italic">
-                  "{growthInsight}"
-                </p>
-                <Link to="/assistant" className="mt-12 text-[10px] font-black text-white uppercase tracking-widest bg-white/10 px-6 py-5 rounded-2xl hover:bg-white/20 transition-all text-center border border-white/10">
-                  Open AI Workspace
-                </Link>
-              </div>
-              <div className="absolute top-[-10%] right-[-10%] w-full h-full bg-indigo-500 rounded-full blur-[120px] opacity-20 pointer-events-none"></div>
-           </div>
 
-           <div className="bg-white rounded-[40px] border border-slate-200 p-10 shadow-sm flex flex-col">
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8">Operational Vitals</h4>
-              <div className="space-y-8">
-                 <div className="flex items-center justify-between border-b border-slate-50 pb-6">
-                    <div>
-                      <p className="text-xs font-black text-slate-900">Daily Run Rate</p>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">Rolling average</p>
-                    </div>
-                    <span className="text-sm font-black text-slate-900">{formatCurrency(revStats.dailyRunRate)}</span>
-                 </div>
-                 <div className="flex items-center justify-between border-b border-slate-50 pb-6">
-                    <div>
-                      <p className="text-xs font-black text-slate-900">Client Distribution</p>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">Portfolio health</p>
-                    </div>
-                    <span className="text-[10px] font-black text-emerald-500 uppercase bg-emerald-50 px-3 py-1 rounded-lg">Healthy</span>
-                 </div>
-                 <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-black text-slate-900">Pipeline Velocity</p>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">Lead processing</p>
-                    </div>
-                    <span className="text-[10px] font-black text-indigo-600 uppercase bg-indigo-50 px-3 py-1 rounded-lg">Optimized</span>
-                 </div>
+           {/* Pie Charts Row */}
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+              <div className="bg-white rounded-[40px] border border-slate-200 p-8 shadow-sm h-[400px] flex flex-col">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Job Status Distribution</h4>
+                <div className="flex-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={jobDistributionData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {jobDistributionData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-[40px] border border-slate-200 p-8 shadow-sm h-[400px] flex flex-col">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Revenue by Client (Top 5)</h4>
+                <div className="flex-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={revenueByClientData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {revenueByClientData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                      <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
            </div>
         </div>

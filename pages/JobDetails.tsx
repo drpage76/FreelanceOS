@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 
@@ -38,12 +37,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   
   const docRef = useRef<HTMLDivElement>(null);
 
-  const handleShiftChange = (index: number, field: keyof JobShift, value: any) => {
-    const next = [...shifts];
-    (next[index] as any)[field] = value;
-    setShifts(next);
-  };
-
   const fetchData = async () => {
     if (!id) return;
     try {
@@ -57,6 +50,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         setJob(foundJob);
         if (!selectedInvoiceDate) setSelectedInvoiceDate(foundJob.endDate);
         
+        // Use shifts from job object first (pre-loaded in DB.getJobs)
         if (foundJob.shifts && foundJob.shifts.length > 0) {
           setShifts(foundJob.shifts);
         } else {
@@ -84,6 +78,32 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
   const totalRecharge = useMemo(() => items.reduce((sum, item) => sum + (item.qty * item.unitPrice), 0), [items]);
 
+  const handleShiftChange = (index: number, field: keyof JobShift, value: any) => {
+    const next = [...shifts];
+    (next[index] as any)[field] = value;
+    setShifts(next);
+  };
+
+  const handleAddShift = () => {
+    if (!job) return;
+    const newShift: JobShift = {
+      id: generateId(),
+      jobId: job.id,
+      title: 'New Shift',
+      startDate: job.startDate,
+      endDate: job.endDate,
+      startTime: '09:00',
+      endTime: '17:30',
+      isFullDay: true,
+      tenant_id: job.tenant_id
+    };
+    setShifts([...shifts, newShift]);
+  };
+
+  const handleRemoveShift = (id: string) => {
+    setShifts(shifts.filter(s => s.id !== id));
+  };
+
   const handleUpdateJob = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!job || isSaving) return;
@@ -95,9 +115,10 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     let startDate = (formData.get('startDate') as string) || job.startDate;
     let endDate = (formData.get('endDate') as string) || job.endDate;
 
+    // Recalculate job dates based on shifts if shift-based
     if (job.schedulingType === SchedulingType.SHIFT_BASED && shifts.length > 0) {
-      const sortedStarts = shifts.map(s => s.startDate).filter(Boolean).sort();
-      const sortedEnds = shifts.map(s => s.endDate).filter(Boolean).sort();
+      const sortedStarts = [...shifts].map(s => s.startDate).filter(Boolean).sort();
+      const sortedEnds = [...shifts].map(s => s.endDate).filter(Boolean).sort();
       if (sortedStarts.length > 0) startDate = sortedStarts[0];
       if (sortedEnds.length > 0) endDate = sortedEnds[sortedEnds.length - 1];
     }
@@ -111,11 +132,13 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       startDate,
       endDate,
       totalRecharge: totalRecharge,
-      shifts: shifts 
+      shifts: shifts // Pass explicitly to DB.saveJob
     };
 
     try {
+      // Save Job and Shifts together via hardened DB.saveJob
       await DB.saveJob(updatedJob);
+      
       const finalItems = items.map(it => ({ 
         ...it, 
         jobId: job.id, 
@@ -129,6 +152,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
       setJob(updatedJob);
       await onRefresh();
+      alert("Project Workspace Synchronized.");
     } catch (err: any) {
       alert(`Sync Error: ${err.message}`);
     } finally {
@@ -295,7 +319,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-20">
-      {/* Modals for Invoice generation and Payment recording */}
       {showInvoiceModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
            <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200 animate-in zoom-in-95">
@@ -312,7 +335,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         </div>
       )}
 
-      {/* Payment Modal */}
       {showPaymentModal && invoice && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
            <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200 animate-in zoom-in-95">
@@ -327,7 +349,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         </div>
       )}
 
-      {/* Quote Preview Modal */}
       {showQuotePreview && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 overflow-y-auto">
            <div className="bg-white rounded-[40px] w-full max-w-4xl shadow-2xl border border-slate-200 animate-in zoom-in-95 my-auto overflow-hidden">
@@ -345,7 +366,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         </div>
       )}
 
-      {/* Invoice Preview Modal */}
       {showInvoicePreview && invoice && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 overflow-y-auto">
            <div className="bg-white rounded-[40px] w-full max-w-4xl shadow-2xl border border-slate-200 animate-in zoom-in-95 my-auto overflow-hidden">
@@ -431,15 +451,34 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 {job.schedulingType === SchedulingType.SHIFT_BASED ? (
                   <div className="space-y-4">
                     {shifts.map((s, idx) => (
-                      <div key={s.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                        <input className="px-3 py-2 bg-slate-50 rounded-lg text-xs font-black border-none w-full mb-3 outline-none" placeholder="Shift Label" value={s.title} onChange={e => handleShiftChange(idx, 'title', e.target.value)} />
+                      <div key={s.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative group">
+                        <button type="button" onClick={() => handleRemoveShift(s.id)} className="absolute top-4 right-4 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"><i className="fa-solid fa-trash-can"></i></button>
+                        <input className="px-3 py-2 bg-slate-50 rounded-lg text-xs font-black border-none w-[90%] mb-3 outline-none" placeholder="Shift Label" value={s.title} onChange={e => handleShiftChange(idx, 'title', e.target.value)} />
                         <div className="grid grid-cols-2 gap-2">
-                           <input type="date" className="px-2 py-2 bg-slate-50 rounded-lg text-[10px] font-bold border-none outline-none" value={s.startDate} onChange={e => handleShiftChange(idx, 'startDate', e.target.value)} />
-                           <input type="date" className="px-2 py-2 bg-slate-50 rounded-lg text-[10px] font-bold border-none outline-none" value={s.endDate} onChange={e => handleShiftChange(idx, 'endDate', e.target.value)} />
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black text-slate-300 uppercase px-1">Start</label>
+                            <input type="date" className="w-full px-2 py-2 bg-slate-50 rounded-lg text-[10px] font-bold border-none outline-none" value={s.startDate} onChange={e => handleShiftChange(idx, 'startDate', e.target.value)} />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black text-slate-300 uppercase px-1">End</label>
+                            <input type="date" className="w-full px-2 py-2 bg-slate-50 rounded-lg text-[10px] font-bold border-none outline-none" value={s.endDate} onChange={e => handleShiftChange(idx, 'endDate', e.target.value)} />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-50">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" className="w-3 h-3 rounded" checked={s.isFullDay} onChange={e => handleShiftChange(idx, 'isFullDay', e.target.checked)} />
+                            <span className="text-[9px] font-black text-slate-400 uppercase">Full Day</span>
+                          </label>
+                          {!s.isFullDay && (
+                            <div className="flex-1 grid grid-cols-2 gap-2 animate-in fade-in">
+                               <input type="time" className="px-2 py-1 bg-slate-50 rounded text-[10px] font-bold border-none outline-none" value={s.startTime} onChange={e => handleShiftChange(idx, 'startTime', e.target.value)} />
+                               <input type="time" className="px-2 py-1 bg-slate-50 rounded text-[10px] font-bold border-none outline-none" value={s.endTime} onChange={e => handleShiftChange(idx, 'endTime', e.target.value)} />
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
-                    <button type="button" onClick={() => setShifts([...shifts, { id: generateId(), jobId: job.id, title: 'New Shift', startDate: job.startDate, endDate: job.endDate, startTime: '09:00', endTime: '17:00', isFullDay: true, tenant_id: job.tenant_id }])} className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest">+ Add Shift</button>
+                    <button type="button" onClick={handleAddShift} className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-white transition-all">+ Add Discrete Shift</button>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-4">
