@@ -55,7 +55,9 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
     }
 
     try {
-      const redirectTo = window.location.origin;
+      // FIX: Use the full current URL (including /FreelanceOS/) for the redirect
+      // This ensures Supabase knows to send the user back to the live site.
+      const redirectTo = window.location.origin + window.location.pathname;
       
       const { error } = await (client.auth as any).signInWithOAuth({
         provider: 'google',
@@ -64,7 +66,6 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
           queryParams: {
             prompt: 'select_account',
             access_type: 'offline',
-            // Using the full calendar scope to allow discovery and interaction with secondary calendars
             scope: 'openid email profile https://www.googleapis.com/auth/calendar'
           }
         }
