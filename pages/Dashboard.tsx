@@ -1,14 +1,14 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area
 } from 'recharts';
 
 const { Link } = ReactRouterDOM;
 
 import { AppState, JobStatus, InvoiceStatus, UserPlan } from '../types';
-import { formatCurrency, formatDate, calculateRevenueStats } from '../utils';
+import { formatCurrency, calculateRevenueStats } from '../utils';
 import { Calendar } from '../components/Calendar';
 import { parseISO, isAfter, startOfDay, isSameDay, isValid, format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { getBusinessInsights } from '../services/gemini';
@@ -147,7 +147,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSy
         <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm hover:shadow-md transition-all group">
            <div className="flex items-center justify-between mb-4">
              <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Upcoming Tasks</p>
-             <i className="fa-solid fa-calendar-check text-slate-100 group-hover:text-indigo-600 transition-colors"></i>
+             <i className="fa-solid fa-calendar-check text-slate-300 group-hover:text-indigo-600 transition-colors"></i>
            </div>
            <p className="text-4xl font-black text-slate-900">{upcomingAssignments.length}</p>
            <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase">Scheduled Projects</p>
@@ -156,7 +156,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSy
         <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm hover:shadow-md transition-all group">
            <div className="flex items-center justify-between mb-4">
              <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Unpaid Ledger</p>
-             <i className="fa-solid fa-credit-card text-slate-100 group-hover:text-rose-500 transition-colors"></i>
+             <i className="fa-solid fa-credit-card text-slate-300 group-hover:text-rose-500 transition-colors"></i>
            </div>
            <p className="text-4xl font-black text-slate-900">{unpaidInvoices.length}</p>
            <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase">Awaiting Settlement</p>
@@ -185,10 +185,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSy
                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Revenue Velocity</h3>
                     <p className="text-[10px] text-slate-400 font-bold mt-1">Rolling 6-Month Gross Billing</p>
                  </div>
-                 <div className="flex gap-4">
+                 <div className="flex gap-4 text-slate-400">
                    <div className="flex items-center gap-2">
                      <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
-                     <span className="text-[9px] font-black text-slate-400 uppercase">Gross Profit</span>
+                     <span className="text-[9px] font-black uppercase">Gross Profit</span>
                    </div>
                  </div>
               </div>
@@ -202,6 +202,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSy
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    {/* Fixed: Changed fontBold to fontWeight to satisfy SVGProps type requirements */}
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 900, fill: '#94a3b8'}} dy={10} />
                     <YAxis hide />
                     <Tooltip 

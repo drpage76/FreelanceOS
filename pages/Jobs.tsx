@@ -125,7 +125,7 @@ export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) =
                 <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest">Project & Venue</th>
                 <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest">Production Date</th>
                 <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Recharge</th>
+                <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Revenue</th>
                 <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Manage</th>
               </tr>
             </thead>
@@ -169,7 +169,7 @@ export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) =
                             </button>
                           )}
                           {hasInvoice && (
-                             <div className="w-11 h-11 flex items-center justify-center rounded-[18px] bg-slate-50 text-slate-300 border border-slate-100">
+                             <div className="w-11 h-11 flex items-center justify-center rounded-[18px] bg-slate-50 text-slate-300 border border-slate-100" title="Invoiced">
                                <i className="fa-solid fa-check-double text-xs"></i>
                              </div>
                           )}

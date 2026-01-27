@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 
@@ -95,10 +94,11 @@ const App: React.FC = () => {
       hasLoadedOnce.current = true;
     } catch (err) {
       console.error("Critical Load Error:", err);
-      setRuntimeError("Synchronization Interrupted. Please refresh the page.");
+      // No longer setting fatal runtime error to prevent infinite blue circle
     } finally {
       setIsSyncing(false);
       syncInProgress.current = false;
+      setIsLoading(false); // CRITICAL: Always release loading state
     }
   }, [getLatestToken]);
 
@@ -113,10 +113,11 @@ const App: React.FC = () => {
         if (user) {
           setCurrentUser(user);
           await loadData(user);
+        } else {
+          setIsLoading(false);
         }
       } catch (e) {
         console.error("Initialization Failed:", e);
-      } finally {
         setIsLoading(false);
       }
     };
@@ -139,24 +140,12 @@ const App: React.FC = () => {
           setAppState({
             user: null, clients: [], jobs: [], quotes: [], externalEvents: [], jobItems: [], invoices: [], mileage: [],
           });
+          setIsLoading(false);
         }
       });
       return () => subscription.unsubscribe();
     }
   }, [loadData]);
-
-  if (runtimeError) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-20 h-20 bg-rose-500/20 rounded-[32px] flex items-center justify-center text-rose-500 mb-6">
-          <i className="fa-solid fa-triangle-exclamation text-3xl"></i>
-        </div>
-        <h1 className="text-white text-2xl font-black mb-2 tracking-tight">System Interruption</h1>
-        <p className="text-slate-400 max-w-sm mb-8 text-sm font-medium">{runtimeError}</p>
-        <button onClick={() => window.location.reload()} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl">Re-establish Connection</button>
-      </div>
-    );
-  }
 
   if (isLoading) return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-6">

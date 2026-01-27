@@ -128,9 +128,8 @@ export const DB = {
     try {
       const client = getSupabase();
       if (!client) return { success: false };
-      const { count: c } = await client.from('clients').select('*', { count: 'exact', head: true });
-      const { count: j } = await client.from('jobs').select('*', { count: 'exact', head: true });
-      return { success: true, counts: { clients: c || 0, jobs: j || 0 } };
+      const { count: c } = await client.from('clients').select('*', { count: 'exact', head: true }).limit(0);
+      return { success: true };
     } catch { return { success: false }; }
   },
 
