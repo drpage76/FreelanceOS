@@ -54,14 +54,15 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
     }
 
     try {
-      // Force a clean redirect URL that includes the subfolder and trailing slash
-      // window.location.origin = https://drpage76.github.io
       const origin = window.location.origin;
       
-      // On GitHub Pages, the base path is /FreelanceOS/
-      // We force this to ensure we don't land on a 404 at the root
-      const basePath = '/FreelanceOS/';
-      const redirectTo = origin + basePath;
+      // Dynamic Redirect:
+      // If we are on the custom domain (freelanceos.org), redirect to root.
+      // If we are on GitHub Pages (github.io), redirect to the subfolder.
+      let redirectTo = origin + '/';
+      if (origin.includes('github.io')) {
+        redirectTo = origin + '/FreelanceOS/';
+      }
       
       console.log("Redirecting to:", redirectTo);
 

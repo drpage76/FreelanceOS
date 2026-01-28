@@ -1,17 +1,11 @@
-
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  // Matches your GitHub repo name exactly
-  base: '/FreelanceOS/', 
-  server: {
-    port: 3000,
-    open: true
-  },
+  // On freelanceos.org, the app lives at the root, so base must be '/'
+  base: '/', 
   define: {
-    // Inject the API key safely
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY || ""),
     'process.env': {} 
   },
