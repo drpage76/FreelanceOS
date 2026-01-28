@@ -1,4 +1,3 @@
-
 export enum JobStatus {
   POTENTIAL = 'Potential',
   PENCILLED = 'Pencilled',
@@ -23,11 +22,13 @@ export enum QuoteStatus {
   EXPIRED = 'Expired'
 }
 
+// Added FREE member to UserPlan enum to support default user states and feature gating logic
 export enum UserPlan {
   FREE = 'Free',
-  PRO_MONTHLY = 'Pro Monthly',
-  PRO_YEARLY = 'Pro Yearly',
-  PRO_COMPLIMENTARY = 'Pro Complimentary'
+  TRIAL = '3-Month Trial',
+  PRO = 'Pro Monthly',
+  BETA = 'Beta Founder (Free)',
+  EXPIRED = 'Trial Expired'
 }
 
 export enum SchedulingType {
@@ -136,6 +137,7 @@ export interface Tenant {
   bankDetails: string;
   logoUrl?: string;
   plan: UserPlan;
+  trialStartDate?: string;
   stripeCustomerId?: string;
   isVatRegistered?: boolean;
   vatNumber?: string;

@@ -1,13 +1,19 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DB } from '../services/db';
-import { Tenant, UserPlan, JobStatus, InvoiceStatus } from '../types';
+import { Tenant, UserPlan } from '../types';
+import { differenceInDays, parseISO, addMonths } from 'date-fns';
 
 interface SettingsProps {
   user: Tenant | null;
   onLogout: () => void;
   onRefresh: () => void;
 }
+
+// BETA WHITELIST (Add your free users here)
+const BETA_EMAILS = [
+  'admin@freelanceos.com',
+  'drpage76@gmail.com'
+];
 
 export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'system'>('profile');
@@ -16,11 +22,6 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | undefined>(user?.logoUrl);
   const [cloudStatus, setCloudStatus] = useState<'checking' | 'online' | 'offline'>('checking');
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
-
-  const aiKeyStatus = process.env.API_KEY && process.env.API_KEY !== "undefined" ? 'Active' : 'Missing';
-  const repoUrl = "https://github.com/drpage76/FreelanceOS";
-  const liveUrl = "https://drpage76.github.io/FreelanceOS/";
 
   const checkCloud = async () => {
     setCloudStatus('checking');
@@ -30,20 +31,19 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
     onRefresh();
   };
 
-  useEffect(() => {
-    checkCloud();
-  }, []);
+  useEffect(() => { checkCloud(); }, []);
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  const trialInfo = useMemo(() => {
+    if (!user) return null;
+    if (BETA_EMAILS.includes(user.email)) return { type: 'beta', daysLeft: Infinity };
+    
+    // Trial logic based on 90 days from signup
+    // In production, trialStartDate would be set in Supabase metadata
+    const start = user.trialStartDate ? parseISO(user.trialStartDate) : new Date();
+    const expiry = addMonths(start, 3);
+    const daysLeft = differenceInDays(expiry, new Date());
+    return { type: 'trial', daysLeft: Math.max(0, daysLeft) };
+  }, [user]);
 
   const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -52,13 +52,12 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
     try {
       const formData = new FormData(e.currentTarget);
       const updated: Tenant = {
-        email: user?.email || '',
+        ...user!,
         name: (formData.get('name') as string) || user?.name || '',
         businessName: (formData.get('businessName') as string) || user?.businessName || '',
         businessAddress: (formData.get('businessAddress') as string) || user?.businessAddress || '',
         bankDetails: (formData.get('bankDetails') as string) || user?.bankDetails || '',
         logoUrl: logoPreview,
-        plan: user?.plan || UserPlan.FREE,
         isVatRegistered: formData.get('isVat') === 'on',
         vatNumber: (formData.get('vatNumber') as string) || ''
       };
@@ -66,37 +65,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
       setSaveSuccess(true);
       onRefresh();
       setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (err: any) { 
-      setErrorMsg(err.message);
-    } finally { setIsSaving(false); }
-  };
-
-  const handleUpgrade = async (plan: UserPlan) => {
-    setIsSaving(true);
-    try {
-      if (!user) return;
-      const updated: Tenant = { ...user, plan };
-      await DB.updateTenant(updated);
-      onRefresh();
-      alert(`Account Synchronized! You are now a ${plan} member.`);
-    } catch (err) {
-      alert("Billing sync interrupted.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const copyAdoptionScript = () => {
-    const email = user?.email || 'your@email.com';
-    const sql = `-- SECURITY & MULTI-USER SYNC
-ALTER TABLE IF EXISTS jobs ADD COLUMN IF NOT EXISTS po_number TEXT;
-ALTER TABLE IF EXISTS jobs ADD COLUMN IF NOT EXISTS scheduling_type TEXT DEFAULT 'Continuous';
-CREATE TABLE IF NOT EXISTS job_shifts (id UUID PRIMARY KEY, job_id TEXT, title TEXT, start_date DATE, end_date DATE, start_time TIME, end_time TIME, is_full_day BOOLEAN DEFAULT FALSE, tenant_id TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW());
-ALTER TABLE job_shifts ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "shift_isolation" ON job_shifts FOR ALL USING (tenant_id = (auth.jwt() ->> 'email'));
-UPDATE clients SET tenant_id = '${email}' WHERE tenant_id IS NULL;`;
-    navigator.clipboard.writeText(sql);
-    alert("Script copied!");
+    } catch (err: any) { setErrorMsg(err.message); } finally { setIsSaving(false); }
   };
 
   return (
@@ -104,12 +73,10 @@ UPDATE clients SET tenant_id = '${email}' WHERE tenant_id IS NULL;`;
       <header className="flex items-center justify-between">
         <div>
           <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Settings</h2>
-          <p className="text-slate-500 font-medium mt-1">Manage your professional presence and cloud subscription.</p>
+          <p className="text-slate-500 font-medium mt-1">Founding Beta Access Member</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={onLogout} className="px-6 py-3 text-slate-400 hover:text-rose-600 font-black text-[10px] uppercase tracking-widest transition-all">
-            Sign Out
-          </button>
+          <button onClick={onLogout} className="px-6 py-3 text-slate-400 hover:text-rose-600 font-black text-[10px] uppercase tracking-widest transition-all">Sign Out</button>
           <div className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 border ${cloudStatus === 'online' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${cloudStatus === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
             {cloudStatus}
@@ -125,34 +92,16 @@ UPDATE clients SET tenant_id = '${email}' WHERE tenant_id IS NULL;`;
 
       {activeTab === 'profile' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in fade-in slide-in-from-bottom-2">
-          <div className="lg:col-span-8 space-y-8">
+          <div className="lg:col-span-8">
             <form onSubmit={handleUpdateProfile} className="bg-white p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-12">
-              <div className="flex flex-col md:flex-row gap-8 items-center p-8 bg-slate-50 rounded-[32px] border border-slate-100">
-                 <div className="w-40 h-40 bg-white rounded-3xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shadow-inner group relative">
-                   {logoPreview ? (
-                     <img src={logoPreview} alt="Logo" className="max-w-full max-h-full object-contain p-2" />
-                   ) : (
-                     <div className="text-center p-4">
-                        <i className="fa-solid fa-image text-slate-200 text-3xl mb-2"></i>
-                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Brand Logo</p>
-                     </div>
-                   )}
-                   <input type="file" accept="image/*" onChange={handleLogoUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
-                 </div>
-                 <div className="flex-1 space-y-2">
-                   <h4 className="font-black text-slate-900 text-lg">Branding Identity</h4>
-                   <p className="text-xs font-bold text-slate-500 leading-relaxed">Your logo will appear on all client-facing invoices and PDFs.</p>
-                 </div>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase block px-1 tracking-widest">Legal Name</label>
-                  <input name="name" defaultValue={user?.name} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all" />
+                  <input name="name" defaultValue={user?.name} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase block px-1 tracking-widest">Trading Name</label>
-                  <input name="businessName" defaultValue={user?.businessName} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all" />
+                  <input name="businessName" defaultValue={user?.businessName} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
                 </div>
                 <div className="md:col-span-2 space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase block px-1 tracking-widest">Billing Address</label>
@@ -160,44 +109,28 @@ UPDATE clients SET tenant_id = '${email}' WHERE tenant_id IS NULL;`;
                 </div>
                 <div className="md:col-span-2 space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase block px-1 tracking-widest">Bank Details</label>
-                  <input name="bankDetails" defaultValue={user?.bankDetails} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-sm outline-none" placeholder="Sort Code: 00-00-00, Account: 00000000" />
+                  <input name="bankDetails" defaultValue={user?.bankDetails} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-sm outline-none" />
                 </div>
               </div>
-
               <button type="submit" disabled={isSaving} className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-sm uppercase shadow-2xl hover:bg-black transition-all">
-                {isSaving ? 'Synchronizing...' : 'Update Records'}
+                {isSaving ? 'Updating...' : 'Save Profile Changes'}
               </button>
             </form>
           </div>
           <div className="lg:col-span-4 space-y-6">
-            <div className="bg-indigo-600 p-8 rounded-[40px] text-white shadow-2xl h-fit">
-               <h3 className="text-xl font-black mb-4">Account Tier</h3>
+            <div className="bg-indigo-600 p-8 rounded-[40px] text-white shadow-2xl">
+               <h3 className="text-xl font-black mb-4">Access Level</h3>
                <div className="bg-white/10 border border-white/20 p-6 rounded-3xl mb-6">
                   <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">Status</p>
-                  <p className="text-2xl font-black">{user?.plan || 'Standard User'}</p>
+                  <p className="text-2xl font-black">{trialInfo?.type === 'beta' ? 'Founder Member' : 'Full Pro Trial'}</p>
                </div>
-               <p className="text-xs font-medium text-indigo-100 leading-relaxed mb-8 opacity-70">
-                 {user?.plan === UserPlan.FREE 
-                   ? "You are using the Lite edition. Cloud synchronization and AI features are restricted." 
-                   : "Pro features are active. You have full access to AI coaching and cloud multi-device sync."}
-               </p>
-               <button onClick={() => setActiveTab('billing')} className="w-full py-4 bg-white text-indigo-600 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg">Manage Subscription</button>
-            </div>
-
-            <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
-               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deployment Status</h3>
-               <div className="space-y-4">
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Live Production URL</p>
-                    <a href={liveUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-indigo-600 break-all hover:underline">{liveUrl}</a>
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Action Pipeline</p>
-                    <a href={`${repoUrl}/actions`} target="_blank" rel="noreferrer" className="text-xs font-bold text-slate-900 hover:text-indigo-600 flex items-center gap-2">
-                       <i className="fa-solid fa-code-branch"></i> GitHub Console <i className="fa-solid fa-arrow-up-right-from-square text-[8px]"></i>
-                    </a>
-                  </div>
-               </div>
+               {trialInfo?.type === 'trial' && (
+                  <p className="text-xs font-medium text-indigo-100 mb-8 opacity-70">You have {trialInfo.daysLeft} days left in your free founding trial. All features are currently active.</p>
+               )}
+               {trialInfo?.type === 'beta' && (
+                  <p className="text-xs font-medium text-indigo-100 mb-8 opacity-70">Welcome back! As an original Beta Founding Member, you have permanent free access to the OS.</p>
+               )}
+               <button onClick={() => setActiveTab('billing')} className="w-full py-4 bg-white text-indigo-600 rounded-2xl font-black text-[10px] uppercase tracking-widest">View Billing Details</button>
             </div>
           </div>
         </div>
@@ -206,111 +139,58 @@ UPDATE clients SET tenant_id = '${email}' WHERE tenant_id IS NULL;`;
       {activeTab === 'billing' && (
         <div className="animate-in fade-in slide-in-from-bottom-2 space-y-8">
           <div className="bg-white rounded-[40px] border border-slate-200 p-12 shadow-sm text-center">
-            <h3 className="text-3xl font-black text-slate-900 mb-2">Choose Your Scale</h3>
-            <p className="text-slate-500 font-medium mb-10">Scalable infrastructure for independent professionals.</p>
+            <h3 className="text-3xl font-black text-slate-900 mb-2">Simple, Fair Pricing.</h3>
+            <p className="text-slate-500 font-medium mb-10">We don't do "Lite" versions. Every freelancer deserves the best tools.</p>
 
-            <div className="flex items-center justify-center gap-4 mb-12">
-              <span className={`text-[10px] font-black uppercase tracking-widest ${billingCycle === 'monthly' ? 'text-slate-900' : 'text-slate-400'}`}>Monthly</span>
-              <button onClick={() => setBillingCycle(prev => prev === 'monthly' ? 'yearly' : 'monthly')} className={`w-14 h-8 rounded-full transition-all relative ${billingCycle === 'yearly' ? 'bg-indigo-600' : 'bg-slate-200'}`}>
-                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${billingCycle === 'yearly' ? 'left-7' : 'left-1'}`} />
-              </button>
-              <span className={`text-[10px] font-black uppercase tracking-widest ${billingCycle === 'yearly' ? 'text-slate-900' : 'text-slate-400'}`}>Yearly <span className="text-emerald-500">(20% OFF)</span></span>
+            <div className="max-w-xl mx-auto bg-indigo-600 p-10 rounded-[50px] text-white shadow-2xl relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-8 opacity-10"><i className="fa-solid fa-crown text-6xl"></i></div>
+               <h4 className="text-xl font-black mb-1">FreelanceOS Pro</h4>
+               <p className="text-indigo-200 text-xs mb-8">Everything Included</p>
+               
+               <div className="flex flex-col items-center mb-10">
+                  <div className="text-7xl font-black">£4.99<span className="text-lg text-indigo-300">/mo</span></div>
+                  <div className="mt-4 px-4 py-2 bg-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-emerald-300">
+                    3 Months Free Trial Included
+                  </div>
+               </div>
+
+               <div className="grid grid-cols-2 gap-4 text-left text-xs font-bold text-indigo-100 mb-10">
+                  <div className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> AI Strategic Hub</div>
+                  <div className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Cloud Sync</div>
+                  <div className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Calendar Automation</div>
+                  <div className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> No Ads / No Walls</div>
+               </div>
+
+               {trialInfo?.type === 'beta' ? (
+                 <div className="w-full py-5 bg-emerald-500 text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-lg">Founding Member — Free for life</div>
+               ) : (
+                 <button className="w-full py-5 bg-white text-indigo-600 rounded-3xl font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.02] transition-all">Subscribe via Stripe</button>
+               )}
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-              <div className="bg-slate-50 border border-slate-200 p-8 rounded-[32px] flex flex-col items-start text-left">
-                <h4 className="text-lg font-black text-slate-900 mb-1 self-start">Lite Tier</h4>
-                <p className="text-slate-500 text-xs mb-6 self-start">Essential ledger tools.</p>
-                <div className="text-4xl font-black mb-8">£0 <span className="text-xs font-bold text-slate-400">/ forever</span></div>
-                <ul className="space-y-4 mb-10 w-full text-xs font-bold text-slate-600">
-                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-500"></i> Full Invoicing & Quotes</li>
-                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-500"></i> Mileage Records</li>
-                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-500"></i> Local Data Isolation</li>
-                  <li className="flex items-center gap-2"><i className="fa-solid fa-xmark text-rose-300"></i> AI Strategic Coaching</li>
-                </ul>
-                <button 
-                  disabled={user?.plan === UserPlan.FREE} 
-                  onClick={() => handleUpgrade(UserPlan.FREE)}
-                  className="w-full py-4 bg-slate-200 text-slate-400 rounded-2xl font-black text-[10px] uppercase transition-all"
-                >
-                  {user?.plan === UserPlan.FREE ? 'Active Selection' : 'Downgrade to Lite'}
-                </button>
-              </div>
-
-              <div className="bg-indigo-600 border border-indigo-700 p-8 rounded-[32px] flex flex-col items-start text-left text-white shadow-2xl shadow-indigo-200 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-6 bg-white/10 rounded-bl-3xl">
-                  <i className="fa-solid fa-bolt text-indigo-300"></i>
-                </div>
-                <h4 className="text-lg font-black mb-1 self-start">Professional Cloud</h4>
-                <p className="text-indigo-200 text-xs mb-6 self-start">Full business OS suite.</p>
-                <div className="text-4xl font-black mb-8">
-                  {billingCycle === 'monthly' ? '£19' : '£15'}<span className="text-xs font-bold text-indigo-300"> / month</span>
-                </div>
-                <ul className="space-y-4 mb-10 w-full text-xs font-bold text-indigo-100">
-                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Unlimited Multi-Device Sync</li>
-                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Gemini AI Strategic Hub</li>
-                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Advanced Calendar Routing</li>
-                  <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Google Search Grounding</li>
-                </ul>
-                <button 
-                  disabled={user?.plan !== UserPlan.FREE && user?.plan !== undefined}
-                  onClick={() => handleUpgrade(billingCycle === 'monthly' ? UserPlan.PRO_MONTHLY : UserPlan.PRO_YEARLY)} 
-                  className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase shadow-xl hover:scale-[1.02] transition-all ${user?.plan !== UserPlan.FREE ? 'bg-indigo-500 text-indigo-200 cursor-default' : 'bg-white text-indigo-600'}`}
-                >
-                  {user?.plan !== UserPlan.FREE ? 'Pro Tier Active' : 'Upgrade to Pro'}
-                </button>
-              </div>
-            </div>
+            
+            <p className="mt-8 text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Next Payment Due: {trialInfo?.daysLeft === Infinity ? 'Never' : `${trialInfo?.daysLeft} days`}</p>
           </div>
         </div>
       )}
 
       {activeTab === 'system' && (
         <div className="animate-in fade-in slide-in-from-bottom-2 grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="bg-slate-900 rounded-[40px] p-10 text-white shadow-2xl border border-slate-700">
-            <h3 className="text-xl font-black mb-6 flex items-center gap-3">
-              <i className="fa-solid fa-microchip text-indigo-400"></i> 
-              Infrastructure
-            </h3>
+          <div className="bg-slate-900 rounded-[40px] p-10 text-white shadow-2xl">
+            <h3 className="text-xl font-black mb-6">Cloud Pulse</h3>
             <div className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b border-white/5">
-                  <span className="text-xs font-bold text-slate-400">Cloud Sync (Supabase)</span>
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${cloudStatus === 'online' ? 'text-emerald-400' : 'text-rose-400'}`}>{cloudStatus}</span>
+                  <span className="text-xs font-bold text-slate-400">Database Engine</span>
+                  <span className={`text-[10px] font-black uppercase ${cloudStatus === 'online' ? 'text-emerald-400' : 'text-rose-400'}`}>{cloudStatus}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-white/5">
-                  <span className="text-xs font-bold text-slate-400">AI Intelligence (Gemini)</span>
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${aiKeyStatus === 'Active' ? 'text-emerald-400' : 'text-amber-400'}`}>{aiKeyStatus}</span>
+                  <span className="text-xs font-bold text-slate-400">AI Intelligence</span>
+                  <span className="text-[10px] font-black text-emerald-400 uppercase">Flash-Native active</span>
                 </div>
-            </div>
-            <div className="mt-8 space-y-4">
-              <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                Database Migration: If you have records from a local session, run this script in your Supabase SQL editor.
-              </p>
-              <button onClick={copyAdoptionScript} className="w-full py-4 bg-white/10 text-indigo-400 border border-indigo-400/20 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all">
-                Copy Migration Script
-              </button>
             </div>
           </div>
-
           <div className="bg-white rounded-[40px] p-10 border border-slate-200 shadow-sm flex flex-col justify-between">
-            <div>
-              <h3 className="text-xl font-black text-slate-900 mb-4">Version Info</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center py-2 border-b border-slate-50">
-                  <span className="text-xs font-bold text-slate-500">Core Engine</span>
-                  <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">React 19 / Vite</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-slate-50">
-                  <span className="text-xs font-bold text-slate-500">Security Policy</span>
-                  <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Auth RLS Active</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-slate-50">
-                  <span className="text-xs font-bold text-slate-500">Deployment</span>
-                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Continuous (GitHub Pages)</span>
-                </div>
-              </div>
-            </div>
-            <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mt-8">Build v3.2.5-stable</p>
+            <div><h3 className="text-xl font-black text-slate-900 mb-4">Version Info</h3><p className="text-xs font-medium text-slate-500 leading-relaxed">FreelanceOS Beta v3.5. Optimized for high-velocity solo operations. All systems operational.</p></div>
+            <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mt-8">Build Stable-Beta-Release</p>
           </div>
         </div>
       )}
