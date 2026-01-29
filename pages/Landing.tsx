@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Auth } from '../components/Auth';
 
@@ -31,7 +30,7 @@ export const Landing: React.FC = () => {
                </button>
                <button 
                  onClick={() => setShowAuth(true)}
-                 className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:bg-indigo-500 transition-all"
+                 className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:bg-indigo-50 transition-all"
                >
                  Create Account
                </button>
@@ -53,7 +52,7 @@ export const Landing: React.FC = () => {
                 One Engine. <br/> 
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-emerald-400 to-indigo-400">Total Control.</span>
               </h1>
-              <p className="text-indigo-400 text-xl font-bold tracking-tight">
+              <p className="text-indigo-400 text-xl md:text-2xl font-black tracking-tight italic">
                 “Jobs, invoices, and time — simplified.”
               </p>
             </div>
@@ -102,8 +101,8 @@ export const Landing: React.FC = () => {
                     alt="Dashboard Preview" 
                     className="rounded-[40px] shadow-inner opacity-60 group-hover:opacity-100 transition-opacity max-h-[380px] object-cover"
                   />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center shadow-2xl animate-pulse">
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-16 h-16 bg-indigo-600/80 rounded-full flex items-center justify-center shadow-2xl animate-pulse">
                       <i className="fa-solid fa-bolt text-xl text-white"></i>
                     </div>
                   </div>

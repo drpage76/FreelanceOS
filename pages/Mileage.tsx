@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { AppState, MileageRecord } from '../types';
 import { DB, generateId } from '../services/db';
@@ -38,7 +37,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
       if (key !== lastCalculatedRef.current) {
         const timer = setTimeout(() => {
           handleCalculateMileage();
-        }, 2000); 
+        }, 1500); 
         return () => clearTimeout(timer);
       }
     }
@@ -68,7 +67,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving || !newEntry.startPostcode || !newEntry.endPostcode || newEntry.distanceMiles <= 0) {
-      if (newEntry.distanceMiles <= 0 && !isCalculating) alert("Please wait for distance calculation or enter manually.");
+      if (newEntry.distanceMiles <= 0 && !isCalculating) alert("Please enter valid postcodes to fetch driving distance.");
       return;
     }
 
@@ -137,7 +136,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
       </header>
 
       <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden">
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4 items-end relative z-10">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-4 items-end relative z-10">
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-400 uppercase px-1">Journey Date</label>
             <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={newEntry.date} onChange={e => setNewEntry({...newEntry, date: e.target.value})} />
@@ -168,11 +167,11 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase px-1">Trips</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase px-1">No. of Trips</label>
             <input 
               type="number" 
               min="1" 
-              className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl font-black outline-none focus:border-indigo-500 transition-colors" 
+              className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl font-black outline-none focus:border-indigo-500 transition-colors h-[52px]" 
               value={newEntry.numTrips} 
               onChange={e => setNewEntry({...newEntry, numTrips: parseInt(e.target.value) || 1})} 
             />
@@ -187,7 +186,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
 
           <button type="submit" disabled={isSaving || newEntry.distanceMiles === 0 || isCalculating} className="h-[52px] bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50">
              {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-floppy-disk"></i>}
-             Register
+             Save Log
           </button>
         </form>
       </div>

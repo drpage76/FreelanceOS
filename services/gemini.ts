@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { AppState } from "../types";
 
@@ -18,8 +17,10 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
   if (!ai) return { miles: null, sources: [], error: "AI Key Missing" };
 
   const model = "gemini-2.5-flash"; 
-  const prompt = `Calculate the fastest driving distance in miles between UK postcodes "${start}" and "${end}" using Google Maps. 
-  Respond ONLY with the distance number followed by the word "miles". For example: "12.5 miles".`;
+  const prompt = `Task: Find the fastest driving distance in miles between UK postcodes "${start}" and "${end}" using Google Maps. 
+  Rule: Your response MUST contain the phrase "Distance: [number] miles". 
+  Example: "Distance: 12.5 miles". 
+  Do not provide extra conversation.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -36,7 +37,7 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
     });
 
     const text = response.text || "";
-    // Robust extraction: find the first number (float or int) in the string
+    // Regex isolates the first decimal or integer found in the text
     const match = text.match(/(\d+(\.\d+)?)/);
     const miles = match ? parseFloat(match[0]) : null;
 
@@ -45,7 +46,7 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
       sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
     };
   } catch (error) {
-    console.error("Mileage AI Error:", error);
+    console.error("Mileage Protocol Error:", error);
     return { miles: null, sources: [] };
   }
 };
