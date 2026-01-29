@@ -22,13 +22,9 @@ export enum QuoteStatus {
   EXPIRED = 'Expired'
 }
 
-// Added FREE member to UserPlan enum to support default user states and feature gating logic
 export enum UserPlan {
-  FREE = 'Free',
   TRIAL = '3-Month Trial',
-  PRO = 'Pro Monthly',
-  BETA = 'Beta Founder (Free)',
-  EXPIRED = 'Trial Expired'
+  ACTIVE = 'Standard Subscription'
 }
 
 export enum SchedulingType {

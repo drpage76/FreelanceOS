@@ -59,10 +59,10 @@ export const calculateDueDate = (startDate: string, terms: number): string => {
 export const calculateRevenueStats = (jobs: any[], goal: number = 50000) => {
   const now = new Date();
   
-  // UK Fiscal Year Logic: Starts April 6th
-  let fiscalYearStart = new Date(now.getFullYear(), 3, 6); // Month is 0-indexed, so 3 is April
+  // UK Fiscal Year Logic: Starts April 5th as requested
+  let fiscalYearStart = new Date(now.getFullYear(), 3, 5); // Month is 0-indexed, so 3 is April
   if (now < fiscalYearStart) {
-    fiscalYearStart = new Date(now.getFullYear() - 1, 3, 6);
+    fiscalYearStart = new Date(now.getFullYear() - 1, 3, 5);
   }
   
   const daysElapsed = Math.max(1, differenceInDays(now, fiscalYearStart));

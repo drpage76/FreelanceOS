@@ -17,7 +17,9 @@ export const Assistant: React.FC<{ state: AppState }> = ({ state }) => {
   const [isTyping, setIsTyping] = useState(false);
   const chatRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const isPro = state.user?.plan && state.user.plan !== UserPlan.FREE;
+  
+  // Fix: UserPlan.FREE does not exist. Both TRIAL and ACTIVE plans are considered pro for now as per landing page.
+  const isPro = !!state.user?.plan;
 
   useEffect(() => {
     if (isPro && !chatRef.current) {

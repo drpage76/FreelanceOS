@@ -128,7 +128,7 @@ export const DB = {
     try {
       const client = getSupabase();
       if (!client) return { success: false };
-      const { data, error } = await client.from('clients').select('id').limit(1);
+      const { error } = await client.from('clients').select('id').limit(1);
       if (error) return { success: false };
       return { success: true };
     } catch { return { success: false }; }
@@ -214,7 +214,15 @@ export const DB = {
       if (data) return fromDb(data) as Tenant;
     } catch (e) {}
     
-    const n: Tenant = { email, name: 'User', businessName: 'Freelance OS', businessAddress: '', bankDetails: '', plan: UserPlan.FREE };
+    const n: Tenant = { 
+      email, 
+      name: email.split('@')[0], 
+      businessName: 'My Freelance Business', 
+      businessAddress: '', 
+      bankDetails: '', 
+      plan: UserPlan.TRIAL,
+      trialStartDate: new Date().toISOString()
+    };
     await DB.updateTenant(n);
     return n;
   },
@@ -232,7 +240,6 @@ export const DB = {
   },
   saveJob: async (j: Job) => {
     await DB.call('jobs', 'upsert', j);
-    // CRITICAL: Ensure shifts are saved explicitly if they exist on the job object
     if (j.shifts) {
       await DB.saveShifts(j.id, j.shifts);
     }
@@ -248,7 +255,6 @@ export const DB = {
   saveJobItems: async (jobId: string, items: JobItem[]) => DB.call('job_items', 'upsert', items),
   getShifts: async (jobId: string) => DB.call('job_shifts', 'select', null, { jobId }),
   saveShifts: async (jobId: string, shifts: JobShift[]) => {
-    // ALWAYS clear existing shifts for this job before saving new ones to ensure sync
     await DB.call('job_shifts', 'delete', null, { jobId });
     if (shifts && shifts.length > 0) {
       const tenantId = await DB.getTenantId() || LOCAL_USER_EMAIL;

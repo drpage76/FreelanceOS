@@ -24,7 +24,8 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
   const [taxRate, setTaxRate] = useState(20);
   const docRef = useRef<HTMLDivElement>(null);
 
-  const isPro = state.user?.plan && state.user.plan !== UserPlan.FREE;
+  // Fix: UserPlan.FREE does not exist. Both TRIAL and ACTIVE plans are considered pro for now as per landing page.
+  const isPro = !!state.user?.plan;
 
   const financialStats = useMemo(() => {
     let totalPaid = 0;
