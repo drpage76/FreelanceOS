@@ -1,5 +1,7 @@
+
 import React, { useState } from 'react';
 import { Auth } from '../components/Auth';
+import { Link } from 'react-router-dom';
 
 export const Landing: React.FC = () => {
   const [showAuth, setShowAuth] = useState(false);
@@ -114,9 +116,11 @@ export const Landing: React.FC = () => {
       </main>
 
       <footer className="relative z-10 border-t border-white/10 py-6 px-6 shrink-0">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-3 opacity-50">
-             <span className="text-[10px] font-black uppercase tracking-widest">FreelanceOS Engine</span>
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-6">
+             <span className="text-[10px] font-black uppercase tracking-widest opacity-50">FreelanceOS Engine</span>
+             <Link to="/privacy" className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400 transition-colors">Privacy</Link>
+             <Link to="/terms" className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400 transition-colors">Terms</Link>
           </div>
           <p className="text-slate-600 text-[9px] font-bold uppercase tracking-widest">© 2025 Professional Business Operating System.</p>
         </div>
