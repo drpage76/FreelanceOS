@@ -216,11 +216,11 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                           <p className="text-sm font-bold text-slate-800">Date Issued: {formatDate(showPreview === 'invoice' ? (invoice?.date || '') : (new Date().toISOString()))}</p>
                           {showPreview === 'invoice' && <p className="text-sm font-black text-indigo-600 mb-3">Due Date: {formatDate(invoice?.dueDate || '')}</p>}
                           
-                          <div className="mt-4 pt-4 border-t border-slate-50 space-y-2">
+                          <div className="mt-4 pt-4 border-t border-slate-50 space-y-1">
                              <p className="text-sm font-black text-slate-900 leading-tight">Project: {job.description}</p>
                              <p className="text-[11px] font-bold text-slate-500 italic">Location: {job.location || 'TBD'}</p>
-                             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Dates: {formatDate(job.startDate)} — {formatDate(job.endDate)}</p>
-                             {showPreview === 'invoice' && job.poNumber && (
+                             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Period: {formatDate(job.startDate)} — {formatDate(job.endDate)}</p>
+                             {job.poNumber && (
                                <p className="text-[11px] font-black text-indigo-600 uppercase tracking-widest mt-2 border-t border-indigo-50 pt-1 inline-block">Purchase Order: {job.poNumber}</p>
                              )}
                           </div>

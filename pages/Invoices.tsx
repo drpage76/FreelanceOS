@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo } from 'react';
 // Use direct named imports from react-router-dom to avoid property access errors
 import { Link } from 'react-router-dom';
@@ -145,9 +144,19 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
                     </div>
                     <div className="text-right">
                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-2">Invoice Details</p>
-                       <p className="text-sm font-bold text-slate-700">Issued: {formatDate(previewData.inv.date)}</p>
-                       <p className="text-sm font-black text-indigo-600 mt-1">Due Date: {formatDate(previewData.inv.dueDate)}</p>
-                       <p className="text-sm font-bold text-slate-700 mt-4">Project: {previewData.job.description}</p>
+                       <div className="space-y-1">
+                          <p className="text-sm font-bold text-slate-700">Issued: {formatDate(previewData.inv.date)}</p>
+                          <p className="text-sm font-black text-indigo-600">Due Date: {formatDate(previewData.inv.dueDate)}</p>
+                          
+                          <div className="mt-4 pt-4 border-t border-slate-50 space-y-1 text-right">
+                             <p className="text-sm font-black text-slate-900 leading-tight">Project: {previewData.job.description}</p>
+                             <p className="text-[11px] font-bold text-slate-500 italic">Location: {previewData.job.location || 'TBD'}</p>
+                             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Period: {formatDate(previewData.job.startDate)} — {formatDate(previewData.job.endDate)}</p>
+                             {previewData.job.poNumber && (
+                               <p className="text-[11px] font-black text-indigo-600 uppercase tracking-widest mt-2 border-t border-indigo-50 pt-1 inline-block">Purchase Order: {previewData.job.poNumber}</p>
+                             )}
+                          </div>
+                       </div>
                     </div>
                  </div>
 

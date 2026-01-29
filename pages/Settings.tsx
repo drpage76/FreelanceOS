@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { DB } from '../services/db';
 import { Tenant, UserPlan, InvoiceNumberingType } from '../types';
-import { differenceInDays, parseISO, addMonths, format } from 'date-fns';
+import { differenceInDays, parseISO, addMonths, format, isValid } from 'date-fns';
 
 interface SettingsProps {
   user: Tenant | null;
@@ -19,14 +18,30 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
 
   const trialInfo = useMemo(() => {
     if (!user) return null;
-    const start = parseISO(user.trialStartDate);
-    const expiry = addMonths(start, 3);
+    
+    // Safety check for trialStartDate
+    let startDate = new Date();
+    if (user.trialStartDate) {
+      const parsed = parseISO(user.trialStartDate);
+      if (isValid(parsed)) {
+        startDate = parsed;
+      }
+    }
+
+    const expiry = addMonths(startDate, 3);
     const daysLeft = Math.max(0, differenceInDays(expiry, new Date()));
+    
+    let formattedExpiry = "TBD";
+    try {
+      formattedExpiry = format(expiry, 'dd MMM yyyy');
+    } catch (e) {
+      console.warn("Date formatting failed", e);
+    }
     
     return { 
       plan: user.plan,
       daysLeft,
-      expiryDate: format(expiry, 'dd MMM yyyy'),
+      expiryDate: formattedExpiry,
       isExpired: daysLeft <= 0
     };
   }, [user]);
@@ -95,7 +110,6 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
   const handleUpgrade = async () => {
     if (!user) return;
     setIsUpgrading(true);
-    // Simulating Secure Payment Gateway Interaction
     setTimeout(async () => {
       try {
         const upgraded: Tenant = {
@@ -113,6 +127,12 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
       }
     }, 2500);
   };
+
+  if (!user) return (
+    <div className="flex items-center justify-center p-20">
+      <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  );
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-20 px-4">
