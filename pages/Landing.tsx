@@ -1,17 +1,9 @@
+
 import React, { useState } from 'react';
 import { Auth } from '../components/Auth';
 
 export const Landing: React.FC = () => {
   const [showAuth, setShowAuth] = useState(false);
-
-  const scrollToFeatures = () => {
-    const featuresSection = document.getElementById('feature-protocols');
-    if (featuresSection) {
-      featuresSection.scrollIntoView({ behavior: 'smooth' });
-    } else {
-      setShowAuth(true);
-    }
-  };
 
   return (
     <div className="h-screen w-full bg-slate-900 text-white selection:bg-indigo-500 selection:text-white overflow-hidden flex flex-col">
@@ -67,10 +59,10 @@ export const Landing: React.FC = () => {
             </div>
 
             <p className="text-slate-400 text-lg font-medium leading-relaxed max-w-md">
-              The professional operating system for modern freelancers. Command your financials, schedule, and client network in one high-performance workspace.
+              The professional operating system for independent freelancers. Command your financials, schedule, and client network in one high-performance workspace.
             </p>
 
-            <div id="feature-protocols" className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               {[
                 { icon: 'fa-cloud-arrow-up', title: 'Global Sync', desc: 'Secure cloud backup' },
                 { icon: 'fa-calendar-check', title: 'Schedule', desc: 'Google bi-sync' },
@@ -111,9 +103,9 @@ export const Landing: React.FC = () => {
                     className="rounded-[40px] shadow-inner opacity-60 group-hover:opacity-100 transition-opacity max-h-[380px] object-cover"
                   />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <button onClick={scrollToFeatures} className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center shadow-2xl animate-pulse hover:scale-110 transition-transform">
-                      <i className="fa-solid fa-eye text-xl text-white"></i>
-                    </button>
+                    <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center shadow-2xl animate-pulse">
+                      <i className="fa-solid fa-bolt text-xl text-white"></i>
+                    </div>
                   </div>
                 </div>
               </div>

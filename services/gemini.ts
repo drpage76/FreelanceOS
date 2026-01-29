@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { AppState } from "../types";
 
@@ -11,16 +12,14 @@ const getAIClient = () => {
 
 /**
  * Calculates driving distance using Google Maps grounding.
- * NOTE: responseMimeType and responseSchema are NOT supported when using googleMaps tool.
  */
 export const calculateDrivingDistance = async (start: string, end: string) => {
   const ai = getAIClient();
   if (!ai) return { miles: null, sources: [], error: "AI Key Missing" };
 
   const model = "gemini-2.5-flash"; 
-  // We use a very strict prompt since we cannot enforce a JSON schema with the Maps tool.
   const prompt = `Calculate the fastest driving distance in miles between UK postcodes "${start}" and "${end}" using Google Maps. 
-  Respond ONLY with the distance number followed by "miles". Example: "12.5 miles".`;
+  Respond ONLY with the distance number followed by the word "miles". For example: "12.5 miles".`;
 
   try {
     const response = await ai.models.generateContent({
@@ -36,19 +35,17 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
       },
     });
 
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
     const text = response.text || "";
-    
-    // Improved regex to find a decimal or integer number, ignoring surrounding text.
+    // Robust extraction: find the first number (float or int) in the string
     const match = text.match(/(\d+(\.\d+)?)/);
     const miles = match ? parseFloat(match[0]) : null;
 
     return {
       miles: miles,
-      sources: groundingChunks || []
+      sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
     };
   } catch (error) {
-    console.error("Mileage Protocol Error:", error);
+    console.error("Mileage AI Error:", error);
     return { miles: null, sources: [] };
   }
 };
