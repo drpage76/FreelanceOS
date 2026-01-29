@@ -36,7 +36,7 @@ export const getSupabase = () => {
 };
 
 const FIELD_MAP: Record<string, string> = {
-  // Tenant Profile
+  // Tenant Profile mappings
   name: 'name',
   businessName: 'business_name',
   businessAddress: 'business_address',
@@ -57,8 +57,10 @@ const FIELD_MAP: Record<string, string> = {
   invoicePrefix: 'invoice_prefix',
   invoiceNextNumber: 'invoice_next_number',
   invoiceNumberingType: 'invoice_numbering_type',
+  trialStartDate: 'trial_start_date',
+  plan: 'plan',
   
-  // App Entities
+  // App Entities mappings
   paymentTermsDays: 'payment_terms_days',
   clientId: 'client_id',
   startDate: 'start_date',
@@ -276,7 +278,6 @@ export const DB = {
   getInvoices: async () => DB.call('invoices', 'select'),
   saveInvoice: async (i: Invoice) => {
     await DB.call('invoices', 'upsert', i);
-    // Increment invoice sequence if unissued
     const user = await DB.getCurrentUser();
     if (user && (i.id.startsWith(user.invoicePrefix) || user.invoiceNumberingType === 'DATE_BASED')) {
       await DB.updateTenant({ ...user, invoiceNextNumber: (user.invoiceNextNumber || 0) + 1 });

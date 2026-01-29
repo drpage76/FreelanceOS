@@ -139,22 +139,22 @@ export interface Tenant {
   accountName?: string;
   accountNumber?: string;
   sortCodeOrIBAN?: string;
-  bankDetails?: string; // Legacy fallback
+  bankDetails?: string; 
   
   // Localization
-  currency: string; // e.g., 'GBP', 'USD', 'EUR'
-  taxName: string; // e.g., 'VAT', 'GST', 'Sales Tax'
-  taxRate: number; // e.g., 20
+  currency: string; 
+  taxName: string; 
+  taxRate: number; 
   isVatRegistered: boolean;
   vatNumber?: string;
   
   // Fiscal Year
-  fiscalYearStartDay: number; // e.g., 5
-  fiscalYearStartMonth: number; // e.g., 4 (April)
+  fiscalYearStartDay: number; 
+  fiscalYearStartMonth: number; 
 
   // Invoicing
-  invoicePrefix: string; // e.g., 'INV-'
-  invoiceNextNumber: number; // e.g., 1
+  invoicePrefix: string; 
+  invoiceNextNumber: number; 
   invoiceNumberingType: InvoiceNumberingType;
 
   logoUrl?: string;

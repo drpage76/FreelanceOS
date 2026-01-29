@@ -10,29 +10,28 @@ const getAIClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-export const getBusinessInsights = async (state: AppState) => {
+// Start a business coaching chat session using gemini-3-pro-preview with full business context
+export const startBusinessChat = (state: AppState) => {
   const ai = getAIClient();
-  if (!ai) return "AI Coach offline. Please configure GEMINI_API_KEY in GitHub Secrets.";
+  if (!ai) return null;
 
-  const model = "gemini-3-flash-preview";
-  const context = {
-    jobs: state.jobs.map(j => ({ desc: j.description, status: j.status, value: j.totalRecharge })),
-    invoices: state.invoices.map(i => ({ status: i.status, date: i.date }))
-  };
+  const systemInstruction = `You are a professional business coach and freelance strategist for a user running a business called "${state.user?.businessName || 'Freelance OS'}".
+    You have access to their business data:
+    - Total Clients: ${state.clients.length}
+    - Total Projects: ${state.jobs.length}
+    - Financials: ${state.invoices.length} invoices recorded.
+    
+    Current projects include: ${state.jobs.slice(0, 5).map(j => j.description).join(', ')}...
+    
+    Provide actionable, data-driven insights on revenue growth, client acquisition, and operational efficiency. 
+    Use a professional, encouraging tone. Format responses in Markdown.`;
 
-  const prompt = `
-    Context: Freelance business data.
-    Data: ${JSON.stringify(context)}
-    Provide one single, high-impact business growth tip under 30 words. No Markdown.
-  `;
-
-  try {
-    const response = await ai.models.generateContent({ model, contents: prompt });
-    return response.text || "Maintain strong client momentum.";
-  } catch (error) {
-    console.error("Gemini Insight Error:", error);
-    return "Focus on pipeline health and timely invoicing.";
-  }
+  return ai.chats.create({
+    model: 'gemini-3-pro-preview',
+    config: {
+      systemInstruction,
+    },
+  });
 };
 
 export const calculateDrivingDistance = async (start: string, end: string) => {
@@ -40,10 +39,14 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
   if (!ai) return { miles: null, sources: [], error: "AI Key Missing" };
 
   const model = "gemini-2.5-flash"; 
-  const prompt = `Find the driving distance between UK postcodes "${start}" and "${end}" using Google Maps. 
-  Respond ONLY with the distance in miles as a single decimal number.
-  If multiple routes exist, provide the distance for the fastest one.
-  Example output: 12.4`;
+  // Refined prompt to demand a parseable number and use grounding
+  const prompt = `Find the precise driving distance in miles between UK postcodes "${start}" and "${end}" using Google Maps.
+  Rules:
+  1. Analyze real-time map data.
+  2. If there are multiple routes, pick the fastest.
+  3. Output ONLY the number of miles as a decimal.
+  4. Do not include any units or explanation.
+  Example output: 14.5`;
 
   try {
     const response = await ai.models.generateContent({
@@ -53,7 +56,7 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
         tools: [{ googleMaps: {} }],
         toolConfig: {
           retrievalConfig: {
-            latLng: { latitude: 51.5074, longitude: -0.1278 }
+            latLng: { latitude: 51.5074, longitude: -0.1278 } // Default to London center for UK context
           }
         }
       },
@@ -61,16 +64,17 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
 
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
     const text = response.text || "";
-    // Robustly find any decimal or integer number in the response
-    const matches = text.match(/(\d+(\.\d+)?)/);
-    const miles = matches ? parseFloat(matches[0]) : null;
+    
+    // Robustly extract the first number found in the output
+    const match = text.match(/(\d+(\.\d+)?)/);
+    const miles = match ? parseFloat(match[0]) : null;
 
     return {
       miles: miles,
       sources: groundingChunks || []
     };
   } catch (error) {
-    console.error("Mileage AI Error:", error);
+    console.error("Mileage Service Error:", error);
     return { miles: null, sources: [] };
   }
 };
@@ -114,16 +118,4 @@ export const smartExtractJob = async (rawText: string) => {
   } catch (error) {
     return null;
   }
-};
-
-export const startBusinessChat = (state: AppState) => {
-  const ai = getAIClient();
-  if (!ai) return null;
-
-  return ai.chats.create({
-    model: "gemini-3-flash-preview",
-    config: {
-      systemInstruction: `Advice for freelancer. State: ${state.clients.length} clients.`
-    }
-  });
 };

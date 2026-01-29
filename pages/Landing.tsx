@@ -1,7 +1,10 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { Auth } from '../components/Auth';
 
 export const Landing: React.FC = () => {
+  const [showAuth, setShowAuth] = useState(false);
+
   return (
     <div className="min-h-screen bg-slate-900 text-white selection:bg-indigo-500 selection:text-white">
       {/* Background Decor */}
@@ -24,7 +27,7 @@ export const Landing: React.FC = () => {
           <div className="space-y-10">
             <div className="inline-flex items-center gap-3 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-4">
               <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-              All features included • 3 months free
+              All features included • Secure Cloud Backup
             </div>
             
             <h1 className="text-6xl md:text-7xl font-black tracking-tighter leading-tight">
@@ -33,16 +36,15 @@ export const Landing: React.FC = () => {
             </h1>
 
             <p className="text-slate-400 text-lg md:text-xl font-medium leading-relaxed">
-              Professional business control for independent freelancers. No tiers. No complexity. 
-              Everything unlocked for <span className="text-white">£4.99/mo</span>.
+              The professional operating system for independent freelancers. Control your financials, schedule, and network in one secure place for <span className="text-white">£4.99/mo</span>.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[
-                { icon: 'fa-brain', title: 'Smart AI Coach', desc: 'Growth analytics and strategic advice included.' },
-                { icon: 'fa-cloud-arrow-up', title: 'Global Sync', desc: 'Secure cloud backup on all devices.' },
-                { icon: 'fa-calendar-check', title: 'Auto-Schedule', desc: 'Google Calendar sync built-in.' },
-                { icon: 'fa-file-invoice-dollar', title: 'Financials', desc: 'Quotes and invoicing made effortless.' }
+                { icon: 'fa-cloud-arrow-up', title: 'Global Sync', desc: 'Secure real-time cloud backup for all your data.' },
+                { icon: 'fa-calendar-check', title: 'Auto-Schedule', desc: 'Seamless Google Calendar bi-sync built-in.' },
+                { icon: 'fa-file-invoice-dollar', title: 'Professional Docs', desc: 'Generate quotes and invoices in seconds.' },
+                { icon: 'fa-map-location-dot', title: 'Travel Intelligence', desc: 'Automatic mileage tracking using map verification.' }
               ].map((f, i) => (
                 <div key={i} className="flex gap-4 p-4 bg-white/5 border border-white/10 rounded-2xl">
                   <i className={`fa-solid ${f.icon} text-indigo-400 text-sm mt-1`}></i>
@@ -53,13 +55,53 @@ export const Landing: React.FC = () => {
                 </div>
               ))}
             </div>
+
+            {!showAuth && (
+              <div className="flex gap-4 pt-4">
+                <button 
+                  onClick={() => setShowAuth(true)}
+                  className="px-10 py-5 bg-indigo-600 text-white rounded-3xl font-black text-lg shadow-2xl shadow-indigo-500/20 hover:bg-indigo-500 transition-all transform hover:-translate-y-1"
+                >
+                  Enter Workspace
+                </button>
+                <button 
+                  onClick={() => setShowAuth(true)}
+                  className="px-10 py-5 bg-white/5 border border-white/10 text-white rounded-3xl font-black text-lg hover:bg-white/10 transition-all"
+                >
+                  Create Account
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="relative">
-            <div className="absolute inset-0 bg-indigo-500/10 blur-[100px] rounded-full"></div>
-            <div className="relative z-20">
-              <Auth onSuccess={() => window.location.reload()} />
-            </div>
+          <div className="relative min-h-[450px] flex items-center justify-center">
+            {showAuth ? (
+              <div className="relative z-20 w-full animate-in fade-in slide-in-from-right-4 duration-500">
+                <Auth onSuccess={() => window.location.reload()} />
+                <button 
+                  onClick={() => setShowAuth(false)}
+                  className="mt-6 text-slate-500 text-[10px] font-black uppercase tracking-widest hover:text-white transition-colors block mx-auto"
+                >
+                  <i className="fa-solid fa-arrow-left mr-2"></i> Back to features
+                </button>
+              </div>
+            ) : (
+              <div className="relative group cursor-pointer" onClick={() => setShowAuth(true)}>
+                <div className="absolute inset-0 bg-indigo-500/20 blur-[80px] rounded-full group-hover:bg-indigo-500/30 transition-all duration-500"></div>
+                <div className="bg-slate-800/50 border border-white/10 p-2 rounded-[48px] backdrop-blur-xl relative z-10 shadow-2xl transition-transform duration-500 group-hover:scale-[1.02]">
+                  <img 
+                    src="https://images.unsplash.com/photo-1551288049-bbb6518149a5?auto=format&fit=crop&q=80&w=800" 
+                    alt="Dashboard Preview" 
+                    className="rounded-[40px] shadow-inner opacity-80 group-hover:opacity-100 transition-opacity"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-20 h-20 bg-indigo-600 rounded-full flex items-center justify-center shadow-2xl animate-pulse">
+                      <i className="fa-solid fa-play text-2xl text-white ml-1"></i>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
