@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { DB } from '../services/db';
 import { Tenant, UserPlan, InvoiceNumberingType } from '../types';
@@ -15,7 +14,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
   const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'localization'>('profile');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [logoPreview, setLogoPreview] = useState<string | undefined>(user?.logoUrl);
+  const [logoBase64, setLogoBase64] = useState<string | undefined>(user?.logoUrl);
 
   const trialInfo = useMemo(() => {
     if (!user) return null;
@@ -30,6 +29,21 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
     };
   }, [user]);
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert("Image too large. Please select a file under 2MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoBase64(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!user) return;
@@ -39,36 +53,31 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
       const formData = new FormData(e.currentTarget);
       const updated: Tenant = {
         ...user,
-        email: user.email, // Ensure PK is preserved
+        email: user.email,
         name: (formData.get('name') as string) || user.name || '',
         businessName: (formData.get('businessName') as string) || user.businessName || '',
         businessAddress: (formData.get('businessAddress') as string) || user.businessAddress || '',
         companyRegNumber: (formData.get('companyRegNumber') as string) || user.companyRegNumber || '',
         
-        // Banking
         accountName: (formData.get('accountName') as string) || user.accountName || '',
         accountNumber: (formData.get('accountNumber') as string) || user.accountNumber || '',
         sortCodeOrIBAN: (formData.get('sortCodeOrIBAN') as string) || user.sortCodeOrIBAN || '',
         
-        // Tax
         isVatRegistered: formData.get('isVatRegistered') === 'on',
         vatNumber: (formData.get('vatNumber') as string) || user.vatNumber || '',
         taxName: (formData.get('taxName') as string) || user.taxName || 'VAT',
         taxRate: parseFloat(formData.get('taxRate') as string) || user.taxRate || 20,
         
-        // Localization
         currency: (formData.get('currency') as string) || user.currency || 'GBP',
         
-        // Fiscal Year
         fiscalYearStartDay: parseInt(formData.get('fiscalDay') as string) || user.fiscalYearStartDay || 6,
         fiscalYearStartMonth: parseInt(formData.get('fiscalMonth') as string) || user.fiscalYearStartMonth || 4,
 
-        // Invoicing
         invoicePrefix: (formData.get('invoicePrefix') as string) || user.invoicePrefix || 'INV-',
         invoiceNextNumber: parseInt(formData.get('invoiceNextNumber') as string) || user.invoiceNextNumber || 1,
         invoiceNumberingType: (formData.get('invoiceNumberingType') as InvoiceNumberingType) || user.invoiceNumberingType || 'INCREMENTAL',
 
-        logoUrl: logoPreview
+        logoUrl: logoBase64
       };
       await DB.updateTenant(updated);
       setSaveSuccess(true);
@@ -76,7 +85,6 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) { 
       console.error("Profile Update Failed:", err);
-      alert("Update synchronization interrupted.");
     } finally { 
       setIsSaving(false); 
     }
@@ -101,10 +109,6 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
           <button onClick={() => setActiveTab('localization')} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'localization' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Tax & Localization</button>
           <button onClick={() => setActiveTab('billing')} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'billing' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Plan</button>
         </div>
-        <div className="flex gap-4">
-          <Link to="/privacy" className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors">Privacy</Link>
-          <Link to="/terms" className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors">Terms</Link>
-        </div>
       </div>
 
       <form onSubmit={handleUpdateProfile} className="space-y-8">
@@ -113,8 +117,39 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Legal Entity Name</label>
+                <input name="name" defaultValue={user?.name} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Trading Name</label>
                 <input name="businessName" defaultValue={user?.businessName} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
               </div>
+              
+              <div className="md:col-span-2 space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Business Logo</label>
+                <div className="flex flex-col md:flex-row gap-6 items-center bg-slate-50 p-6 rounded-[24px] border border-slate-100">
+                  <div className="w-32 h-32 bg-white rounded-3xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                    {logoBase64 ? (
+                      <img src={logoBase64} alt="Company Logo" className="w-full h-full object-contain p-2" />
+                    ) : (
+                      <i className="fa-solid fa-image text-slate-200 text-3xl"></i>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2 text-center md:text-left">
+                    <p className="text-xs font-bold text-slate-900">Upload high-resolution logo</p>
+                    <p className="text-[10px] text-slate-500">Supports PNG, JPG (Max 2MB). This will appear on all documents.</p>
+                    <div className="pt-2">
+                      <label className="cursor-pointer bg-white border border-slate-200 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest inline-block shadow-sm hover:border-indigo-400 transition-colors">
+                        Select File
+                        <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
+                      </label>
+                      {logoBase64 && (
+                        <button type="button" onClick={() => setLogoBase64(undefined)} className="ml-4 text-[10px] font-black text-rose-500 uppercase tracking-widest">Remove</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Company Reg Number (Optional)</label>
                 <input name="companyRegNumber" defaultValue={user?.companyRegNumber} placeholder="e.g. 12345678" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
@@ -124,7 +159,6 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 <textarea name="businessAddress" defaultValue={user?.businessAddress} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold h-24 outline-none" />
               </div>
               
-              {/* Banking Section */}
               <div className="md:col-span-2 pt-4 border-t border-slate-50">
                 <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 italic">Remittance & Banking Protocols</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -148,11 +182,9 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
             </button>
           </div>
         )}
-
         {activeTab === 'localization' && (
           <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8 animate-in fade-in slide-in-from-bottom-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Regional Settings */}
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Trading Currency</label>
                 <select name="currency" defaultValue={user?.currency || 'GBP'} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none">
@@ -169,7 +201,6 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 <input name="taxName" defaultValue={user?.taxName || 'VAT'} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
               </div>
 
-              {/* Tax Settings */}
               <div className="md:col-span-2 pt-4 border-t border-slate-50">
                 <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 italic">Taxation Configuration</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -188,7 +219,6 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 </div>
               </div>
 
-              {/* Fiscal Year */}
               <div className="md:col-span-2 pt-4 border-t border-slate-50">
                 <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 italic">Fiscal Reporting Cycle</h4>
                 <div className="flex gap-6 items-center">
@@ -204,13 +234,9 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                          ))}
                       </select>
                    </div>
-                   <div className="flex-[2] bg-indigo-50 p-4 rounded-2xl border border-indigo-100 italic text-[10px] text-indigo-700 font-bold">
-                     Dashboard resets annually on the {user?.fiscalYearStartDay}th of {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][(user?.fiscalYearStartMonth || 4)-1]}.
-                   </div>
                 </div>
               </div>
 
-              {/* Invoicing Sequence */}
               <div className="md:col-span-2 pt-4 border-t border-slate-50">
                 <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 italic">Invoicing Identity & Sequencing</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -221,7 +247,6 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                        <option value="DATE_BASED">Date-based (e.g. 250301)</option>
                     </select>
                   </div>
-                  
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Prefix (Incremental only)</label>
                     <input name="invoicePrefix" defaultValue={user?.invoicePrefix || 'INV-'} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
@@ -238,30 +263,22 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
             </button>
           </div>
         )}
-
         {activeTab === 'billing' && (
           <div className="max-w-lg mx-auto bg-slate-900 p-10 rounded-[48px] text-white shadow-2xl text-center animate-in fade-in slide-in-from-bottom-2">
              <p className="text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-2">Standard Protocol</p>
              <h3 className="text-3xl font-black mb-10 tracking-tighter">FreelanceOS Elite</h3>
-             
              <div className="mb-10">
                 <div className="text-7xl font-black">£4.99<span className="text-lg text-slate-500">/mo</span></div>
                 <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-4">
                   Trial Status: {trialInfo?.daysLeft} days remaining (Ends {trialInfo?.expiryDate})
                 </p>
              </div>
-
              <ul className="space-y-4 text-left text-xs font-bold text-slate-400 mb-10">
                 <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Local & Cloud Sync Engine</li>
                 <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Secure Real-time Workspace Backup</li>
                 <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Google Calendar Bi-sync</li>
              </ul>
-
-             {user?.plan === UserPlan.ACTIVE ? (
-               <div className="w-full py-5 bg-emerald-500 rounded-3xl font-black text-xs uppercase">Subscription Active</div>
-             ) : (
-               <button type="button" onClick={() => alert("Connecting to Stripe Gateway...")} className="w-full py-5 bg-indigo-600 rounded-3xl font-black text-xs uppercase hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20">Upgrade Lifetime Account</button>
-             )}
+             <button type="button" onClick={() => alert("Connecting to Stripe Gateway...")} className="w-full py-5 bg-indigo-600 rounded-3xl font-black text-xs uppercase hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20">Upgrade Account</button>
           </div>
         )}
       </form>
