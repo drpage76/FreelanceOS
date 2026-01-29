@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import * as ReactRouterDOM from 'react-router-dom';
-
-const { HashRouter, Routes, Route, Navigate } = ReactRouterDOM;
+// Use direct named imports from react-router-dom to avoid property access errors
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { Navigation } from './components/Navigation';
 import { Dashboard } from './pages/Dashboard';

@@ -14,14 +14,15 @@ import {
   addMonths, 
   subMonths,
   isWithinInterval,
-  startOfYear,
   differenceInDays
 } from 'date-fns';
+import { Tenant } from './types';
 
-export const formatCurrency = (amount: number): string => {
+export const formatCurrency = (amount: number, userSettings?: Tenant | null): string => {
+  const currency = userSettings?.currency || 'GBP';
   return new Intl.NumberFormat('en-GB', {
     style: 'currency',
-    currency: 'GBP',
+    currency: currency,
     maximumFractionDigits: 0
   }).format(amount);
 };
@@ -43,12 +44,11 @@ export const generateJobId = (startDate: string, sequence: number): string => {
   return `${yy}${mm}${seq}`;
 };
 
-export const generateInvoiceId = (sequence: number): string => {
-  const now = new Date();
-  const yy = format(now, 'yy');
-  const mm = format(now, 'MM');
-  const seq = (sequence + 1).toString().slice(-2).padStart(2, '0');
-  return `${yy}${mm}${seq}`;
+export const generateInvoiceId = (userSettings: Tenant | null): string => {
+  if (!userSettings) return `INV-${Date.now()}`;
+  const prefix = userSettings.invoicePrefix || 'INV-';
+  const num = (userSettings.invoiceNextNumber || 1).toString().padStart(4, '0');
+  return `${prefix}${num}`;
 };
 
 export const calculateDueDate = (startDate: string, terms: number): string => {
@@ -56,13 +56,16 @@ export const calculateDueDate = (startDate: string, terms: number): string => {
   return format(addDays(date, terms), 'yyyy-MM-dd');
 };
 
-export const calculateRevenueStats = (jobs: any[], goal: number = 50000) => {
+export const calculateRevenueStats = (jobs: any[], userSettings: Tenant | null, goal: number = 50000) => {
   const now = new Date();
   
-  // UK Fiscal Year Logic: Starts April 5th as requested
-  let fiscalYearStart = new Date(now.getFullYear(), 3, 5); // Month is 0-indexed, so 3 is April
+  // Custom Fiscal Year Logic
+  const startDay = userSettings?.fiscalYearStartDay ?? 5;
+  const startMonth = (userSettings?.fiscalYearStartMonth ?? 4) - 1; // Month is 0-indexed
+  
+  let fiscalYearStart = new Date(now.getFullYear(), startMonth, startDay);
   if (now < fiscalYearStart) {
-    fiscalYearStart = new Date(now.getFullYear() - 1, 3, 5);
+    fiscalYearStart = new Date(now.getFullYear() - 1, startMonth, startDay);
   }
   
   const daysElapsed = Math.max(1, differenceInDays(now, fiscalYearStart));
@@ -71,7 +74,6 @@ export const calculateRevenueStats = (jobs: any[], goal: number = 50000) => {
     .filter(j => j.status !== 'Cancelled' && parseISO(j.startDate) >= fiscalYearStart && parseISO(j.startDate) <= now)
     .reduce((sum, j) => sum + (j.totalRecharge || 0), 0);
 
-  // Projection based on current daily velocity
   const dailyRunRate = ytdRevenue / daysElapsed;
   const projectedAnnual = dailyRunRate * 365;
   const percentOfGoal = Math.min(100, (ytdRevenue / goal) * 100);

@@ -1,3 +1,4 @@
+
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Client, Job, JobItem, Invoice, Tenant, UserPlan, MileageRecord, JobShift, SchedulingType, Quote } from '../types';
 
@@ -38,11 +39,22 @@ const FIELD_MAP: Record<string, string> = {
   paymentTermsDays: 'payment_terms_days',
   businessName: 'business_name',
   businessAddress: 'business_address',
+  companyRegNumber: 'company_reg_number',
+  accountName: 'account_name',
+  accountNumber: 'account_number',
+  sortCodeOrIBAN: 'sort_code_iban',
   bankDetails: 'bank_details',
   logoUrl: 'logo_url',
   stripeCustomerId: 'stripe_customer_id',
   isVatRegistered: 'is_vat_registered',
   vatNumber: 'vat_number',
+  taxName: 'tax_name',
+  taxRate: 'tax_rate',
+  currency: 'currency',
+  fiscalYearStartDay: 'fiscal_year_start_day',
+  fiscalYearStartMonth: 'fiscal_year_start_month',
+  invoicePrefix: 'invoice_prefix',
+  invoiceNextNumber: 'invoice_next_number',
   clientId: 'client_id',
   startDate: 'start_date',
   endDate: 'end_date',
@@ -220,6 +232,14 @@ export const DB = {
       businessName: 'My Freelance Business', 
       businessAddress: '', 
       bankDetails: '', 
+      currency: 'GBP',
+      taxName: 'VAT',
+      taxRate: 20,
+      isVatRegistered: false,
+      fiscalYearStartDay: 6,
+      fiscalYearStartMonth: 4,
+      invoicePrefix: 'INV-',
+      invoiceNextNumber: 1,
       plan: UserPlan.TRIAL,
       trialStartDate: new Date().toISOString()
     };
@@ -248,7 +268,14 @@ export const DB = {
   saveQuote: async (q: Quote) => DB.call('quotes', 'upsert', q),
   deleteQuote: async (id: string) => DB.call('quotes', 'delete', null, { id }),
   getInvoices: async () => DB.call('invoices', 'select'),
-  saveInvoice: async (i: Invoice) => DB.call('invoices', 'upsert', i),
+  saveInvoice: async (i: Invoice) => {
+    await DB.call('invoices', 'upsert', i);
+    // Increment invoice sequence if unissued
+    const user = await DB.getCurrentUser();
+    if (user && i.id.startsWith(user.invoicePrefix)) {
+      await DB.updateTenant({ ...user, invoiceNextNumber: (user.invoiceNextNumber || 0) + 1 });
+    }
+  },
   getMileage: async () => DB.call('mileage', 'select'),
   saveMileage: async (m: MileageRecord) => DB.call('mileage', 'upsert', m),
   getJobItems: async (jobId: string) => DB.call('job_items', 'select', null, { jobId }),

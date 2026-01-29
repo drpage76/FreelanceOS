@@ -1,13 +1,10 @@
-
 import React, { useState } from 'react';
 import { AppState, Client } from '../types';
 import { ClientImporter } from '../components/ClientImporter';
 import { AddClientModal } from '../components/AddClientModal';
 import { DB } from '../services/db';
-// Fix: Use namespace import for react-router-dom to resolve exported member errors
-import * as ReactRouterDOM from 'react-router-dom';
-
-const { Link } = ReactRouterDOM;
+// Use direct named imports from react-router-dom to avoid property access errors
+import { Link } from 'react-router-dom';
 
 interface ClientsProps {
   state: AppState;

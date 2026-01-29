@@ -1,3 +1,4 @@
+
 export enum JobStatus {
   POTENTIAL = 'Potential',
   PENCILLED = 'Pencilled',
@@ -130,13 +131,33 @@ export interface Tenant {
   name: string;
   businessName: string;
   businessAddress: string;
-  bankDetails: string;
+  companyRegNumber?: string;
+  
+  // Banking
+  accountName?: string;
+  accountNumber?: string;
+  sortCodeOrIBAN?: string;
+  bankDetails?: string; // Legacy fallback
+  
+  // Localization
+  currency: string; // e.g., 'GBP', 'USD', 'EUR'
+  taxName: string; // e.g., 'VAT', 'GST', 'Sales Tax'
+  taxRate: number; // e.g., 20
+  isVatRegistered: boolean;
+  vatNumber?: string;
+  
+  // Fiscal Year
+  fiscalYearStartDay: number; // e.g., 5
+  fiscalYearStartMonth: number; // e.g., 4 (April)
+
+  // Invoicing
+  invoicePrefix: string; // e.g., 'INV-'
+  invoiceNextNumber: number; // e.g., 1
+
   logoUrl?: string;
   plan: UserPlan;
   trialStartDate?: string;
   stripeCustomerId?: string;
-  isVatRegistered?: boolean;
-  vatNumber?: string;
 }
 
 export interface AppState {

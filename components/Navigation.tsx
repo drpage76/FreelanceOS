@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import * as ReactRouterDOM from 'react-router-dom';
-
-const { Link, useLocation } = ReactRouterDOM;
+// Use direct named imports from react-router-dom to avoid property access errors
+import { Link, useLocation } from 'react-router-dom';
 
 import { Tenant, UserPlan } from '../types';
 import { DB } from '../services/db';

@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import * as ReactRouterDOM from 'react-router-dom';
-
-const { Link, useNavigate } = ReactRouterDOM;
+// Use direct named imports from react-router-dom to avoid property access errors
+import { Link, useNavigate } from 'react-router-dom';
 
 import { AppState, JobStatus, InvoiceStatus, Invoice, Job, Client } from '../types';
 import { formatCurrency, formatDate, calculateDueDate, generateInvoiceId } from '../utils';
@@ -53,7 +52,7 @@ export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) =
       const terms = parseInt(invoicePrompt.client.paymentTermsDays as any) || 30;
       
       const newInvoice: Invoice = {
-        id: generateInvoiceId(invoices.length + 1),
+        id: generateInvoiceId(invoicePrompt.job.tenant_id ? { invoicePrefix: 'INV-', invoiceNextNumber: invoices.length + 1 } as any : null),
         jobId: invoicePrompt.job.id,
         date: promptDate,
         dueDate: calculateDueDate(promptDate, terms),

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import * as ReactRouterDOM from 'react-router-dom';
-
-const { useParams, useNavigate, Link } = ReactRouterDOM;
+// Use direct named imports from react-router-dom to avoid property access errors
+import { useParams, useNavigate, Link } from 'react-router-dom';
 
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -50,7 +49,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         setJob(foundJob);
         if (!selectedInvoiceDate) setSelectedInvoiceDate(foundJob.endDate);
         
-        // Use shifts from job object first (pre-loaded in DB.getJobs)
         if (foundJob.shifts && foundJob.shifts.length > 0) {
           setShifts(foundJob.shifts);
         } else {
@@ -78,32 +76,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
   const totalRecharge = useMemo(() => items.reduce((sum, item) => sum + (item.qty * item.unitPrice), 0), [items]);
 
-  const handleShiftChange = (index: number, field: keyof JobShift, value: any) => {
-    const next = [...shifts];
-    (next[index] as any)[field] = value;
-    setShifts(next);
-  };
-
-  const handleAddShift = () => {
-    if (!job) return;
-    const newShift: JobShift = {
-      id: generateId(),
-      jobId: job.id,
-      title: 'New Shift',
-      startDate: job.startDate,
-      endDate: job.endDate,
-      startTime: '09:00',
-      endTime: '17:30',
-      isFullDay: true,
-      tenant_id: job.tenant_id
-    };
-    setShifts([...shifts, newShift]);
-  };
-
-  const handleRemoveShift = (id: string) => {
-    setShifts(shifts.filter(s => s.id !== id));
-  };
-
   const handleUpdateJob = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!job || isSaving) return;
@@ -115,7 +87,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     let startDate = (formData.get('startDate') as string) || job.startDate;
     let endDate = (formData.get('endDate') as string) || job.endDate;
 
-    // Recalculate job dates based on shifts if shift-based
     if (job.schedulingType === SchedulingType.SHIFT_BASED && shifts.length > 0) {
       const sortedStarts = [...shifts].map(s => s.startDate).filter(Boolean).sort();
       const sortedEnds = [...shifts].map(s => s.endDate).filter(Boolean).sort();
@@ -132,32 +103,21 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       startDate,
       endDate,
       totalRecharge: totalRecharge,
-      shifts: shifts // Pass explicitly to DB.saveJob
+      shifts: shifts
     };
 
     try {
-      // Save Job and Shifts together via hardened DB.saveJob
       await DB.saveJob(updatedJob);
-      
       const finalItems = items.map(it => ({ 
         ...it, 
         jobId: job.id, 
         rechargeAmount: (parseFloat(it.qty as any) || 0) * (parseFloat(it.unitPrice as any) || 0) 
       }));
       await DB.saveJobItems(job.id, finalItems);
-      
-      if (googleAccessToken) {
-        await syncJobToGoogle(updatedJob, googleAccessToken, client?.name);
-      }
-
+      if (googleAccessToken) await syncJobToGoogle(updatedJob, googleAccessToken, client?.name);
       setJob(updatedJob);
       await onRefresh();
-      alert("Project Workspace Synchronized.");
-    } catch (err: any) {
-      alert(`Sync Error: ${err.message}`);
-    } finally {
-      setIsSaving(false);
-    }
+    } catch (err: any) { alert(`Sync Error: ${err.message}`); } finally { setIsSaving(false); }
   };
 
   const handleDownloadPDF = async (filename: string) => {
@@ -177,29 +137,13 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     }, 150);
   };
 
-  const handleMarkAsPaidSubmit = async () => {
-    if (!invoice || !job) return;
-    setIsSaving(true);
-    try {
-      const updatedInvoice: Invoice = { ...invoice, status: InvoiceStatus.PAID, datePaid: paymentDate };
-      await DB.saveInvoice(updatedInvoice);
-      const updatedJob: Job = { ...job, status: JobStatus.COMPLETED };
-      await DB.saveJob(updatedJob);
-      setInvoice(updatedInvoice);
-      setJob(updatedJob);
-      await onRefresh();
-      setShowPaymentModal(false);
-    } catch (err) { alert("Error marking as paid."); } finally { setIsSaving(false); }
-  };
-
   const finalizeInvoice = async () => {
-    if (!job || !client || isSaving || !selectedInvoiceDate) return;
+    if (!job || !client || isSaving || !selectedInvoiceDate || !currentUser) return;
     setIsSaving(true);
     try {
-      const invoices = await DB.getInvoices();
       const terms = parseInt(client.paymentTermsDays as any) || 30;
       const newInvoice: Invoice = {
-        id: generateInvoiceId(invoices.length + 1),
+        id: generateInvoiceId(currentUser),
         jobId: job.id,
         date: selectedInvoiceDate,
         dueDate: calculateDueDate(selectedInvoiceDate, terms),
@@ -211,8 +155,36 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       setInvoice(newInvoice);
       setShowInvoiceModal(false);
       setShowInvoicePreview(true);
-    } catch (err) { alert("Invoice failed."); }
+    } catch (err) { alert("Invoice generation failed."); }
     finally { setIsSaving(false); }
+  };
+
+  // Implementation of handleMarkAsPaidSubmit to record the settlement of an invoice.
+  const handleMarkAsPaidSubmit = async () => {
+    if (!invoice || isSaving) return;
+    setIsSaving(true);
+    try {
+      const updatedInvoice: Invoice = {
+        ...invoice,
+        status: InvoiceStatus.PAID,
+        datePaid: paymentDate
+      };
+      await DB.saveInvoice(updatedInvoice);
+      
+      if (job) {
+        const updatedJob: Job = { ...job, status: JobStatus.COMPLETED };
+        await DB.saveJob(updatedJob);
+        setJob(updatedJob);
+      }
+      
+      setInvoice(updatedInvoice);
+      setShowPaymentModal(false);
+      await onRefresh();
+    } catch (err) {
+      alert("Failed to mark as paid.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const DocumentRender = ({ type, docId, date, dueDate, validUntil }: { type: 'QUOTATION' | 'INVOICE', docId: string, date: string, dueDate?: string, validUntil?: string }) => (
@@ -233,7 +205,8 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         <div className="text-right">
           <p className="font-black text-xl">{currentUser?.businessName}</p>
           <p className="text-sm text-slate-500 whitespace-pre-line leading-relaxed mt-2">{currentUser?.businessAddress}</p>
-          {currentUser?.vatNumber && <p className="text-[10px] font-black uppercase text-slate-400 mt-2">VAT: {currentUser.vatNumber}</p>}
+          {currentUser?.companyRegNumber && <p className="text-[10px] font-black uppercase text-slate-400 mt-2">Registration: {currentUser.companyRegNumber}</p>}
+          {currentUser?.vatNumber && <p className="text-[10px] font-black uppercase text-slate-400 mt-1">{currentUser.taxName || 'Tax ID'}: {currentUser.vatNumber}</p>}
         </div>
       </div>
 
@@ -251,7 +224,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           <div className="mt-4 pt-4 border-t border-slate-50">
             <p className="text-[9px] font-black text-slate-300 uppercase mb-1">Project Identifier</p>
             <p className="text-sm font-bold text-slate-700">{job?.description}</p>
-            <p className="text-xs font-medium text-slate-400">{job?.location}</p>
           </div>
         </div>
       </div>
@@ -259,10 +231,10 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       <table className="w-full mb-12">
         <thead>
           <tr className="border-b-2 border-slate-900">
-            <th className="py-4 text-left text-[10px] font-black uppercase tracking-widest">Deliverable / Description</th>
+            <th className="py-4 text-left text-[10px] font-black uppercase tracking-widest">Description</th>
             <th className="py-4 text-center text-[10px] font-black uppercase tracking-widest">Qty</th>
-            <th className="py-4 text-right text-[10px] font-black uppercase tracking-widest">Unit Price</th>
-            <th className="py-4 text-right text-[10px] font-black uppercase tracking-widest">Net Total</th>
+            <th className="py-4 text-right text-[10px] font-black uppercase tracking-widest">Rate</th>
+            <th className="py-4 text-right text-[10px] font-black uppercase tracking-widest">Amount</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -270,8 +242,8 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
             <tr key={it.id}>
               <td className="py-5 font-bold text-slate-700 text-sm">{it.description}</td>
               <td className="py-5 text-center text-slate-600 font-black text-xs">{it.qty}</td>
-              <td className="py-5 text-right text-slate-600 font-black text-xs">{formatCurrency(it.unitPrice)}</td>
-              <td className="py-5 text-right font-black text-slate-900 text-sm">{formatCurrency(it.qty * it.unitPrice)}</td>
+              <td className="py-5 text-right text-slate-600 font-black text-xs">{formatCurrency(it.unitPrice, currentUser)}</td>
+              <td className="py-5 text-right font-black text-slate-900 text-sm">{formatCurrency(it.qty * it.unitPrice, currentUser)}</td>
             </tr>
           ))}
         </tbody>
@@ -280,35 +252,37 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       <div className="flex justify-end pt-10 border-t-2 border-slate-900">
         <div className="w-64 space-y-4">
           <div className="flex justify-between items-center">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subtotal (Net)</span>
-            <span className="text-xl font-bold text-slate-700">{formatCurrency(totalRecharge)}</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Net Subtotal</span>
+            <span className="text-xl font-bold text-slate-700">{formatCurrency(totalRecharge, currentUser)}</span>
           </div>
           {currentUser?.isVatRegistered && (
             <div className="flex justify-between items-center pt-2 border-t border-slate-50">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">VAT (20%)</span>
-              <span className="text-xl font-bold text-slate-700">{formatCurrency(totalRecharge * 0.2)}</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{currentUser.taxName || 'Tax'} ({currentUser.taxRate || 20}%)</span>
+              <span className="text-xl font-bold text-slate-700">{formatCurrency(totalRecharge * ((currentUser.taxRate || 20)/100), currentUser)}</span>
             </div>
           )}
           <div className="flex justify-between items-center pt-4 border-t-2 border-slate-900">
-            <span className="text-xs font-black uppercase tracking-widest">Total Amount</span>
-            <span className="text-3xl font-black text-indigo-600">{formatCurrency(totalRecharge * (currentUser?.isVatRegistered ? 1.2 : 1))}</span>
+            <span className="text-xs font-black uppercase tracking-widest">Total Payable</span>
+            <span className="text-3xl font-black text-indigo-600">
+              {formatCurrency(totalRecharge * (currentUser?.isVatRegistered ? (1 + (currentUser.taxRate || 20)/100) : 1), currentUser)}
+            </span>
           </div>
         </div>
       </div>
 
       <div className="mt-40 pt-10 border-t border-slate-100 grid grid-cols-2 gap-10">
         <div>
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Settlement & Remittance</p>
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Payment & Bank Details</p>
           <div className="bg-slate-50 p-6 rounded-2xl font-mono text-[11px] text-slate-700 leading-relaxed border border-slate-100 shadow-inner">
-            {currentUser?.bankDetails || 'Provide bank details in your OS Settings.'}
+            <p className="font-black mb-1">{currentUser?.accountName}</p>
+            <p>Acc: {currentUser?.accountNumber}</p>
+            <p>Ref/Sort/IBAN: {currentUser?.sortCodeOrIBAN}</p>
           </div>
         </div>
         <div>
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Terms & Provisions</p>
           <p className="text-[11px] text-slate-500 leading-relaxed font-medium italic">
-            {type === 'QUOTATION' 
-              ? `This proposal is based on the requirements discussed and remains valid until ${formatDate(validUntil || '')}. Full settlement is required within ${client?.paymentTermsDays || 30} days of project completion.`
-              : `Settlement of this invoice is required by ${formatDate(dueDate || '')}. Please ensure the reference ${docId} is included with your transfer. Thank you for your business.`}
+            Settlement is required within {client?.paymentTermsDays || 30} days. Please quote reference {docId} on all payments.
           </p>
         </div>
       </div>
@@ -318,12 +292,12 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   if (!job) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>;
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-20">
+    <div className="space-y-6 max-w-6xl mx-auto pb-20 px-4">
       {showInvoiceModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
            <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200 animate-in zoom-in-95">
               <h3 className="text-xl font-black text-slate-900 mb-2">Issue Project Invoice</h3>
-              <p className="text-sm text-slate-500 font-medium mb-6">Terms for {client?.name}: {client?.paymentTermsDays || 30} days.</p>
+              <p className="text-sm text-slate-500 font-medium mb-6">Sequence: {currentUser?.invoicePrefix}{currentUser?.invoiceNextNumber?.toString().padStart(4, '0')}</p>
               <input type="date" value={selectedInvoiceDate} onChange={(e) => setSelectedInvoiceDate(e.target.value)} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none mb-6" />
               <div className="flex gap-3">
                 <button onClick={() => setShowInvoiceModal(false)} className="flex-1 py-4 bg-slate-50 text-slate-400 rounded-2xl font-black uppercase text-[10px]">Cancel</button>
@@ -339,7 +313,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
            <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200 animate-in zoom-in-95">
               <h3 className="text-xl font-black text-slate-900 mb-2">Record Settlement</h3>
-              <p className="text-sm text-slate-500 font-medium mb-6">Confirm date funds were received for Ref: {invoice.id}</p>
+              <p className="text-sm text-slate-500 font-medium mb-6">Confirm fund arrival for Ref: {invoice.id}</p>
               <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none mb-6" />
               <div className="flex gap-3">
                 <button onClick={() => setShowPaymentModal(false)} className="flex-1 py-4 bg-slate-50 text-slate-400 rounded-2xl font-black uppercase text-[10px]">Cancel</button>
@@ -355,7 +329,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Professional Quotation</h3>
                  <div className="flex gap-2">
-                    <button onClick={() => handleDownloadPDF(`Quotation_${job.id}.pdf`)} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg flex items-center gap-2"><i className="fa-solid fa-download"></i> PDF</button>
+                    <button onClick={() => handleDownloadPDF(`Quote_${job.id}.pdf`)} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg flex items-center gap-2"><i className="fa-solid fa-download"></i> PDF</button>
                     <button onClick={() => setShowQuotePreview(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-rose-500"><i className="fa-solid fa-xmark"></i></button>
                  </div>
               </div>
@@ -372,7 +346,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                  <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Professional Invoice</h3>
                  <div className="flex gap-2">
-                    <button onClick={() => handleDownloadPDF(`Invoice_${invoice.id}.pdf`)} className="px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase shadow-lg flex items-center gap-2"><i className="fa-solid fa-download"></i> PDF</button>
+                    <button onClick={() => handleDownloadPDF(`Inv_${invoice.id}.pdf`)} className="px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase shadow-lg flex items-center gap-2"><i className="fa-solid fa-download"></i> PDF</button>
                     <button onClick={() => setShowInvoicePreview(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-rose-500"><i className="fa-solid fa-xmark"></i></button>
                  </div>
               </div>
@@ -386,31 +360,31 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Link to="/jobs" className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:text-indigo-600 shadow-sm"><i className="fa-solid fa-arrow-left"></i></Link>
-          <div><h2 className="text-2xl font-black text-slate-900 leading-none">Job Workspace</h2><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Ref: {job.id}</p></div>
+          <div><h2 className="text-2xl font-black text-slate-900 leading-none">Job Hub</h2><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Ref: {job.id}</p></div>
         </div>
         <div className="flex flex-wrap gap-2 justify-center md:justify-end">
           <button onClick={() => setShowQuotePreview(true)} className="px-6 py-3 bg-white text-indigo-600 border border-indigo-100 rounded-xl font-black text-[10px] uppercase hover:bg-indigo-50 transition-all flex items-center gap-2">
-             <i className="fa-solid fa-file-signature"></i> Print Quotation
+             <i className="fa-solid fa-file-signature"></i> Proposal
           </button>
           
           {invoice ? (
             <>
               <button onClick={() => setShowInvoicePreview(true)} className="px-6 py-3 bg-white text-slate-900 border border-slate-200 rounded-xl font-black text-[10px] uppercase hover:bg-slate-50 transition-all flex items-center gap-2">
-                 <i className="fa-solid fa-file-invoice"></i> View Invoice
+                 <i className="fa-solid fa-file-invoice"></i> View Inv
               </button>
               {invoice.status !== InvoiceStatus.PAID && (
-                <button onClick={() => setShowPaymentModal(true)} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-emerald-700">Record Payment</button>
+                <button onClick={() => setShowPaymentModal(true)} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-emerald-700">Settle</button>
               )}
             </>
           ) : (
-            <button onClick={() => { setSelectedInvoiceDate(job.endDate); setShowInvoiceModal(true); }} className="px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-black">Final Invoice</button>
+            <button onClick={() => { setSelectedInvoiceDate(job.endDate); setShowInvoiceModal(true); }} className="px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-black">Finalize</button>
           )}
 
           {invoice?.status === InvoiceStatus.PAID ? (
-             <span className="px-6 py-3 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl font-black text-[10px] uppercase flex items-center gap-2"><i className="fa-solid fa-check-double"></i> Fully Settled</span>
+             <span className="px-6 py-3 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl font-black text-[10px] uppercase flex items-center gap-2"><i className="fa-solid fa-check-double"></i> Settled</span>
           ) : (
             <button onClick={() => handleUpdateJob()} disabled={isSaving} className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg flex items-center justify-center gap-2">
-              {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-cloud-arrow-up"></i>} Sync Changes
+              {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-cloud-arrow-up"></i>} Sync Hub
             </button>
           )}
         </div>
@@ -421,11 +395,11 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           <form id="job-full-edit-form" onSubmit={handleUpdateJob} className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block px-1">Project Description</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block px-1">Description</label>
                 <input name="description" defaultValue={job.description} required className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-lg outline-none" />
               </div>
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block px-1">Pipeline Status</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block px-1">Status</label>
                 <select name="status" defaultValue={job.status} className={`w-full px-6 py-4 border rounded-2xl font-black text-[11px] uppercase outline-none appearance-none ${STATUS_COLORS[job.status]}`}>
                   {Object.values(JobStatus).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
@@ -435,16 +409,16 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 <input name="poNumber" defaultValue={job.poNumber} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" />
               </div>
               <div className="md:col-span-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block px-1">Venue / Location</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block px-1">Venue / Studio</label>
                 <input name="location" defaultValue={job.location} required className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm outline-none" />
               </div>
 
               <div className="md:col-span-2 p-6 bg-slate-50 rounded-[32px] border border-slate-200">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-black text-slate-900 text-sm">Production Schedule</h4>
+                  <h4 className="font-black text-slate-900 text-sm">Schedule Engine</h4>
                   <div className="flex gap-2 bg-white p-1 rounded-xl border border-slate-100">
-                    <button type="button" onClick={() => setJob({...job, schedulingType: SchedulingType.CONTINUOUS})} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${job.schedulingType === SchedulingType.CONTINUOUS ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-indigo-600'}`}>Continuous</button>
-                    <button type="button" onClick={() => setJob({...job, schedulingType: SchedulingType.SHIFT_BASED})} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${job.schedulingType === SchedulingType.SHIFT_BASED ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-indigo-600'}`}>Shift-Based</button>
+                    <button type="button" onClick={() => setJob({...job, schedulingType: SchedulingType.CONTINUOUS})} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${job.schedulingType === SchedulingType.CONTINUOUS ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-indigo-600'}`}>Span</button>
+                    <button type="button" onClick={() => setJob({...job, schedulingType: SchedulingType.SHIFT_BASED})} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${job.schedulingType === SchedulingType.SHIFT_BASED ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-indigo-600'}`}>Shifts</button>
                   </div>
                 </div>
 
@@ -452,33 +426,21 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                   <div className="space-y-4">
                     {shifts.map((s, idx) => (
                       <div key={s.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative group">
-                        <button type="button" onClick={() => handleRemoveShift(s.id)} className="absolute top-4 right-4 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"><i className="fa-solid fa-trash-can"></i></button>
-                        <input className="px-3 py-2 bg-slate-50 rounded-lg text-xs font-black border-none w-[90%] mb-3 outline-none" placeholder="Shift Label" value={s.title} onChange={e => handleShiftChange(idx, 'title', e.target.value)} />
+                        <button type="button" onClick={() => { if(window.confirm('Kill shift?')) setShifts(shifts.filter(sh => sh.id !== s.id)); }} className="absolute top-4 right-4 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"><i className="fa-solid fa-trash-can"></i></button>
+                        <input className="px-3 py-2 bg-slate-50 rounded-lg text-xs font-black border-none w-[90%] mb-3 outline-none" value={s.title} onChange={e => {
+                          const n = [...shifts]; n[idx].title = e.target.value; setShifts(n);
+                        }} />
                         <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <label className="text-[8px] font-black text-slate-300 uppercase px-1">Start</label>
-                            <input type="date" className="w-full px-2 py-2 bg-slate-50 rounded-lg text-[10px] font-bold border-none outline-none" value={s.startDate} onChange={e => handleShiftChange(idx, 'startDate', e.target.value)} />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[8px] font-black text-slate-300 uppercase px-1">End</label>
-                            <input type="date" className="w-full px-2 py-2 bg-slate-50 rounded-lg text-[10px] font-bold border-none outline-none" value={s.endDate} onChange={e => handleShiftChange(idx, 'endDate', e.target.value)} />
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-50">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" className="w-3 h-3 rounded" checked={s.isFullDay} onChange={e => handleShiftChange(idx, 'isFullDay', e.target.checked)} />
-                            <span className="text-[9px] font-black text-slate-400 uppercase">Full Day</span>
-                          </label>
-                          {!s.isFullDay && (
-                            <div className="flex-1 grid grid-cols-2 gap-2 animate-in fade-in">
-                               <input type="time" className="px-2 py-1 bg-slate-50 rounded text-[10px] font-bold border-none outline-none" value={s.startTime} onChange={e => handleShiftChange(idx, 'startTime', e.target.value)} />
-                               <input type="time" className="px-2 py-1 bg-slate-50 rounded text-[10px] font-bold border-none outline-none" value={s.endTime} onChange={e => handleShiftChange(idx, 'endTime', e.target.value)} />
-                            </div>
-                          )}
+                          <input type="date" className="w-full px-2 py-2 bg-slate-50 rounded-lg text-[10px] font-bold outline-none" value={s.startDate} onChange={e => {
+                            const n = [...shifts]; n[idx].startDate = e.target.value; setShifts(n);
+                          }} />
+                          <input type="date" className="w-full px-2 py-2 bg-slate-50 rounded-lg text-[10px] font-bold outline-none" value={s.endDate} onChange={e => {
+                            const n = [...shifts]; n[idx].endDate = e.target.value; setShifts(n);
+                          }} />
                         </div>
                       </div>
                     ))}
-                    <button type="button" onClick={handleAddShift} className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-white transition-all">+ Add Discrete Shift</button>
+                    <button type="button" onClick={() => setShifts([...shifts, { id: generateId(), jobId: job.id, title: 'New Shift', startDate: job.startDate, endDate: job.endDate, startTime: '09:00', endTime: '17:30', isFullDay: true, tenant_id: job.tenant_id }])} className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-white">+ Add Discrete Shift</button>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-4">
@@ -491,8 +453,8 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           </form>
 
           <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
-             <div className="flex items-center justify-between"><h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><i className="fa-solid fa-list-check text-indigo-600"></i> Deliverables</h3>
-             <button type="button" onClick={() => setItems([...items, { id: generateId(), jobId: job.id, description: 'New Deliverable', qty: 1, unitPrice: 0, rechargeAmount: 0, actualCost: 0 }])} className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-black text-[9px] uppercase border border-indigo-100">+ Add Entry</button></div>
+             <div className="flex items-center justify-between"><h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><i className="fa-solid fa-list-check text-indigo-600"></i> Revenue Items</h3>
+             <button type="button" onClick={() => setItems([...items, { id: generateId(), jobId: job.id, description: 'New Line', qty: 1, unitPrice: 0, rechargeAmount: 0, actualCost: 0 }])} className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-black text-[9px] uppercase border border-indigo-100">+ Add Row</button></div>
              <div className="space-y-2">
                 {items.map((item, idx) => (
                   <div key={item.id} className="grid grid-cols-12 gap-3 p-3 rounded-2xl border items-center bg-slate-50/50 border-slate-100 group transition-all hover:bg-white hover:shadow-lg">
@@ -506,7 +468,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                        const n = [...items]; n[idx].unitPrice = parseFloat(e.target.value) || 0; setItems(n);
                      }} />
                      <button onClick={async () => {
-                        if (window.confirm("Delete row?")) {
+                        if (window.confirm("Kill row?")) {
                           if (item.id) await DB.deleteJobItem(item.id);
                           setItems(items.filter((_, i) => i !== idx));
                         }
@@ -517,17 +479,16 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           </div>
         </div>
 
-        <div className="lg:col-span-4 space-y-6">
-          <div className="bg-slate-900 p-8 rounded-[40px] text-white shadow-2xl sticky top-6">
+        <div className="lg:col-span-4 space-y-6 sticky top-6">
+          <div className="bg-slate-900 p-8 rounded-[40px] text-white shadow-2xl">
              <div className="flex items-center justify-between mb-2">
-               <p className="text-slate-500 text-[8px] font-black uppercase tracking-[0.2em]">Project Valuation</p>
+               <p className="text-slate-500 text-[8px] font-black uppercase tracking-[0.2em]">Net Project Value</p>
                <span className={`px-3 py-0.5 rounded-lg text-[7px] font-black uppercase border ${STATUS_COLORS[job.status]}`}>{job.status}</span>
              </div>
-             <p className="text-5xl font-black mb-8">{formatCurrency(totalRecharge)}</p>
+             <p className="text-5xl font-black mb-8">{formatCurrency(totalRecharge, currentUser)}</p>
              <div className="space-y-4 pt-6 border-t border-white/10">
                 <div className="flex justify-between items-center"><span className="text-slate-500 font-black text-[9px] uppercase">Client</span><span className="text-indigo-400 font-black text-xs">{client?.name || 'Unassigned'}</span></div>
-                <div className="flex justify-between items-center"><span className="text-slate-500 font-black text-[9px] uppercase">Location</span><span className="text-slate-300 font-black text-xs">{job.location}</span></div>
-                <div className="flex justify-between items-center"><span className="text-slate-500 font-black text-[9px] uppercase">Invoiced</span><span className={`font-black text-xs ${invoice ? 'text-emerald-400' : 'text-slate-600'}`}>{invoice ? `Yes (${invoice.id})` : 'No'}</span></div>
+                <div className="flex justify-between items-center"><span className="text-slate-500 font-black text-[9px] uppercase">Inv Ref</span><span className={`font-black text-xs ${invoice ? 'text-emerald-400' : 'text-slate-600'}`}>{invoice ? invoice.id : 'Pending'}</span></div>
              </div>
           </div>
         </div>

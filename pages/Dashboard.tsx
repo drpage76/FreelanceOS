@@ -1,11 +1,10 @@
 import React, { useMemo } from 'react';
-import * as ReactRouterDOM from 'react-router-dom';
+// Use direct named imports from react-router-dom to avoid property access errors
+import { Link } from 'react-router-dom';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip
 } from 'recharts';
 import { parseISO, isAfter, startOfDay, addDays, isBefore, isValid, format, differenceInDays } from 'date-fns';
-
-const { Link } = ReactRouterDOM;
 
 import { AppState, JobStatus, InvoiceStatus, UserPlan } from '../types';
 import { formatCurrency, calculateRevenueStats } from '../utils';
@@ -21,7 +20,7 @@ interface DashboardProps {
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
 
 export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSyncCalendar, isSyncing }) => {
-  const revStats = useMemo(() => calculateRevenueStats(state.jobs, 60000), [state.jobs]);
+  const revStats = useMemo(() => calculateRevenueStats(state.jobs, state.user, 60000), [state.jobs, state.user]);
 
   const nextPayment = useMemo(() => {
     const today = startOfDay(new Date());
@@ -63,7 +62,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSy
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-2">
         <div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight italic">Command Center</h2>
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Business Intelligence</p>
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Business Intelligence Hub</p>
         </div>
         <div className="flex gap-2">
           <button onClick={onSyncCalendar} disabled={isSyncing} className="bg-white text-slate-600 border border-slate-200 px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center shadow-sm disabled:opacity-50">
@@ -89,7 +88,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSy
                 <p className="text-[11px] font-black text-slate-900 truncate">{nextPayment.client?.name}</p>
                 <p className="text-[9px] font-bold text-slate-400 truncate">{nextPayment.job?.description}</p>
               </div>
-              <p className="text-sm font-black text-slate-900 ml-4">{formatCurrency(nextPayment.job?.totalRecharge || 0)}</p>
+              <p className="text-sm font-black text-slate-900 ml-4">{formatCurrency(nextPayment.job?.totalRecharge || 0, state.user)}</p>
             </div>
           ) : (
             <p className="text-[10px] text-slate-300 font-black uppercase text-center py-1">No pending payments</p>
@@ -117,14 +116,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSy
         <div className="bg-slate-900 rounded-[24px] p-4 shadow-xl text-white flex flex-col justify-between h-[100px] relative overflow-hidden">
           <div className="absolute top-0 right-0 p-2 opacity-10"><i className="fa-solid fa-chart-line text-5xl"></i></div>
           <div className="relative z-10">
-            <p className="text-slate-500 text-[8px] font-black uppercase tracking-widest italic">YTD Revenue (Apr 5 Start)</p>
-            <p className="text-2xl font-black tracking-tighter mt-0.5">{formatCurrency(revStats.ytdRevenue)}</p>
+            <p className="text-slate-500 text-[8px] font-black uppercase tracking-widest italic leading-none">
+              Fiscal Year Rev (Starts {state.user?.fiscalYearStartDay}/{state.user?.fiscalYearStartMonth})
+            </p>
+            <p className="text-2xl font-black tracking-tighter mt-1">{formatCurrency(revStats.ytdRevenue, state.user)}</p>
           </div>
           <div className="relative z-10">
             <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mb-1">
               <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${revStats.percentOfGoal}%` }}></div>
             </div>
-            <p className="text-[7px] text-slate-500 font-black uppercase">Run-rate: {formatCurrency(revStats.dailyRunRate)}/d</p>
+            <p className="text-[7px] text-slate-500 font-black uppercase">Run-rate: {formatCurrency(revStats.dailyRunRate, state.user)}/d</p>
           </div>
         </div>
       </div>
@@ -133,7 +134,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSy
         <Calendar jobs={state.jobs} externalEvents={state.externalEvents} clients={state.clients} />
       </div>
 
-      {/* Bottom Analytics: Pie + Full Side List (no scroll) */}
+      {/* Bottom Analytics */}
       <div className="bg-white rounded-[24px] border border-slate-200 p-4 shadow-sm h-[260px] overflow-hidden">
         <div className="flex flex-col lg:flex-row gap-4 h-full">
           <div className="w-full lg:w-1/3 h-full flex flex-col border-r border-slate-50 pr-4">
@@ -161,10 +162,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSy
             </div>
           </div>
 
-          <div className="w-full lg:w-2/3 flex flex-col h-full">
-            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">Active Accounts</p>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-              {revenueByClientData.slice(0, 10).map((client, idx) => (
+          <div className="w-full lg:w-2/3 flex flex-col h-full overflow-hidden">
+            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">Active Account Ledger</p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 overflow-y-auto custom-scrollbar pr-2">
+              {revenueByClientData.map((client, idx) => (
                 <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-100 rounded-xl">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-5 h-5 rounded-md flex items-center justify-center text-white font-black text-[7px]" style={{ backgroundColor: COLORS[idx % COLORS.length] }}>
@@ -172,7 +173,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSy
                     </div>
                     <p className="text-[10px] font-black text-slate-900 truncate">{client.name}</p>
                   </div>
-                  <p className="text-[10px] font-black text-slate-900 ml-2 shrink-0">{formatCurrency(client.value)}</p>
+                  <p className="text-[10px] font-black text-slate-900 ml-2 shrink-0">{formatCurrency(client.value, state.user)}</p>
                 </div>
               ))}
               {revenueByClientData.length === 0 && <p className="text-[9px] text-slate-300 uppercase py-4 col-span-2 text-center">No accounts recorded</p>}

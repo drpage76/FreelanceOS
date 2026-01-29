@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import * as ReactRouterDOM from 'react-router-dom';
-
-const { useNavigate } = ReactRouterDOM;
+// Use direct named imports from react-router-dom to avoid property access errors
+import { useNavigate } from 'react-router-dom';
 
 import { 
   format, isSameMonth, isSameDay, addMonths, subMonths, 

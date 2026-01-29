@@ -1,10 +1,8 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { AppState, UserPlan } from '../types';
 import { startBusinessChat } from '../services/gemini';
-import * as ReactRouterDOM from 'react-router-dom';
-
-const { Link } = ReactRouterDOM;
+// Use direct named imports from react-router-dom to avoid property access errors
+import { Link } from 'react-router-dom';
 
 interface Message {
   role: 'user' | 'model';

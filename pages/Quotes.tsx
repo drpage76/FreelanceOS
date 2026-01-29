@@ -1,12 +1,9 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { AppState, Quote, QuoteStatus, Client, JobItem, JobStatus, SchedulingType, Job } from '../types';
 import { DB, generateId } from '../services/db';
 import { formatCurrency, formatDate, generateJobId } from '../utils';
-// Fix: Use namespace import for react-router-dom to resolve exported member errors
-import * as ReactRouterDOM from 'react-router-dom';
-
-const { Link, useNavigate } = ReactRouterDOM;
+// Use direct named imports from react-router-dom to avoid property access errors
+import { Link, useNavigate } from 'react-router-dom';
 
 interface QuotesProps {
   state: AppState;
@@ -204,7 +201,7 @@ export const Quotes: React.FC<QuotesProps> = ({ state, onRefresh }) => {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200 my-auto">
+          <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200 my-auto overflow-hidden">
              <div className="p-8 border-b border-slate-100 flex items-center justify-between">
                 <h3 className="text-2xl font-black text-slate-900">Create Estimation</h3>
                 <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:text-rose-500"><i className="fa-solid fa-xmark"></i></button>
