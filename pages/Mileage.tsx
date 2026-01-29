@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { AppState, MileageRecord } from '../types';
 import { DB, generateId } from '../services/db';
 import { formatDate, formatCurrency } from '../utils';
@@ -16,6 +16,8 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [groundingSources, setGroundingSources] = useState<any[]>([]);
+  const lastCalculatedRef = useRef("");
+
   const [newEntry, setNewEntry] = useState({
     date: new Date().toISOString().split('T')[0],
     startPostcode: '',
@@ -28,26 +30,37 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
     description: ''
   });
 
+  // Effect to automatically calculate mileage when postcodes are valid
+  useEffect(() => {
+    const start = newEntry.startPostcode.trim();
+    const end = newEntry.endPostcode.trim();
+    const key = `${start}-${end}`;
+
+    if (start.length >= 5 && end.length >= 5 && key !== lastCalculatedRef.current) {
+      const timer = setTimeout(() => {
+        handleCalculateMileage();
+      }, 800); // Small debounce
+      return () => clearTimeout(timer);
+    }
+  }, [newEntry.startPostcode, newEntry.endPostcode]);
+
   const handleCalculateMileage = async () => {
     const start = newEntry.startPostcode.trim();
     const end = newEntry.endPostcode.trim();
 
-    if (!start || !end) {
-      alert("Please provide both start and end postcodes.");
-      return;
-    }
+    if (!start || !end) return;
     
     setIsCalculating(true);
+    lastCalculatedRef.current = `${start}-${end}`;
+    
     try {
       const result = await calculateDrivingDistance(start, end);
       if (result.miles !== null) {
         setNewEntry(prev => ({ ...prev, distanceMiles: result.miles || 0 }));
         setGroundingSources(result.sources || []);
-      } else {
-        alert("The AI was unable to calculate that specific route. Please check your postcodes or enter the distance manually.");
       }
     } catch (err) {
-      alert("Service error during calculation. Please try again or enter distance manually.");
+      console.warn("Auto-calculate failed:", err);
     } finally {
       setIsCalculating(false);
     }
@@ -56,7 +69,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving || !newEntry.startPostcode || !newEntry.endPostcode || newEntry.distanceMiles <= 0) {
-      if (newEntry.distanceMiles <= 0) alert("Please calculate or enter the distance before saving.");
+      if (newEntry.distanceMiles <= 0) alert("Please enter postcodes to calculate distance before saving.");
       return;
     }
 
@@ -80,6 +93,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
         description: ''
       });
       setGroundingSources([]);
+      lastCalculatedRef.current = "";
       onRefresh();
     } catch (err) {
       alert("Failed to save mileage record.");
@@ -110,7 +124,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-900">Travel & Mileage</h2>
-          <p className="text-slate-500 font-medium">Postcode-to-postcode intelligence powered by Google Maps grounding.</p>
+          <p className="text-slate-500 font-medium">Auto-calculating postcode intelligence powered by Google Maps.</p>
         </div>
         <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm flex items-center gap-8">
            <div className="text-center">
@@ -120,7 +134,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
            <div className="w-px h-10 bg-slate-100"></div>
            <div className="text-center">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Claim Value</p>
-              <p className="text-2xl font-black text-indigo-600">{formatCurrency(totals.value)}</p>
+              <p className="text-2xl font-black text-indigo-600">{formatCurrency(totals.value, state.user)}</p>
            </div>
         </div>
       </header>
@@ -159,7 +173,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-400 uppercase px-1">Distance & Rate</label>
             <div className="flex gap-2">
-              <div className="flex-1 px-4 py-3 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-between font-black text-sm text-indigo-700 h-[52px]">
+              <div className={`flex-1 px-4 py-3 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[52px] ${isCalculating ? 'border-indigo-400 animate-pulse' : 'border-indigo-100 text-indigo-700'}`}>
                 {isCalculating ? (
                   <i className="fa-solid fa-spinner animate-spin mx-auto text-indigo-400"></i>
                 ) : (
@@ -176,15 +190,6 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                   </>
                 )}
               </div>
-              <button 
-                type="button" 
-                onClick={handleCalculateMileage} 
-                disabled={isCalculating || !newEntry.startPostcode || !newEntry.endPostcode}
-                className={`px-4 py-3 rounded-2xl transition-all border shadow-sm ${isCalculating ? 'bg-slate-50 text-slate-300' : 'bg-white text-indigo-600 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 active:scale-95'}`}
-                title="Calculate Distance via Maps"
-              >
-                <i className={`fa-solid ${isCalculating ? 'fa-hourglass-half' : 'fa-wand-magic-sparkles'}`}></i>
-              </button>
             </div>
           </div>
 
@@ -218,7 +223,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
 
         {groundingSources.length > 0 && (
           <div className="mt-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100 animate-in fade-in slide-in-from-top-2">
-            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2">Distance Verification Sources (Google Maps):</p>
+            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2">Distance Verification (Google Maps):</p>
             <div className="flex flex-wrap gap-2">
               {groundingSources.map((chunk, i) => (
                 chunk.maps && (
@@ -231,23 +236,6 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
             </div>
           </div>
         )}
-      </div>
-
-      <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl flex items-center justify-between animate-in fade-in duration-500">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white text-xs shadow-sm">
-            <i className="fa-solid fa-info"></i>
-          </div>
-          <p className="text-xs font-bold text-indigo-900">
-            HMRC Approved Rate: <span className="text-indigo-600">45p per mile</span> for first 10,000 business miles.
-          </p>
-        </div>
-        <div className="text-right">
-           <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Estimated Value</p>
-           <p className="text-sm font-black text-indigo-700">
-             {newEntry.distanceMiles > 0 ? formatCurrency(newEntry.distanceMiles * newEntry.numTrips * (newEntry.isReturn ? 2 : 1) * MILEAGE_RATE) : '£0.00'}
-           </p>
-        </div>
       </div>
 
       <div className="bg-white rounded-[32px] border border-slate-200 overflow-hidden shadow-sm">
@@ -290,7 +278,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                         {record.description && <p className="text-[10px] text-slate-400 mt-1.5 italic leading-relaxed">{record.description}</p>}
                       </td>
                       <td className="p-6">
-                        <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${record.isReturn ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
+                        <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${record.isReturn ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
                           {record.numTrips > 1 ? `${record.numTrips}x ` : ''}{record.isReturn ? 'Return' : 'Single'}
                         </span>
                       </td>
@@ -305,7 +293,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                         )}
                       </td>
                       <td className="p-6 text-right font-black text-slate-900">{totalTripMiles.toFixed(1)} <span className="text-[10px] text-slate-400 uppercase font-bold">mi</span></td>
-                      <td className="p-6 text-right font-black text-indigo-600">{formatCurrency(totalTripMiles * MILEAGE_RATE)}</td>
+                      <td className="p-6 text-right font-black text-indigo-600">{formatCurrency(totalTripMiles * MILEAGE_RATE, state.user)}</td>
                       <td className="p-6 text-center">
                          <button onClick={() => handleDelete(record.id)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:bg-rose-500 hover:text-white transition-all border border-slate-100">
                             <i className="fa-solid fa-trash-can text-xs"></i>

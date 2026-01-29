@@ -33,6 +33,8 @@ export enum SchedulingType {
   SHIFT_BASED = 'Shift-based'
 }
 
+export type InvoiceNumberingType = 'INCREMENTAL' | 'DATE_BASED';
+
 export interface Client {
   id: string;
   name: string;
@@ -153,6 +155,7 @@ export interface Tenant {
   // Invoicing
   invoicePrefix: string; // e.g., 'INV-'
   invoiceNextNumber: number; // e.g., 1
+  invoiceNumberingType: InvoiceNumberingType;
 
   logoUrl?: string;
   plan: UserPlan;

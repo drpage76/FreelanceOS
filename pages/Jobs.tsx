@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 // Use direct named imports from react-router-dom to avoid property access errors
 import { Link, useNavigate } from 'react-router-dom';
@@ -52,7 +53,7 @@ export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) =
       const terms = parseInt(invoicePrompt.client.paymentTermsDays as any) || 30;
       
       const newInvoice: Invoice = {
-        id: generateInvoiceId(invoicePrompt.job.tenant_id ? { invoicePrefix: 'INV-', invoiceNextNumber: invoices.length + 1 } as any : null),
+        id: generateInvoiceId(state.user),
         jobId: invoicePrompt.job.id,
         date: promptDate,
         dueDate: calculateDueDate(promptDate, terms),
@@ -67,6 +68,20 @@ export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) =
     } finally {
       setIsProcessing(null);
       setInvoicePrompt(null);
+    }
+  };
+
+  const handleDeleteJob = async (id: string, description: string) => {
+    if (window.confirm(`Are you sure you want to permanently delete project: "${description}"? This will also remove all associated items and shifts.`)) {
+      setIsProcessing(id);
+      try {
+        await DB.deleteJob(id);
+        await onRefresh();
+      } catch (err) {
+        alert("Delete failed. Cloud synchronization error.");
+      } finally {
+        setIsProcessing(null);
+      }
     }
   };
 
@@ -137,6 +152,8 @@ export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) =
                 filteredJobs.map(job => {
                   const client = state.clients.find(c => c.id === job.clientId);
                   const hasInvoice = state.invoices.some(inv => inv.jobId === job.id);
+                  const isBusy = isProcessing === job.id;
+
                   return (
                     <tr key={job.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="p-8">
@@ -156,7 +173,7 @@ export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) =
                       <td className="p-8">
                         <span className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border ${STATUS_COLORS[job.status]}`}>{job.status}</span>
                       </td>
-                      <td className="p-8 text-right font-black text-slate-900 text-lg tracking-tight">{formatCurrency(job.totalRecharge)}</td>
+                      <td className="p-8 text-right font-black text-slate-900 text-lg tracking-tight">{formatCurrency(job.totalRecharge, state.user)}</td>
                       <td className="p-8">
                         <div className="flex items-center justify-center gap-3">
                           <Link to={`/jobs/${job.id}`} className="bg-slate-900 text-white w-11 h-11 flex items-center justify-center rounded-[18px] hover:bg-indigo-600 transition-all shadow-md" title="Open Workspace">
@@ -167,11 +184,14 @@ export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) =
                               <i className="fa-solid fa-file-invoice-dollar text-xs"></i>
                             </button>
                           )}
-                          {hasInvoice && (
-                             <div className="w-11 h-11 flex items-center justify-center rounded-[18px] bg-slate-50 text-slate-300 border border-slate-100" title="Invoiced">
-                               <i className="fa-solid fa-check-double text-xs"></i>
-                             </div>
-                          )}
+                          <button 
+                            disabled={isBusy}
+                            onClick={() => handleDeleteJob(job.id, job.description)} 
+                            className="bg-white text-slate-300 border border-slate-200 w-11 h-11 flex items-center justify-center rounded-[18px] hover:text-rose-500 hover:border-rose-200 transition-all shadow-sm" 
+                            title="Delete Project"
+                          >
+                            {isBusy ? <i className="fa-solid fa-spinner animate-spin text-[10px]"></i> : <i className="fa-solid fa-trash-can text-xs"></i>}
+                          </button>
                         </div>
                       </td>
                     </tr>

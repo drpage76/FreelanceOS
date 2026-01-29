@@ -46,9 +46,19 @@ export const generateJobId = (startDate: string, sequence: number): string => {
 
 export const generateInvoiceId = (userSettings: Tenant | null): string => {
   if (!userSettings) return `INV-${Date.now()}`;
-  const prefix = userSettings.invoicePrefix || 'INV-';
-  const num = (userSettings.invoiceNextNumber || 1).toString().padStart(4, '0');
-  return `${prefix}${num}`;
+  
+  if (userSettings.invoiceNumberingType === 'DATE_BASED') {
+    const now = new Date();
+    const yy = format(now, 'yy');
+    const mm = format(now, 'MM');
+    // Using simple incrementing logic for the month's sequence
+    const seq = (userSettings.invoiceNextNumber || 1).toString().padStart(2, '0');
+    return `${yy}${mm}${seq}`;
+  } else {
+    const prefix = userSettings.invoicePrefix || 'INV-';
+    const num = (userSettings.invoiceNextNumber || 1).toString().padStart(4, '0');
+    return `${prefix}${num}`;
+  }
 };
 
 export const calculateDueDate = (startDate: string, terms: number): string => {

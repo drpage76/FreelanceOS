@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { DB } from '../services/db';
-import { Tenant, UserPlan } from '../types';
+import { Tenant, UserPlan, InvoiceNumberingType } from '../types';
 import { differenceInDays, parseISO, addMonths, format } from 'date-fns';
 
 interface SettingsProps {
@@ -62,6 +62,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
         // Invoicing
         invoicePrefix: (formData.get('invoicePrefix') as string) || user?.invoicePrefix || 'INV-',
         invoiceNextNumber: parseInt(formData.get('invoiceNextNumber') as string) || user?.invoiceNextNumber || 1,
+        invoiceNumberingType: (formData.get('invoiceNumberingType') as InvoiceNumberingType) || 'INCREMENTAL',
 
         logoUrl: logoPreview
       };
@@ -194,13 +195,29 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
               {/* Invoicing Sequence */}
               <div className="md:col-span-2 pt-4 border-t border-slate-50">
                 <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 italic">Invoicing Identity & Sequencing</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Numbering Logic</label>
+                    <div className="flex gap-2 bg-slate-50 p-1 rounded-2xl border border-slate-200">
+                      <button 
+                        type="button" 
+                        onClick={() => {/* handled by select in form */}} 
+                        className="flex-1"
+                      >
+                         <select name="invoiceNumberingType" defaultValue={user?.invoiceNumberingType || 'INCREMENTAL'} className="w-full px-4 py-3 bg-white rounded-xl font-black text-[11px] uppercase outline-none border-none">
+                            <option value="INCREMENTAL">Incremental (e.g. INV-0042)</option>
+                            <option value="DATE_BASED">Date-based (e.g. 250301)</option>
+                         </select>
+                      </button>
+                    </div>
+                  </div>
+                  
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Invoice Prefix</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Incremental Prefix (Type 1 only)</label>
                     <input name="invoicePrefix" defaultValue={user?.invoicePrefix || 'INV-'} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Next Sequence Number</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Next sequence number</label>
                     <input type="number" name="invoiceNextNumber" defaultValue={user?.invoiceNextNumber || 1} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
                   </div>
                 </div>
@@ -225,7 +242,6 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
              </div>
 
              <ul className="space-y-4 text-left text-xs font-bold text-slate-400 mb-10">
-                <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Smart AI Business Coaching</li>
                 <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Global Currency & Tax Engine</li>
                 <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Secure Real-time Cloud Backup</li>
                 <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Google Calendar Bi-sync</li>

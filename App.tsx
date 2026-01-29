@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 // Use direct named imports from react-router-dom to avoid property access errors
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -9,7 +10,6 @@ import { JobDetails } from './pages/JobDetails';
 import { Clients } from './pages/Clients';
 import { Invoices } from './pages/Invoices';
 import { Mileage } from './pages/Mileage';
-import { Assistant } from './pages/Assistant';
 import { Settings } from './pages/Settings';
 import { Landing } from './pages/Landing'; 
 import { CreateJobModal } from './components/CreateJobModal';
@@ -180,7 +180,6 @@ const App: React.FC = () => {
             <Route path="/clients" element={<Clients state={appState} onRefresh={loadData} />} />
             <Route path="/invoices" element={<Invoices state={appState} onRefresh={loadData} />} />
             <Route path="/mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
-            <Route path="/assistant" element={<Assistant state={appState} />} />
             <Route path="/settings" element={<Settings user={currentUser} onLogout={() => DB.signOut().then(() => window.location.reload())} onRefresh={loadData} />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

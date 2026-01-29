@@ -55,6 +55,7 @@ const FIELD_MAP: Record<string, string> = {
   fiscalYearStartMonth: 'fiscal_year_start_month',
   invoicePrefix: 'invoice_prefix',
   invoiceNextNumber: 'invoice_next_number',
+  invoiceNumberingType: 'invoice_numbering_type',
   clientId: 'client_id',
   startDate: 'start_date',
   endDate: 'end_date',
@@ -240,6 +241,7 @@ export const DB = {
       fiscalYearStartMonth: 4,
       invoicePrefix: 'INV-',
       invoiceNextNumber: 1,
+      invoiceNumberingType: 'INCREMENTAL',
       plan: UserPlan.TRIAL,
       trialStartDate: new Date().toISOString()
     };
@@ -272,7 +274,7 @@ export const DB = {
     await DB.call('invoices', 'upsert', i);
     // Increment invoice sequence if unissued
     const user = await DB.getCurrentUser();
-    if (user && i.id.startsWith(user.invoicePrefix)) {
+    if (user && (i.id.startsWith(user.invoicePrefix) || user.invoiceNumberingType === 'DATE_BASED')) {
       await DB.updateTenant({ ...user, invoiceNextNumber: (user.invoiceNextNumber || 0) + 1 });
     }
   },
@@ -293,6 +295,7 @@ export const DB = {
   deleteJob: async (id: string) => {
     await DB.call('jobs', 'delete', null, { id });
     await DB.call('job_shifts', 'delete', null, { jobId: id });
+    await DB.call('job_items', 'delete', null, { jobId: id });
   },
   deleteJobItem: async (id: string) => DB.call('job_items', 'delete', null, { id }),
   deleteInvoice: async (id: string) => DB.call('invoices', 'delete', null, { id }),
