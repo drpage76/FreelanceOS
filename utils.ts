@@ -58,21 +58,29 @@ export const calculateDueDate = (startDate: string, terms: number): string => {
 
 export const calculateRevenueStats = (jobs: any[], goal: number = 50000) => {
   const now = new Date();
-  const startYear = startOfYear(now);
-  const daysElapsed = Math.max(1, differenceInDays(now, startYear));
   
-  const ytdRevenue = jobs
-    .filter(j => j.status !== 'Cancelled' && parseISO(j.startDate) >= startYear && parseISO(j.startDate) <= now)
-    .reduce((sum, j) => sum + j.totalRecharge, 0);
+  // UK Fiscal Year Logic: Starts April 6th
+  let fiscalYearStart = new Date(now.getFullYear(), 3, 6); // Month is 0-indexed, so 3 is April
+  if (now < fiscalYearStart) {
+    fiscalYearStart = new Date(now.getFullYear() - 1, 3, 6);
+  }
+  
+  const daysElapsed = Math.max(1, differenceInDays(now, fiscalYearStart));
+  
+  const ytdRevenue = (jobs || [])
+    .filter(j => j.status !== 'Cancelled' && parseISO(j.startDate) >= fiscalYearStart && parseISO(j.startDate) <= now)
+    .reduce((sum, j) => sum + (j.totalRecharge || 0), 0);
 
-  const projectedAnnual = (ytdRevenue / daysElapsed) * 365;
+  // Projection based on current daily velocity
+  const dailyRunRate = ytdRevenue / daysElapsed;
+  const projectedAnnual = dailyRunRate * 365;
   const percentOfGoal = Math.min(100, (ytdRevenue / goal) * 100);
 
   return {
     ytdRevenue,
     projectedAnnual,
     percentOfGoal,
-    dailyRunRate: ytdRevenue / daysElapsed
+    dailyRunRate
   };
 };
 
