@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { AppState } from "../types";
 
 const getAIClient = () => {
@@ -16,9 +16,9 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
   if (!ai) return { miles: null, sources: [], error: "AI Key Missing" };
 
   const model = "gemini-2.5-flash"; 
-  // Update prompt to ask for just the number since we can't enforce JSON schema with Maps tool
+  // Refined prompt to get a clear distance in text
   const prompt = `Find the fastest driving distance in miles between UK postcodes "${start}" and "${end}" using Google Maps. 
-  Respond with ONLY the number representing the distance in miles.`;
+  Please state the total distance clearly in miles. For example: "The distance is 15.4 miles".`;
 
   try {
     const response = await ai.models.generateContent({
@@ -36,8 +36,10 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
     });
 
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-    const text = response.text || "0";
+    const text = response.text || "";
+    
     // Robust parsing for distance as we can't use responseSchema with Maps grounding
+    // Look for the first number followed by "miles" or just the first decimal/integer number
     const match = text.match(/(\d+(\.\d+)?)/);
     const miles = match ? parseFloat(match[0]) : null;
 
@@ -65,20 +67,20 @@ export const smartExtractJob = async (rawText: string) => {
       config: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.OBJECT,
+          type: "OBJECT" as any, // Schema types are strictly enum or string in some contexts, but following instructions
           properties: {
-            description: { type: Type.STRING },
-            location: { type: Type.STRING },
-            startDate: { type: Type.STRING },
-            endDate: { type: Type.STRING },
+            description: { type: "STRING" as any },
+            location: { type: "STRING" as any },
+            startDate: { type: "STRING" as any },
+            endDate: { type: "STRING" as any },
             suggestedItems: {
-              type: Type.ARRAY,
+              type: "ARRAY" as any,
               items: {
-                type: Type.OBJECT,
+                type: "OBJECT" as any,
                 properties: {
-                  description: { type: Type.STRING },
-                  qty: { type: Type.INTEGER },
-                  unitPrice: { type: Type.NUMBER }
+                  description: { type: "STRING" as any },
+                  qty: { type: "NUMBER" as any },
+                  unitPrice: { type: "NUMBER" as any }
                 }
               }
             }
@@ -90,32 +92,4 @@ export const smartExtractJob = async (rawText: string) => {
   } catch (error) {
     return null;
   }
-};
-
-// Fix: Added missing startBusinessChat export for pages/Assistant.tsx
-export const startBusinessChat = (state: AppState) => {
-  const ai = getAIClient();
-  if (!ai) throw new Error("AI Client not initialized");
-
-  const totalRevenue = state.jobs.reduce((sum, j) => sum + (j.totalRecharge || 0), 0);
-  
-  // System instruction provides the business context for the coach
-  const systemInstruction = `You are a world-class freelance business coach and growth strategist for ${state.user?.name || 'a freelancer'}'s business, ${state.user?.businessName || 'Freelance OS'}. 
-  Your mission is to provide expert guidance on scaling, rate optimization, and client management.
-  
-  Current Workspace Overview:
-  - Clients: ${state.clients.length}
-  - Active/Archive Projects: ${state.jobs.length}
-  - Lifetime Gross Billing: ${totalRevenue}
-  - Settled Invoices: ${state.invoices.filter(i => i.status === 'Paid').length}
-  - Outstanding Receivables: ${state.invoices.filter(i => i.status !== 'Paid').length}
-  
-  Provide concise, strategic, and actionable insights to help the user professionalize their operation.`;
-
-  return ai.chats.create({
-    model: 'gemini-3-pro-preview',
-    config: {
-      systemInstruction,
-    },
-  });
 };

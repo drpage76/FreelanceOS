@@ -33,13 +33,16 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
   useEffect(() => {
     const start = newEntry.startPostcode.trim();
     const end = newEntry.endPostcode.trim();
-    const key = `${start}-${end}`;
-
-    if (start.length >= 5 && end.length >= 5 && key !== lastCalculatedRef.current) {
-      const timer = setTimeout(() => {
-        handleCalculateMileage();
-      }, 1000); // Debounce
-      return () => clearTimeout(timer);
+    
+    // Simple UK Postcode validation check (basic length)
+    if (start.length >= 5 && end.length >= 5) {
+      const key = `${start}-${end}`;
+      if (key !== lastCalculatedRef.current) {
+        const timer = setTimeout(() => {
+          handleCalculateMileage();
+        }, 1500); // 1.5s debounce to allow finishing typing
+        return () => clearTimeout(timer);
+      }
     }
   }, [newEntry.startPostcode, newEntry.endPostcode]);
 
@@ -67,7 +70,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving || !newEntry.startPostcode || !newEntry.endPostcode || newEntry.distanceMiles <= 0) {
-      if (newEntry.distanceMiles <= 0) alert("Please enter valid postcodes to fetch driving distance.");
+      if (newEntry.distanceMiles <= 0 && !isCalculating) alert("Please enter valid postcodes to fetch driving distance.");
       return;
     }
 
@@ -108,7 +111,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
 
   const totals = useMemo(() => {
     return state.mileage.reduce((acc, curr) => {
-      const tripDistance = curr.distanceMiles * curr.numTrips * (curr.isReturn ? 2 : 1);
+      const tripDistance = (curr.distanceMiles || 0) * (curr.numTrips || 1) * (curr.isReturn ? 2 : 1);
       return {
         miles: acc.miles + tripDistance,
         value: acc.value + (tripDistance * MILEAGE_RATE)
@@ -121,7 +124,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-900">Travel & Mileage</h2>
-          <p className="text-slate-500 font-medium">Automatic distance lookup powered by map protocols.</p>
+          <p className="text-slate-500 font-medium">Automatic distance lookup powered by global map protocols.</p>
         </div>
         <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm flex items-center gap-8">
            <div className="text-center">
@@ -161,7 +164,9 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
             <label className="text-[10px] font-black text-slate-400 uppercase px-1">Distance (Miles)</label>
             <div className={`px-4 py-3 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[52px] ${isCalculating ? 'border-indigo-400 animate-pulse' : 'border-indigo-100 text-indigo-700'}`}>
               {isCalculating ? (
-                <i className="fa-solid fa-spinner animate-spin mx-auto text-indigo-400"></i>
+                <div className="w-full flex items-center justify-center">
+                   <i className="fa-solid fa-spinner animate-spin text-indigo-400"></i>
+                </div>
               ) : (
                 <input 
                   type="number" 
@@ -184,7 +189,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
              </div>
           </div>
 
-          <button type="submit" disabled={isSaving || newEntry.distanceMiles === 0} className="h-[52px] bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-lg flex items-center justify-center gap-2">
+          <button type="submit" disabled={isSaving || newEntry.distanceMiles === 0 || isCalculating} className="h-[52px] bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50">
              {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-floppy-disk"></i>}
              Save Journey
           </button>
@@ -209,7 +214,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                 <tr><td colSpan={6} className="p-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">No travel logs recorded</td></tr>
               ) : (
                 state.mileage.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(record => {
-                  const totalTripMiles = record.distanceMiles * record.numTrips * (record.isReturn ? 2 : 1);
+                  const totalTripMiles = (record.distanceMiles || 0) * (record.numTrips || 1) * (record.isReturn ? 2 : 1);
                   return (
                     <tr key={record.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="p-6 text-xs font-black text-slate-900">{formatDate(record.date)}</td>

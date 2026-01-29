@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useMemo } from 'react';
 // Use direct named imports from react-router-dom to avoid property access errors
 import { Link } from 'react-router-dom';
@@ -19,10 +20,8 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState<Invoice | null>(null);
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
-  const [taxRate, setTaxRate] = useState(20);
   const docRef = useRef<HTMLDivElement>(null);
 
-  // Fix: UserPlan.FREE does not exist. Both TRIAL and ACTIVE plans are considered pro for now as per landing page.
   const isPro = !!state.user?.plan;
 
   const financialStats = useMemo(() => {
@@ -33,7 +32,7 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
     (state.invoices || []).forEach(inv => {
       const job = (state.jobs || []).find(j => j.id === inv.jobId);
       const subtotal = job?.totalRecharge || 0;
-      const vatMultiplier = state.user?.isVatRegistered ? 1.20 : 1.0;
+      const vatMultiplier = state.user?.isVatRegistered ? (1 + (state.user?.taxRate || 20) / 100) : 1.0;
       const val = subtotal * vatMultiplier;
       
       if (inv.status === InvoiceStatus.PAID) totalPaid += val;
@@ -53,7 +52,7 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
     ).map(job => {
       const inv = state.invoices.find(i => i.jobId === job.id);
       const client = state.clients.find(c => c.id === job.clientId);
-      const vatMultiplier = state.user?.isVatRegistered ? 1.2 : 1.0;
+      const vatMultiplier = state.user?.isVatRegistered ? (1 + (state.user?.taxRate || 20) / 100) : 1.0;
       return { job, client, invoice: inv, status: inv ? inv.status : 'TO BE INVOICED', amount: (job.totalRecharge || 0) * vatMultiplier };
     }).sort((a, b) => new Date(b.job.startDate).getTime() - new Date(a.job.startDate).getTime());
   }, [state.jobs, state.invoices, state.clients, state.user]);
@@ -134,7 +133,7 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
                     <div className="text-right">
                        <p className="font-black text-xl">{state.user?.businessName}</p>
                        <p className="text-sm text-slate-500 whitespace-pre-line leading-relaxed mt-2">{state.user?.businessAddress}</p>
-                       {state.user?.vatNumber && <p className="text-[10px] font-black uppercase text-slate-400 mt-2">VAT: {state.user.vatNumber}</p>}
+                       {state.user?.vatNumber && <p className="text-[10px] font-black uppercase text-slate-400 mt-2">{state.user?.taxName || 'VAT'}: {state.user.vatNumber}</p>}
                     </div>
                  </div>
 
@@ -166,8 +165,8 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
                          <tr key={it.id}>
                             <td className="py-5 font-bold text-slate-700 text-sm">{it.description}</td>
                             <td className="py-5 text-center text-slate-600 font-black text-xs">{it.qty}</td>
-                            <td className="py-5 text-right text-slate-600 font-black text-xs">{formatCurrency(it.unitPrice)}</td>
-                            <td className="py-5 text-right font-black text-slate-900 text-sm">{formatCurrency(it.qty * it.unitPrice)}</td>
+                            <td className="py-5 text-right text-slate-600 font-black text-xs">{formatCurrency(it.unitPrice, state.user)}</td>
+                            <td className="py-5 text-right font-black text-slate-900 text-sm">{formatCurrency(it.qty * it.unitPrice, state.user)}</td>
                          </tr>
                        ))}
                     </tbody>
@@ -177,18 +176,18 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
                     <div className="w-64 space-y-4">
                        <div className="flex justify-between items-center">
                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Net Total</span>
-                          <span className="text-xl font-bold text-slate-700">{formatCurrency(previewData.job.totalRecharge)}</span>
+                          <span className="text-xl font-bold text-slate-700">{formatCurrency(previewData.job.totalRecharge, state.user)}</span>
                        </div>
                        {state.user?.isVatRegistered && (
                          <div className="flex justify-between items-center pt-2 border-t border-slate-50">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">VAT (20%)</span>
-                            <span className="text-xl font-bold text-slate-700">{formatCurrency(previewData.job.totalRecharge * 0.2)}</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{state.user?.taxName || 'VAT'} ({state.user?.taxRate || 20}%)</span>
+                            <span className="text-xl font-bold text-slate-700">{formatCurrency(previewData.job.totalRecharge * ((state.user?.taxRate || 20) / 100), state.user)}</span>
                          </div>
                        )}
                        <div className="flex justify-between items-center pt-4 border-t-2 border-slate-900">
                           <span className="text-xs font-black uppercase tracking-widest">Total Payable</span>
                           <span className="text-3xl font-black text-indigo-600">
-                            {formatCurrency(previewData.job.totalRecharge * (state.user?.isVatRegistered ? 1.2 : 1))}
+                            {formatCurrency(previewData.job.totalRecharge * (state.user?.isVatRegistered ? (1 + (state.user?.taxRate || 20) / 100) : 1), state.user)}
                           </span>
                        </div>
                     </div>
@@ -196,9 +195,12 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
 
                  <div className="mt-40 pt-10 border-t border-slate-100 grid grid-cols-2 gap-10">
                     <div>
-                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Payment Details</p>
+                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Remittance Details</p>
                        <div className="bg-slate-50 p-6 rounded-2xl font-mono text-[11px] text-slate-700 leading-relaxed border border-slate-100 shadow-inner">
-                         {state.user?.bankDetails || 'Provide bank details in settings tab.'}
+                         {state.user?.accountName && <p className="font-black mb-1">{state.user.accountName}</p>}
+                         {state.user?.accountNumber && <p>Acc: {state.user.accountNumber}</p>}
+                         {state.user?.sortCodeOrIBAN && <p>Sort/IBAN: {state.user.sortCodeOrIBAN}</p>}
+                         {!state.user?.accountName && !state.user?.accountNumber && <p className="text-slate-400 italic">Configure banking in Workspace Settings.</p>}
                        </div>
                     </div>
                     <div>
@@ -218,8 +220,8 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
           <p className="text-slate-500 font-medium">Full reporting for project lifecycle and settlements.</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl min-w-[140px] shadow-sm"><p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">Settled Income</p><p className="text-xl font-black text-emerald-900">{formatCurrency(financialStats.totalPaid)}</p></div>
-          <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl min-w-[140px] shadow-sm"><p className="text-[9px] font-black text-indigo-600 uppercase tracking-widest mb-1">Accounts Receivable</p><p className="text-xl font-black text-indigo-900">{formatCurrency(financialStats.totalOutstanding)}</p></div>
+          <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl min-w-[140px] shadow-sm"><p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">Settled Income</p><p className="text-xl font-black text-emerald-900">{formatCurrency(financialStats.totalPaid, state.user)}</p></div>
+          <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl min-w-[140px] shadow-sm"><p className="text-[9px] font-black text-indigo-600 uppercase tracking-widest mb-1">Accounts Receivable</p><p className="text-xl font-black text-indigo-900">{formatCurrency(financialStats.totalOutstanding, state.user)}</p></div>
         </div>
       </header>
 
@@ -254,7 +256,7 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
                           {status}
                         </span>
                       </td>
-                      <td className="p-6 text-right font-black text-slate-900">{formatCurrency(amount)}</td>
+                      <td className="p-6 text-right font-black text-slate-900">{formatCurrency(amount, state.user)}</td>
                       <td className="p-6 text-center">
                         {invoice ? (
                           <button onClick={() => handlePreview(invoice)} disabled={isProcessingRow} className="bg-slate-900 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all">Open Doc</button>

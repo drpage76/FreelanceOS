@@ -31,46 +31,54 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
 
   const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!user) return;
+    
     setIsSaving(true);
     try {
       const formData = new FormData(e.currentTarget);
       const updated: Tenant = {
-        ...user!,
-        name: (formData.get('name') as string) || user?.name || '',
-        businessName: (formData.get('businessName') as string) || user?.businessName || '',
-        businessAddress: (formData.get('businessAddress') as string) || user?.businessAddress || '',
-        companyRegNumber: (formData.get('companyRegNumber') as string) || user?.companyRegNumber || '',
+        ...user,
+        email: user.email, // Ensure PK is preserved
+        name: (formData.get('name') as string) || user.name || '',
+        businessName: (formData.get('businessName') as string) || user.businessName || '',
+        businessAddress: (formData.get('businessAddress') as string) || user.businessAddress || '',
+        companyRegNumber: (formData.get('companyRegNumber') as string) || user.companyRegNumber || '',
         
         // Banking
-        accountName: (formData.get('accountName') as string) || user?.accountName || '',
-        accountNumber: (formData.get('accountNumber') as string) || user?.accountNumber || '',
-        sortCodeOrIBAN: (formData.get('sortCodeOrIBAN') as string) || user?.sortCodeOrIBAN || '',
+        accountName: (formData.get('accountName') as string) || user.accountName || '',
+        accountNumber: (formData.get('accountNumber') as string) || user.accountNumber || '',
+        sortCodeOrIBAN: (formData.get('sortCodeOrIBAN') as string) || user.sortCodeOrIBAN || '',
         
         // Tax
         isVatRegistered: formData.get('isVatRegistered') === 'on',
-        vatNumber: (formData.get('vatNumber') as string) || user?.vatNumber || '',
-        taxName: (formData.get('taxName') as string) || user?.taxName || 'VAT',
-        taxRate: parseFloat(formData.get('taxRate') as string) || user?.taxRate || 20,
+        vatNumber: (formData.get('vatNumber') as string) || user.vatNumber || '',
+        taxName: (formData.get('taxName') as string) || user.taxName || 'VAT',
+        taxRate: parseFloat(formData.get('taxRate') as string) || user.taxRate || 20,
         
         // Localization
-        currency: (formData.get('currency') as string) || user?.currency || 'GBP',
+        currency: (formData.get('currency') as string) || user.currency || 'GBP',
         
         // Fiscal Year
-        fiscalYearStartDay: parseInt(formData.get('fiscalDay') as string) || user?.fiscalYearStartDay || 6,
-        fiscalYearStartMonth: parseInt(formData.get('fiscalMonth') as string) || user?.fiscalYearStartMonth || 4,
+        fiscalYearStartDay: parseInt(formData.get('fiscalDay') as string) || user.fiscalYearStartDay || 6,
+        fiscalYearStartMonth: parseInt(formData.get('fiscalMonth') as string) || user.fiscalYearStartMonth || 4,
 
         // Invoicing
-        invoicePrefix: (formData.get('invoicePrefix') as string) || user?.invoicePrefix || 'INV-',
-        invoiceNextNumber: parseInt(formData.get('invoiceNextNumber') as string) || user?.invoiceNextNumber || 1,
-        invoiceNumberingType: (formData.get('invoiceNumberingType') as InvoiceNumberingType) || 'INCREMENTAL',
+        invoicePrefix: (formData.get('invoicePrefix') as string) || user.invoicePrefix || 'INV-',
+        invoiceNextNumber: parseInt(formData.get('invoiceNextNumber') as string) || user.invoiceNextNumber || 1,
+        invoiceNumberingType: (formData.get('invoiceNumberingType') as InvoiceNumberingType) || user.invoiceNumberingType || 'INCREMENTAL',
 
         logoUrl: logoPreview
       };
       await DB.updateTenant(updated);
       setSaveSuccess(true);
-      onRefresh();
+      await onRefresh();
       setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (err) { } finally { setIsSaving(false); }
+    } catch (err) { 
+      console.error("Profile Update Failed:", err);
+      alert("Update synchronization interrupted.");
+    } finally { 
+      setIsSaving(false); 
+    }
   };
 
   return (
@@ -80,7 +88,10 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
           <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none italic">Workspace Engine</h2>
           <p className="text-slate-500 font-medium mt-1">Configuring global protocols for {user?.email}</p>
         </div>
-        <button onClick={onLogout} className="px-6 py-3 bg-white text-rose-500 border border-slate-200 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm">Sign Out</button>
+        <div className="flex gap-3">
+           {saveSuccess && <span className="bg-emerald-50 text-emerald-600 px-4 py-3 rounded-xl text-[10px] font-black uppercase flex items-center animate-in fade-in zoom-in-95"><i className="fa-solid fa-check mr-2"></i> Synced</span>}
+           <button onClick={onLogout} className="px-6 py-3 bg-white text-rose-500 border border-slate-200 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm">Sign Out</button>
+        </div>
       </header>
 
       <div className="flex gap-1 p-1 bg-slate-100 rounded-2xl w-fit">
@@ -126,7 +137,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
               </div>
             </div>
             <button type="submit" disabled={isSaving} className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-black transition-all">
-              {isSaving ? 'Synchronizing...' : 'Update Business Core'}
+              {isSaving ? 'Synchronizing Core...' : 'Update Business Core'}
             </button>
           </div>
         )}
@@ -187,7 +198,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                       </select>
                    </div>
                    <div className="flex-[2] bg-indigo-50 p-4 rounded-2xl border border-indigo-100 italic text-[10px] text-indigo-700 font-bold">
-                     Revenue dashboard will reset on the {user?.fiscalYearStartDay}th of {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][(user?.fiscalYearStartMonth || 4)-1]} annually.
+                     Dashboard resets annually on the {user?.fiscalYearStartDay}th of {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][(user?.fiscalYearStartMonth || 4)-1]}.
                    </div>
                 </div>
               </div>
@@ -198,22 +209,14 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Numbering Logic</label>
-                    <div className="flex gap-2 bg-slate-50 p-1 rounded-2xl border border-slate-200">
-                      <button 
-                        type="button" 
-                        onClick={() => {/* handled by select in form */}} 
-                        className="flex-1"
-                      >
-                         <select name="invoiceNumberingType" defaultValue={user?.invoiceNumberingType || 'INCREMENTAL'} className="w-full px-4 py-3 bg-white rounded-xl font-black text-[11px] uppercase outline-none border-none">
-                            <option value="INCREMENTAL">Incremental (e.g. INV-0042)</option>
-                            <option value="DATE_BASED">Date-based (e.g. 250301)</option>
-                         </select>
-                      </button>
-                    </div>
+                    <select name="invoiceNumberingType" defaultValue={user?.invoiceNumberingType || 'INCREMENTAL'} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-[11px] uppercase outline-none">
+                       <option value="INCREMENTAL">Incremental (e.g. INV-0042)</option>
+                       <option value="DATE_BASED">Date-based (e.g. 250301)</option>
+                    </select>
                   </div>
                   
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Incremental Prefix (Type 1 only)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Prefix (Incremental only)</label>
                     <input name="invoicePrefix" defaultValue={user?.invoicePrefix || 'INV-'} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
                   </div>
                   <div className="space-y-2">
@@ -242,8 +245,8 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
              </div>
 
              <ul className="space-y-4 text-left text-xs font-bold text-slate-400 mb-10">
-                <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Global Currency & Tax Engine</li>
-                <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Secure Real-time Cloud Backup</li>
+                <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Local & Cloud Sync Engine</li>
+                <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Secure Real-time Workspace Backup</li>
                 <li className="flex items-center gap-2"><i className="fa-solid fa-check text-emerald-400"></i> Google Calendar Bi-sync</li>
              </ul>
 

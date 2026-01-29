@@ -1,6 +1,6 @@
+
 import React, { useState } from 'react';
 import { AppState, Client } from '../types';
-import { ClientImporter } from '../components/ClientImporter';
 import { AddClientModal } from '../components/AddClientModal';
 import { DB } from '../services/db';
 // Use direct named imports from react-router-dom to avoid property access errors
@@ -12,27 +12,10 @@ interface ClientsProps {
 }
 
 export const Clients: React.FC<ClientsProps> = ({ state, onRefresh }) => {
-  const [isImportOpen, setIsImportOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-
-  const handleImported = async (newClients: Client[]) => {
-    setIsProcessing(true);
-    try {
-      for (const client of newClients) {
-        await DB.saveClient(client);
-      }
-      await onRefresh();
-      alert(`Successfully imported ${newClients.length} clients.`);
-    } catch (err) {
-      console.error("Import failed:", err);
-      alert("Import partially failed. Please check your cloud connection.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   const filteredClients = state.clients.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -92,14 +75,6 @@ export const Clients: React.FC<ClientsProps> = ({ state, onRefresh }) => {
             className="bg-white text-slate-600 border border-slate-200 px-6 py-3 rounded-2xl font-black shadow-sm hover:bg-slate-50 transition-all flex items-center"
           >
             <i className="fa-solid fa-file-csv mr-2 text-emerald-600"></i> Export
-          </button>
-          <button 
-            disabled={isProcessing}
-            onClick={() => setIsImportOpen(true)}
-            className="bg-white text-indigo-600 border border-indigo-100 px-6 py-3 rounded-2xl font-black shadow-sm hover:bg-indigo-50 transition-all flex items-center disabled:opacity-50"
-          >
-            {isProcessing ? <i className="fa-solid fa-spinner animate-spin mr-2"></i> : <i className="fa-solid fa-file-import mr-2"></i>}
-            Smart Import
           </button>
           <button 
             onClick={openAddModal}
@@ -195,13 +170,6 @@ export const Clients: React.FC<ClientsProps> = ({ state, onRefresh }) => {
           </table>
         </div>
       </div>
-
-      <ClientImporter 
-        isOpen={isImportOpen} 
-        onClose={() => setIsImportOpen(false)} 
-        onImport={handleImported} 
-        tenantId={state.user?.email || ''} 
-      />
 
       <AddClientModal 
         isOpen={isModalOpen}
