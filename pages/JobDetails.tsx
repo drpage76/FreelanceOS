@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 // Use direct named imports from react-router-dom to avoid property access errors
 import { useParams, useNavigate, Link } from 'react-router-dom';
@@ -118,6 +119,21 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       setJob(updatedJob);
       await onRefresh();
     } catch (err: any) { alert(`Sync Error: ${err.message}`); } finally { setIsSaving(false); }
+  };
+
+  const handleDeleteJob = async () => {
+    if (!job) return;
+    if (window.confirm(`Are you sure you want to permanently delete project: "${job.description}"? This action cannot be undone.`)) {
+      setIsSaving(true);
+      try {
+        await DB.deleteJob(job.id);
+        await onRefresh();
+        navigate('/jobs');
+      } catch (err) {
+        alert("Failed to delete project. Please check your cloud connection.");
+        setIsSaving(false);
+      }
+    }
   };
 
   const handleDownloadPDF = async (filename: string) => {
@@ -483,6 +499,14 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                   </div>
                 ))}
              </div>
+          </div>
+          
+          <div className="p-8 bg-rose-50 rounded-[40px] border border-rose-100 mt-12">
+             <h4 className="text-xs font-black text-rose-900 uppercase tracking-widest mb-2 italic">Danger Protocol</h4>
+             <p className="text-[11px] text-rose-600 font-medium mb-6 leading-relaxed">Permanently terminate this project and purge all associated records. This action is irreversible.</p>
+             <button onClick={handleDeleteJob} disabled={isSaving} className="px-8 py-3 bg-rose-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-rose-700 transition-all flex items-center gap-2">
+                {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-trash-can"></i>} Terminate Project Archive
+             </button>
           </div>
         </div>
 

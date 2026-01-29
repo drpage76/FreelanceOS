@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 // Use direct named imports from react-router-dom to avoid property access errors
 import { Link, useLocation } from 'react-router-dom';
@@ -62,7 +63,6 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
         <NavItem to="/clients" icon="fa-users" label="Clients" active={location.pathname.startsWith('/clients')} />
         <NavItem to="/invoices" icon="fa-file-invoice-dollar" label="Financials" active={location.pathname.startsWith('/invoices')} />
         <NavItem to="/mileage" icon="fa-car-side" label="Mileage" active={location.pathname === '/mileage'} />
-        <NavItem to="/assistant" icon="fa-robot" label="AI Coach" active={location.pathname === '/assistant'} />
         <NavItem to="/settings" icon="fa-gear" label="Settings" active={location.pathname === '/settings'} />
       </div>
 

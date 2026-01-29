@@ -40,7 +40,10 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
   if (!ai) return { miles: null, sources: [], error: "AI Key Missing" };
 
   const model = "gemini-2.5-flash"; 
-  const prompt = `Calculate the driving distance in miles for the fastest route between UK postcodes "${start}" and "${end}". Return only the numeric value.`;
+  const prompt = `Find the driving distance between UK postcodes "${start}" and "${end}" using Google Maps. 
+  Respond ONLY with the distance in miles as a single decimal number.
+  If multiple routes exist, provide the distance for the fastest one.
+  Example output: 12.4`;
 
   try {
     const response = await ai.models.generateContent({
@@ -58,12 +61,16 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
 
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
     const text = response.text || "";
+    // Robustly find any decimal or integer number in the response
     const matches = text.match(/(\d+(\.\d+)?)/);
+    const miles = matches ? parseFloat(matches[0]) : null;
+
     return {
-      miles: matches ? parseFloat(matches[0]) : null,
+      miles: miles,
       sources: groundingChunks || []
     };
   } catch (error) {
+    console.error("Mileage AI Error:", error);
     return { miles: null, sources: [] };
   }
 };

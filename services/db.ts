@@ -36,7 +36,8 @@ export const getSupabase = () => {
 };
 
 const FIELD_MAP: Record<string, string> = {
-  paymentTermsDays: 'payment_terms_days',
+  // Tenant Profile
+  name: 'name',
   businessName: 'business_name',
   businessAddress: 'business_address',
   companyRegNumber: 'company_reg_number',
@@ -56,6 +57,9 @@ const FIELD_MAP: Record<string, string> = {
   invoicePrefix: 'invoice_prefix',
   invoiceNextNumber: 'invoice_next_number',
   invoiceNumberingType: 'invoice_numbering_type',
+  
+  // App Entities
+  paymentTermsDays: 'payment_terms_days',
   clientId: 'client_id',
   startDate: 'start_date',
   endDate: 'end_date',

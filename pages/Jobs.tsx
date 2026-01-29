@@ -71,20 +71,6 @@ export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) =
     }
   };
 
-  const handleDeleteJob = async (id: string, description: string) => {
-    if (window.confirm(`Are you sure you want to permanently delete project: "${description}"? This will also remove all associated items and shifts.`)) {
-      setIsProcessing(id);
-      try {
-        await DB.deleteJob(id);
-        await onRefresh();
-      } catch (err) {
-        alert("Delete failed. Cloud synchronization error.");
-      } finally {
-        setIsProcessing(null);
-      }
-    }
-  };
-
   return (
     <div className="space-y-6 pb-20 px-4">
       {invoicePrompt && (
@@ -152,7 +138,6 @@ export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) =
                 filteredJobs.map(job => {
                   const client = state.clients.find(c => c.id === job.clientId);
                   const hasInvoice = state.invoices.some(inv => inv.jobId === job.id);
-                  const isBusy = isProcessing === job.id;
 
                   return (
                     <tr key={job.id} className="hover:bg-slate-50/50 transition-colors group">
@@ -184,14 +169,11 @@ export const Jobs: React.FC<JobsProps> = ({ state, onNewJobClick, onRefresh }) =
                               <i className="fa-solid fa-file-invoice-dollar text-xs"></i>
                             </button>
                           )}
-                          <button 
-                            disabled={isBusy}
-                            onClick={() => handleDeleteJob(job.id, job.description)} 
-                            className="bg-white text-slate-300 border border-slate-200 w-11 h-11 flex items-center justify-center rounded-[18px] hover:text-rose-500 hover:border-rose-200 transition-all shadow-sm" 
-                            title="Delete Project"
-                          >
-                            {isBusy ? <i className="fa-solid fa-spinner animate-spin text-[10px]"></i> : <i className="fa-solid fa-trash-can text-xs"></i>}
-                          </button>
+                          {hasInvoice && (
+                             <div className="w-11 h-11 flex items-center justify-center rounded-[18px] bg-slate-50 text-slate-300 border border-slate-100" title="Invoiced">
+                               <i className="fa-solid fa-check-double text-xs"></i>
+                             </div>
+                          )}
                         </div>
                       </td>
                     </tr>
