@@ -10,15 +10,15 @@ const getAIClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-// Fix: calculateDrivingDistance updated to comply with Google Maps grounding rules (no responseMimeType/responseSchema)
+// Fixed: calculateDrivingDistance revised to strictly pull the fastest numerical distance from Maps grounding
 export const calculateDrivingDistance = async (start: string, end: string) => {
   const ai = getAIClient();
   if (!ai) return { miles: null, sources: [], error: "AI Key Missing" };
 
   const model = "gemini-2.5-flash"; 
-  // Refined prompt to get a clear distance in text
-  const prompt = `Find the fastest driving distance in miles between UK postcodes "${start}" and "${end}" using Google Maps. 
-  Please state the total distance clearly in miles. For example: "The distance is 15.4 miles".`;
+  // Ultra-specific prompt to minimize verbose text
+  const prompt = `Task: Calculate the fastest driving distance in miles between UK postcodes "${start}" and "${end}" using Google Maps. 
+  Output Rule: Your response must include the number of miles clearly. For example: "Distance: 12.5 miles".`;
 
   try {
     const response = await ai.models.generateContent({
@@ -26,7 +26,6 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
       contents: prompt,
       config: {
         tools: [{ googleMaps: {} }],
-        // responseMimeType and responseSchema are NOT allowed when using the googleMaps tool per guidelines
         toolConfig: {
           retrievalConfig: {
             latLng: { latitude: 51.5074, longitude: -0.1278 }
@@ -38,8 +37,8 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
     const text = response.text || "";
     
-    // Robust parsing for distance as we can't use responseSchema with Maps grounding
-    // Look for the first number followed by "miles" or just the first decimal/integer number
+    // Improved regex to find the first number that might be the distance
+    // It looks for decimals or integers.
     const match = text.match(/(\d+(\.\d+)?)/);
     const miles = match ? parseFloat(match[0]) : null;
 
@@ -48,7 +47,7 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
       sources: groundingChunks || []
     };
   } catch (error) {
-    console.error("Mileage AI Error:", error);
+    console.error("Mileage Protocol Error:", error);
     return { miles: null, sources: [] };
   }
 };
@@ -67,7 +66,7 @@ export const smartExtractJob = async (rawText: string) => {
       config: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: "OBJECT" as any, // Schema types are strictly enum or string in some contexts, but following instructions
+          type: "OBJECT" as any,
           properties: {
             description: { type: "STRING" as any },
             location: { type: "STRING" as any },

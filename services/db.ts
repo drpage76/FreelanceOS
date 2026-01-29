@@ -88,11 +88,9 @@ const FIELD_MAP: Record<string, string> = {
 
 const toDb = (table: string, obj: any, tenantId: string) => {
   const newObj: any = {};
-  // For non-tenant tables, ensure we have the tenant_id link
   if (table !== 'tenants') newObj['tenant_id'] = tenantId;
   
   for (const key in obj) {
-    // Skip calculated or irrelevant fields
     if (key === '__isSeed' || key === 'tenant_id' || key === 'shifts') continue;
     if (key === 'rechargeAmount' || key === 'actualCost') continue;
 
@@ -109,10 +107,6 @@ const fromDb = (obj: any) => {
   for (const key in obj) {
     const jsKey = inverseMap[key] || key;
     newObj[jsKey] = obj[key];
-  }
-  // Re-calculate recharge amount for items if present
-  if (newObj.qty !== undefined && newObj.unitPrice !== undefined) {
-    newObj.rechargeAmount = (parseFloat(newObj.qty) || 0) * (parseFloat(newObj.unitPrice) || 0);
   }
   return newObj;
 };
@@ -147,7 +141,7 @@ export const DB = {
     return null;
   },
 
-  testConnection: async (): Promise<{ success: boolean; counts?: { clients: number; jobs: number } }> => {
+  testConnection: async (): Promise<{ success: boolean }> => {
     try {
       const client = getSupabase();
       if (!client) return { success: false };
@@ -165,6 +159,7 @@ export const DB = {
     const effectiveId = await DB.getTenantId();
     const tenantId = effectiveId || LOCAL_USER_EMAIL;
 
+    // Handle Local Upsert
     if (method === 'upsert' && payload) {
       const raw = Array.isArray(payload) ? payload : [payload];
       raw.forEach(p => {
@@ -178,16 +173,7 @@ export const DB = {
       saveLocalData(localData);
     }
 
-    if (method === 'delete') {
-      const pk = table === 'tenants' ? 'email' : 'id';
-      if (filter?.id) {
-        (localData as any)[table] = localList.filter((i: any) => i[pk] !== filter.id);
-      } else if (filter?.jobId) {
-        (localData as any)[table] = localList.filter((i: any) => i.job_id !== filter.jobId);
-      }
-      saveLocalData(localData);
-    }
-
+    // Handle Cloud
     if (DB.isCloudConfigured() && effectiveId) {
       const client = getSupabase();
       if (client) {
@@ -196,10 +182,12 @@ export const DB = {
           if (method === 'upsert' && payload) {
             const raw = Array.isArray(payload) ? payload : [payload];
             const mapped = raw.map(p => toDb(table, p, effectiveId));
-            await query.upsert(mapped);
+            const { error } = await query.upsert(mapped);
+            if (error) console.error(`Sync Error in ${table}:`, error);
           }
           if (method === 'delete') {
-            if (filter?.id) await query.delete().eq(table === 'tenants' ? 'email' : 'id', filter.id);
+            const pk = table === 'tenants' ? 'email' : 'id';
+            if (filter?.id) await query.delete().eq(pk, filter.id);
             else if (filter?.jobId) await query.delete().eq('job_id', filter.jobId);
           }
           if (method === 'select') {
@@ -209,7 +197,7 @@ export const DB = {
             if (!error && data && data.length > 0) return data.map(fromDb);
           }
         } catch (cloudErr) {
-          console.warn(`Cloud failure in ${table}.${method}:`, cloudErr);
+          console.warn(`Cloud fallback in ${table}.${method}`);
         }
       }
     }
@@ -237,13 +225,12 @@ export const DB = {
       if (data) return fromDb(data) as Tenant;
     } catch (e) {}
     
-    // Initial profile if not found
+    // Default fallback profile
     const n: Tenant = { 
       email, 
       name: email.split('@')[0], 
       businessName: 'My Freelance Business', 
       businessAddress: '', 
-      bankDetails: '', 
       currency: 'GBP',
       taxName: 'VAT',
       taxRate: 20,
@@ -273,9 +260,7 @@ export const DB = {
   },
   saveJob: async (j: Job) => {
     await DB.call('jobs', 'upsert', j);
-    if (j.shifts) {
-      await DB.saveShifts(j.id, j.shifts);
-    }
+    if (j.shifts) await DB.saveShifts(j.id, j.shifts);
   },
   getQuotes: async () => DB.call('quotes', 'select'),
   saveQuote: async (q: Quote) => DB.call('quotes', 'upsert', q),
