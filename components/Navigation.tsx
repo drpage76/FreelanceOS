@@ -59,7 +59,6 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
       <div className="flex justify-around md:flex-col md:space-y-1 flex-1 overflow-y-auto custom-scrollbar">
         <NavItem to="/" icon="fa-chart-pie" label="Dashboard" active={location.pathname === '/'} />
         <NavItem to="/jobs" icon="fa-briefcase" label="Jobs" active={location.pathname.startsWith('/jobs')} />
-        <NavItem to="/quotes" icon="fa-file-signature" label="Estimates" active={location.pathname === '/quotes'} />
         <NavItem to="/clients" icon="fa-users" label="Clients" active={location.pathname.startsWith('/clients')} />
         <NavItem to="/invoices" icon="fa-file-invoice-dollar" label="Financials" active={location.pathname.startsWith('/invoices')} />
         <NavItem to="/mileage" icon="fa-car-side" label="Mileage" active={location.pathname === '/mileage'} />

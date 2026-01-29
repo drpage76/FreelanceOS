@@ -97,11 +97,11 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
   };
 
   return (
-    <div className="bg-white rounded-[40px] border border-slate-200 shadow-xl overflow-hidden flex flex-col h-full max-h-[800px]">
-      <div className="px-10 py-6 flex items-center justify-between bg-white border-b border-slate-100 shrink-0">
-        <div className="flex items-center gap-10">
+    <div className="bg-white rounded-[40px] overflow-hidden flex flex-col h-auto">
+      <div className="px-8 py-6 flex items-center justify-between bg-white border-b border-slate-100">
+        <div className="flex items-center gap-8">
           <div className="flex items-center gap-4">
-             <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">
+             <h3 className="text-2xl font-black text-slate-900 tracking-tight">
                {format(currentDate, 'MMMM yyyy')}
              </h3>
              <div className="relative overflow-hidden w-10 h-10 flex items-center justify-center bg-slate-50 rounded-xl border border-slate-200 group cursor-pointer transition-all hover:border-indigo-400">
@@ -114,21 +114,21 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
                 />
              </div>
           </div>
-          <div className="flex bg-slate-100 p-1 rounded-[20px] border border-slate-200">
-            <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl text-slate-400 transition-all"><i className="fa-solid fa-chevron-left text-xs"></i></button>
-            <button onClick={() => setCurrentDate(new Date())} className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest mx-2 shadow-lg shadow-indigo-100">Today</button>
-            <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="w-10 h-10 flex items-center justify-center hover:bg-white rounded-xl text-slate-400 transition-all"><i className="fa-solid fa-chevron-right text-xs"></i></button>
+          <div className="flex bg-slate-100 p-1 rounded-[16px] border border-slate-200">
+            <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="w-9 h-9 flex items-center justify-center hover:bg-white rounded-lg text-slate-400 transition-all"><i className="fa-solid fa-chevron-left text-xs"></i></button>
+            <button onClick={() => setCurrentDate(new Date())} className="px-6 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest mx-2 shadow-sm">Today</button>
+            <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="w-9 h-9 flex items-center justify-center hover:bg-white rounded-lg text-slate-400 transition-all"><i className="fa-solid fa-chevron-right text-xs"></i></button>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 bg-slate-50/50 border-b border-slate-100 shrink-0">
+      <div className="grid grid-cols-7 bg-slate-50/30 border-b border-slate-100">
         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
           <div key={day} className="py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">{day}</div>
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1">
         {weeks.map((week, wIdx) => {
           const weekStart = startOfDay(week[0]), weekEnd = endOfDay(week[6]);
           const weekEntries = allCalendarEntries.filter(e => {
@@ -169,20 +169,20 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
           });
 
           return (
-            <div key={wIdx} className="relative min-h-[140px] border-b border-slate-50">
+            <div key={wIdx} className="relative min-h-[120px] border-b border-slate-50 last:border-b-0">
               <div className="absolute inset-0 grid grid-cols-7 pointer-events-none">
                 {week.map((day, dIdx) => (
-                  <div key={dIdx} className={`border-r border-slate-50 flex flex-col p-2 ${!isSameMonth(day, currentDate) ? 'bg-slate-50/20' : ''}`}>
-                    <span className={`text-[11px] font-black w-7 h-7 flex items-center justify-center rounded-xl ${isSameDay(day, new Date()) ? 'bg-indigo-600 text-white shadow-lg' : isSameMonth(day, currentDate) ? 'text-slate-900' : 'text-slate-200'}`}>
+                  <div key={dIdx} className={`border-r border-slate-50 flex flex-col p-2 ${!isSameMonth(day, currentDate) ? 'bg-slate-50/10' : ''}`}>
+                    <span className={`text-[11px] font-black w-6 h-6 flex items-center justify-center rounded-lg ${isSameDay(day, new Date()) ? 'bg-indigo-600 text-white shadow-md' : isSameMonth(day, currentDate) ? 'text-slate-900' : 'text-slate-200'}`}>
                       {format(day, 'd')}
                     </span>
                   </div>
                 ))}
               </div>
 
-              <div className="relative pt-12 pb-2 px-1 space-y-1">
+              <div className="relative pt-10 pb-2 px-1 space-y-1">
                 {lanes.map((lane, lIdx) => (
-                  <div key={lIdx} className="grid grid-cols-7 gap-1 h-7 relative">
+                  <div key={lIdx} className="grid grid-cols-7 gap-1 h-6 relative">
                     {week.map((day, dIdx) => {
                       const entry = lane.find(e => {
                         const sISO = parseISO(e.startDate);
@@ -214,11 +214,11 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
                           key={`${entry.id}-${wIdx}`}
                           onClick={() => entry.jobId && navigate(`/jobs/${entry.jobId}`)}
                           style={{ gridColumn: `${offset + 1} / span ${duration}`, backgroundColor: bgColor }}
-                          className={`h-6 rounded-[10px] shadow-sm flex items-center px-4 z-10 transition-all hover:brightness-105 hover:scale-[1.02] cursor-pointer ${textColor}`}
+                          className={`h-5 rounded-lg shadow-sm flex items-center px-3 z-10 transition-all hover:brightness-105 hover:scale-[1.01] cursor-pointer ${textColor}`}
                         >
                           <div className="flex items-center gap-2 overflow-hidden w-full">
-                            {entry.type === 'external' && <i className="fa-brands fa-google text-[8px] opacity-70"></i>}
-                            <span className="text-[9px] font-black uppercase tracking-tight whitespace-nowrap overflow-hidden">
+                            {entry.type === 'external' && <i className="fa-brands fa-google text-[7px] opacity-70"></i>}
+                            <span className="text-[8px] font-black uppercase tracking-tight whitespace-nowrap overflow-hidden">
                               {entry.timeLabel ? `${entry.timeLabel} • ` : ''}{entry.title}
                             </span>
                           </div>

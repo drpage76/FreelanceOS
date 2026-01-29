@@ -8,7 +8,6 @@ import { Jobs } from './pages/Jobs';
 import { JobDetails } from './pages/JobDetails';
 import { Clients } from './pages/Clients';
 import { Invoices } from './pages/Invoices';
-import { Quotes } from './pages/Quotes';
 import { Mileage } from './pages/Mileage';
 import { Assistant } from './pages/Assistant';
 import { Settings } from './pages/Settings';
@@ -104,7 +103,6 @@ const App: React.FC = () => {
     if (isInitializing.current) return;
     isInitializing.current = true;
 
-    // Failsafe: Force stop loading after 6 seconds if DB doesn't respond
     const failsafe = setTimeout(() => {
       if (isLoading) {
         console.warn("Initialization taking too long. Forcing app start.");
@@ -179,7 +177,6 @@ const App: React.FC = () => {
             <Route path="/" element={<Dashboard state={appState} onNewJobClick={() => setIsNewJobModalOpen(true)} onSyncCalendar={() => loadData(currentUser)} isSyncing={isSyncing} />} />
             <Route path="/jobs" element={<Jobs state={appState} onNewJobClick={() => setIsNewJobModalOpen(true)} onRefresh={loadData} />} />
             <Route path="/jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
-            <Route path="/quotes" element={<Quotes state={appState} onRefresh={loadData} />} />
             <Route path="/clients" element={<Clients state={appState} onRefresh={loadData} />} />
             <Route path="/invoices" element={<Invoices state={appState} onRefresh={loadData} />} />
             <Route path="/mileage" element={<Mileage state={appState} onRefresh={loadData} />} />

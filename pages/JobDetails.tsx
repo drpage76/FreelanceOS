@@ -159,7 +159,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     finally { setIsSaving(false); }
   };
 
-  // Implementation of handleMarkAsPaidSubmit to record the settlement of an invoice.
   const handleMarkAsPaidSubmit = async () => {
     if (!invoice || isSaving) return;
     setIsSaving(true);
@@ -189,7 +188,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
   const DocumentRender = ({ type, docId, date, dueDate, validUntil }: { type: 'QUOTATION' | 'INVOICE', docId: string, date: string, dueDate?: string, validUntil?: string }) => (
     <div ref={docRef} className="bg-white p-12 border border-slate-100 min-h-[1000px] shadow-sm text-slate-900 font-sans">
-      <div className="flex justify-between items-start mb-20">
+      <div className="flex justify-between items-start mb-16">
         <div>
           {currentUser?.logoUrl ? (
             <img src={currentUser.logoUrl} alt="Logo" className="h-32 mb-6 object-contain" />
@@ -201,6 +200,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           )}
           <h1 className="text-5xl font-black uppercase tracking-tight">{type}</h1>
           <p className="text-slate-400 font-bold uppercase text-xs mt-2 tracking-widest">Reference: {docId}</p>
+          {job?.poNumber && <p className="text-indigo-600 font-black uppercase text-[10px] mt-1 tracking-widest">PO Ref: {job.poNumber}</p>}
         </div>
         <div className="text-right">
           <p className="font-black text-xl">{currentUser?.businessName}</p>
@@ -210,7 +210,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-10 mb-20">
+      <div className="grid grid-cols-2 gap-10 mb-16">
         <div>
           <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-2">{type === 'QUOTATION' ? 'Prepared For' : 'Attention To'}</p>
           <p className="font-black text-xl">{client?.name}</p>
@@ -221,11 +221,18 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           <p className="text-sm font-bold text-slate-700">{type === 'QUOTATION' ? 'Issue Date:' : 'Invoice Date:'} {formatDate(date)}</p>
           {dueDate && <p className="text-sm font-black text-indigo-600 mt-1">Payment Due: {formatDate(dueDate)}</p>}
           {validUntil && <p className="text-sm font-black text-indigo-600 mt-1">Quote Valid Until: {formatDate(validUntil)}</p>}
-          <div className="mt-4 pt-4 border-t border-slate-50">
-            <p className="text-[9px] font-black text-slate-300 uppercase mb-1">Project Identifier</p>
-            <p className="text-sm font-bold text-slate-700">{job?.description}</p>
+          
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <p className="text-[9px] font-black text-slate-300 uppercase mb-1">Production Timeline</p>
+            <p className="text-xs font-bold text-slate-900">{formatDate(job?.startDate || '')} — {formatDate(job?.endDate || '')}</p>
           </div>
         </div>
+      </div>
+
+      <div className="mb-12 p-6 bg-slate-50 rounded-2xl border border-slate-100">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Project Brief & Location</p>
+        <p className="font-black text-lg text-slate-900 leading-tight">{job?.description}</p>
+        <p className="text-sm font-bold text-indigo-600 mt-2"><i className="fa-solid fa-location-dot mr-2"></i> {job?.location}</p>
       </div>
 
       <table className="w-full mb-12">
