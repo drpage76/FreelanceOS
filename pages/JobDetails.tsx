@@ -25,7 +25,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   const [currentUser, setCurrentUser] = useState<Tenant | null>(null);
   
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [showInvoicePreview, setShowInvoicePreview] = useState(false);
+  const [showPreview, setShowPreview] = useState<'invoice' | 'quote' | null>(null);
   const [selectedInvoiceDate, setSelectedInvoiceDate] = useState('');
   
   const docRef = useRef<HTMLDivElement>(null);
@@ -113,7 +113,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       await onRefresh(); 
       setInvoice(newInvoice);
       setShowInvoiceModal(false);
-      setShowInvoicePreview(true);
+      setShowPreview('invoice');
     } catch (err) { alert("Failed."); } finally { setIsSaving(false); }
   };
 
@@ -130,10 +130,11 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           </div>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => setShowPreview('quote')} className="px-6 py-3 bg-white border border-slate-200 text-slate-900 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all">Print Quotation</button>
           {!invoice ? (
             <button onClick={() => setShowInvoiceModal(true)} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all">Print Invoice</button>
           ) : (
-            <button onClick={() => setShowInvoicePreview(true)} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl">View Invoice</button>
+            <button onClick={() => setShowPreview('invoice')} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl">View Invoice</button>
           )}
           <button onClick={() => handleUpdateJob()} disabled={isSaving} className="px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-black transition-all">
             {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : 'Save Changes'}
@@ -159,32 +160,107 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         </div>
       )}
 
-      {showInvoicePreview && invoice && (
+      {showPreview && (
         <div className="fixed inset-0 z-[300] flex items-start justify-center bg-slate-900/80 backdrop-blur-sm p-4 overflow-y-auto">
            <div className="bg-white w-full max-w-4xl rounded-[40px] shadow-2xl my-8 overflow-hidden">
               <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center sticky top-0 z-50">
-                 <span className="text-[10px] font-black uppercase text-indigo-600 px-4">Document Preview — {invoice.id}</span>
+                 <span className="text-[10px] font-black uppercase text-indigo-600 px-4">Document Preview — {showPreview === 'invoice' ? invoice?.id : 'Quote Protocol'}</span>
                  <div className="flex gap-2">
-                    <button onClick={() => handleDownloadPDF(`Invoice_${invoice.id}.pdf`)} className="px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center gap-2"><i className="fa-solid fa-download"></i> Download</button>
-                    <button onClick={() => setShowInvoicePreview(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-rose-500 border border-slate-200"><i className="fa-solid fa-xmark"></i></button>
+                    <button onClick={() => handleDownloadPDF(`${showPreview === 'invoice' ? 'Invoice' : 'Quote'}_${job.id}.pdf`)} className="px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center gap-2"><i className="fa-solid fa-download"></i> Download</button>
+                    <button onClick={() => setShowPreview(null)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-rose-500 border border-slate-200"><i className="fa-solid fa-xmark"></i></button>
                  </div>
               </div>
               <div className="p-8 bg-slate-100">
-                <div ref={docRef} className="bg-white p-12 border border-slate-100 min-h-[1000px] text-slate-900 shadow-sm">
-                   {/* Minimalist Doc Branding */}
+                <div ref={docRef} className="bg-white p-16 border border-slate-100 min-h-[1100px] text-slate-900 shadow-sm font-sans">
+                   {/* High-Fidelity Doc Template */}
                    <div className="flex justify-between items-start mb-20">
                       <div>
-                        {currentUser?.logoUrl ? <img src={currentUser.logoUrl} alt="Logo" className="h-24 mb-6 object-contain" /> : <div className="text-2xl font-black italic mb-6">Freelance<span className="text-indigo-600">OS</span></div>}
-                        <h1 className="text-5xl font-black uppercase tracking-tight">Invoice</h1>
-                        <p className="text-xs font-bold text-slate-400 mt-2 uppercase">Reference: {invoice.id}</p>
+                        {currentUser?.logoUrl ? <img src={currentUser.logoUrl} alt="Logo" className="h-28 mb-8 object-contain" /> : <div className="text-3xl font-black italic mb-8">Freelance<span className="text-indigo-600">OS</span></div>}
+                        <h1 className="text-6xl font-black uppercase tracking-tighter leading-none mb-2">{showPreview === 'invoice' ? 'Invoice' : 'Quotation'}</h1>
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                          {showPreview === 'invoice' ? `Reference: ${invoice?.id}` : `Ref: ${job.id}-Q`}
+                        </p>
                       </div>
-                      <div className="text-right text-xs">
-                        <p className="font-black text-lg">{currentUser?.businessName}</p>
-                        <p className="text-slate-500 whitespace-pre-line mt-2">{currentUser?.businessAddress}</p>
+                      <div className="text-right text-sm">
+                        <p className="font-black text-2xl mb-1">{currentUser?.businessName}</p>
+                        <p className="text-slate-500 whitespace-pre-line leading-relaxed">{currentUser?.businessAddress}</p>
+                        {currentUser?.vatNumber && <p className="text-[10px] font-black uppercase tracking-widest mt-4 text-slate-400">{currentUser.taxName}: {currentUser.vatNumber}</p>}
                       </div>
                    </div>
-                   {/* Rest of invoice logic simplified for prompt brevity */}
-                   <div className="p-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">Document Data Core Active</div>
+
+                   <div className="grid grid-cols-2 gap-12 mb-20">
+                      <div>
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-3">Client Identity</p>
+                        <p className="font-black text-2xl mb-2">{client?.name}</p>
+                        <p className="text-sm text-slate-500 whitespace-pre-line leading-relaxed">{client?.address}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-3">Date Details</p>
+                        <p className="text-sm font-bold text-slate-800">Date Issued: {formatDate(showPreview === 'invoice' ? (invoice?.date || '') : (new Date().toISOString()))}</p>
+                        {showPreview === 'invoice' && <p className="text-sm font-black text-indigo-600 mt-1">Due Date: {formatDate(invoice?.dueDate || '')}</p>}
+                        <p className="text-sm font-bold text-slate-600 mt-4 italic">Project: {job.description}</p>
+                      </div>
+                   </div>
+
+                   <table className="w-full mb-16">
+                      <thead>
+                        <tr className="border-b-2 border-slate-900">
+                          <th className="py-4 text-left text-[11px] font-black uppercase tracking-[0.2em]">Deliverable</th>
+                          <th className="py-4 text-center text-[11px] font-black uppercase tracking-[0.2em]">Qty</th>
+                          <th className="py-4 text-right text-[11px] font-black uppercase tracking-[0.2em]">Rate</th>
+                          <th className="py-4 text-right text-[11px] font-black uppercase tracking-[0.2em]">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {items.map(it => (
+                          <tr key={it.id}>
+                            <td className="py-6 font-bold text-slate-800 text-base">{it.description}</td>
+                            <td className="py-6 text-center text-slate-600 font-black text-sm">{it.qty}</td>
+                            <td className="py-6 text-right text-slate-600 font-black text-sm">{formatCurrency(it.unitPrice, currentUser)}</td>
+                            <td className="py-6 text-right font-black text-slate-900 text-base">{formatCurrency(it.qty * it.unitPrice, currentUser)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                   </table>
+
+                   <div className="flex justify-end pt-12 border-t-2 border-slate-900 mb-24">
+                      <div className="w-72 space-y-5">
+                        <div className="flex justify-between items-center text-sm font-black uppercase tracking-widest text-slate-400">
+                           <span>Subtotal</span>
+                           <span className="text-slate-900">{formatCurrency(totalRecharge, currentUser)}</span>
+                        </div>
+                        {currentUser?.isVatRegistered && (
+                          <div className="flex justify-between items-center text-sm font-black uppercase tracking-widest text-slate-400">
+                             <span>{currentUser.taxName} ({currentUser.taxRate}%)</span>
+                             <span className="text-slate-900">{formatCurrency(totalRecharge * (currentUser.taxRate / 100), currentUser)}</span>
+                          </div>
+                        )}
+                        <div className="pt-6 border-t border-slate-100 flex justify-between items-center">
+                           <span className="text-xs font-black uppercase tracking-[0.4em]">Total Payable</span>
+                           <span className="text-4xl font-black text-indigo-600 tracking-tighter">
+                             {formatCurrency(totalRecharge * (currentUser?.isVatRegistered ? (1 + (currentUser.taxRate / 100)) : 1), currentUser)}
+                           </span>
+                        </div>
+                      </div>
+                   </div>
+
+                   <div className="mt-auto pt-16 border-t border-slate-100 grid grid-cols-2 gap-12">
+                      <div>
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-4">Remittance & Banking</p>
+                        <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 shadow-inner font-mono text-[12px] leading-relaxed text-slate-700">
+                          {currentUser?.accountName && <p className="font-black text-slate-900 mb-1">{currentUser.accountName}</p>}
+                          {currentUser?.accountNumber && <p>ACC: {currentUser.accountNumber}</p>}
+                          {currentUser?.sortCodeOrIBAN && <p>SORT/IBAN: {currentUser.sortCodeOrIBAN}</p>}
+                          {!currentUser?.accountName && <p className="text-slate-400 italic">No banking details configured.</p>}
+                        </div>
+                      </div>
+                      <div className="flex flex-col justify-end text-right">
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-4">Verification</p>
+                        <p className="text-[11px] text-slate-400 italic leading-relaxed">
+                          This document is generated by FreelanceOS. Please use the reference ID {showPreview === 'invoice' ? invoice?.id : job.id} for all related correspondence.
+                        </p>
+                      </div>
+                   </div>
                 </div>
               </div>
            </div>

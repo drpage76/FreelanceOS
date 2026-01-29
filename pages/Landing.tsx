@@ -40,24 +40,24 @@ export const Landing: React.FC = () => {
         </div>
       </nav>
 
-      <main className="relative z-10 max-w-7xl mx-auto w-full px-8 flex-1 flex flex-col justify-center py-20">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center w-full">
-          <div className="space-y-12 max-w-2xl">
-            <div className="inline-flex items-center gap-3 px-6 py-2.5 bg-white/5 border border-white/10 rounded-full text-[11px] font-black uppercase tracking-[0.2em] text-emerald-400 mb-2 shadow-inner">
+      <main className="relative z-10 max-w-7xl mx-auto w-full px-8 pt-10 pb-20 flex-1">
+        <div className="space-y-12 mb-20 text-center lg:text-left">
+           <div className="inline-flex items-center gap-3 px-6 py-2.5 bg-white/5 border border-white/10 rounded-full text-[11px] font-black uppercase tracking-[0.2em] text-emerald-400 mb-2 shadow-inner">
               <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_#10b981]"></span>
               Professional Workspace Engine
             </div>
-            
-            <div className="space-y-6">
-              <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] text-white italic drop-shadow-2xl">
-                “Jobs, invoices, and time — <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-emerald-400 to-indigo-400">simplified.”</span>
-              </h1>
-              <p className="text-slate-400 text-2xl font-medium leading-relaxed max-w-lg pt-4">
-                The high-performance operating system for the modern independent professional. Built to command your business lifecycle.
-              </p>
-            </div>
+            <h1 className="text-6xl md:text-9xl font-black tracking-tighter leading-[0.85] text-white italic drop-shadow-2xl max-w-full">
+              “Jobs, invoices, and time — <br className="hidden md:block" /><span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-emerald-400 to-indigo-400">simplified.”</span>
+            </h1>
+        </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-start">
+          <div className="space-y-10">
+            <p className="text-slate-400 text-2xl font-medium leading-relaxed max-w-xl">
+              The high-performance operating system for the modern independent professional. Built to command your business lifecycle.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {[
                 { icon: 'fa-cloud-arrow-up', title: 'Global Sync', desc: 'Secure real-time cloud backup' },
                 { icon: 'fa-calendar-check', title: 'Schedule', desc: 'Google Calendar bi-sync' },
@@ -77,7 +77,7 @@ export const Landing: React.FC = () => {
             </div>
           </div>
 
-          <div className="relative min-h-[500px] flex items-center justify-center">
+          <div className="relative min-h-[400px]">
             {showAuth ? (
               <div className="relative z-20 w-full animate-in fade-in slide-in-from-right-10 duration-500">
                 <div id="auth-section" className="max-w-md mx-auto">
@@ -108,9 +108,9 @@ export const Landing: React.FC = () => {
         </div>
       </main>
 
-      <footer className="relative z-50 border-t border-white/5 bg-slate-900/80 backdrop-blur-xl py-8 px-8 mt-auto">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-8">
+      <footer className="relative z-50 border-t border-white/5 bg-slate-900/80 backdrop-blur-xl py-12 px-8 mt-auto">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="flex items-center gap-10">
              <span className="text-[11px] font-black uppercase tracking-[0.3em] opacity-30">FREELANCEOS CORE</span>
              <Link to="/privacy" className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400 transition-colors">Privacy Protocols</Link>
              <Link to="/terms" className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400 transition-colors">Usage Terms</Link>
