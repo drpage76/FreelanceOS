@@ -3,8 +3,8 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  // On freelanceos.org, the app lives at the root, so base must be '/'
-  base: '/', 
+  // Use relative base to ensure it works on subfolders (like GitHub Pages) and custom domains
+  base: './', 
   define: {
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY || ""),
     'process.env': {} 

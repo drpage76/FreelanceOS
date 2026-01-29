@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-// Use direct named imports from react-router-dom to avoid property access errors
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { Navigation } from './components/Navigation';
@@ -12,6 +11,8 @@ import { Invoices } from './pages/Invoices';
 import { Mileage } from './pages/Mileage';
 import { Settings } from './pages/Settings';
 import { Landing } from './pages/Landing'; 
+import { Privacy } from './pages/Privacy';
+import { Terms } from './pages/Terms';
 import { CreateJobModal } from './components/CreateJobModal';
 import { AppState, Tenant, JobStatus, InvoiceStatus } from './types';
 import { DB, getSupabase } from './services/db';
@@ -166,38 +167,50 @@ const App: React.FC = () => {
     </div>
   );
 
-  if (!currentUser) return <Landing />; 
-
   return (
     <HashRouter>
-      <div className="flex flex-col md:flex-row h-screen bg-slate-50 overflow-hidden">
-        <Navigation isSyncing={isSyncing} user={currentUser} />
-        <main className="flex-1 p-3 md:p-6 overflow-y-auto flex flex-col custom-scrollbar">
-          <Routes>
-            <Route path="/" element={<Dashboard state={appState} onNewJobClick={() => setIsNewJobModalOpen(true)} onSyncCalendar={() => loadData(currentUser)} isSyncing={isSyncing} />} />
-            <Route path="/jobs" element={<Jobs state={appState} onNewJobClick={() => setIsNewJobModalOpen(true)} onRefresh={loadData} />} />
-            <Route path="/jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
-            <Route path="/clients" element={<Clients state={appState} onRefresh={loadData} />} />
-            <Route path="/invoices" element={<Invoices state={appState} onRefresh={loadData} />} />
-            <Route path="/mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
-            <Route path="/settings" element={<Settings user={currentUser} onLogout={() => DB.signOut().then(() => window.location.reload())} onRefresh={loadData} />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </main>
-      </div>
-      <CreateJobModal 
-        isOpen={isNewJobModalOpen} 
-        onClose={() => setIsNewJobModalOpen(false)} 
-        clients={appState.clients} 
-        tenant_id={currentUser?.email}
-        onSave={async (job, items, clientName) => {
-          await DB.saveJob(job);
-          await DB.saveJobItems(job.id, items);
-          const token = await getLatestToken();
-          if (token) await syncJobToGoogle(job, token, clientName);
-          await loadData();
-        }} 
-      />
+      <Routes>
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
+        
+        {/* Main App Layout */}
+        <Route path="/*" element={
+          !currentUser ? (
+            <Landing />
+          ) : (
+            <>
+              <div className="flex flex-col md:flex-row h-screen bg-slate-50 overflow-hidden">
+                <Navigation isSyncing={isSyncing} user={currentUser} />
+                <main className="flex-1 p-3 md:p-6 overflow-y-auto flex flex-col custom-scrollbar">
+                  <Routes>
+                    <Route path="/" element={<Dashboard state={appState} onNewJobClick={() => setIsNewJobModalOpen(true)} onSyncCalendar={() => loadData(currentUser)} isSyncing={isSyncing} />} />
+                    <Route path="/jobs" element={<Jobs state={appState} onNewJobClick={() => setIsNewJobModalOpen(true)} onRefresh={loadData} />} />
+                    <Route path="/jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
+                    <Route path="/clients" element={<Clients state={appState} onRefresh={loadData} />} />
+                    <Route path="/invoices" element={<Invoices state={appState} onRefresh={loadData} />} />
+                    <Route path="/mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
+                    <Route path="/settings" element={<Settings user={currentUser} onLogout={() => DB.signOut().then(() => window.location.reload())} onRefresh={loadData} />} />
+                    <Route path="*" element={<Navigate to="/" />} />
+                  </Routes>
+                </main>
+              </div>
+              <CreateJobModal 
+                isOpen={isNewJobModalOpen} 
+                onClose={() => setIsNewJobModalOpen(false)} 
+                clients={appState.clients} 
+                tenant_id={currentUser?.email}
+                onSave={async (job, items, clientName) => {
+                  await DB.saveJob(job);
+                  await DB.saveJobItems(job.id, items);
+                  const token = await getLatestToken();
+                  if (token) await syncJobToGoogle(job, token, clientName);
+                  await loadData();
+                }} 
+              />
+            </>
+          )
+        } />
+      </Routes>
     </HashRouter>
   );
 };
