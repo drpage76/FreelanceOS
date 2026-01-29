@@ -159,8 +159,10 @@ export interface Tenant {
 
   logoUrl?: string;
   plan: UserPlan;
-  trialStartDate?: string;
+  trialStartDate: string;
   stripeCustomerId?: string;
+  subscriptionExpiry?: string;
+  paymentStatus?: 'PAID' | 'UNPAID' | 'TRIALING';
 }
 
 export interface AppState {

@@ -44,6 +44,8 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
     return () => clearInterval(interval);
   }, []);
 
+  const isPro = user?.plan === UserPlan.ACTIVE;
+
   return (
     <nav className="no-print fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 md:relative md:border-t-0 md:h-screen md:w-64 md:border-r p-2 md:p-4 z-50 flex flex-col">
       <div className="hidden md:flex flex-col mb-8 px-2">
@@ -53,6 +55,11 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
           </div>
           <div>
             <h1 className="font-black text-xl tracking-tight leading-none text-slate-900">Freelance<br/><span className="text-indigo-600">OS</span></h1>
+            {isPro ? (
+              <span className="inline-block mt-2 bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest italic">Elite Pro</span>
+            ) : (
+              <span className="inline-block mt-2 bg-slate-100 text-slate-400 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest italic">Trial Mode</span>
+            )}
           </div>
         </div>
       </div>
