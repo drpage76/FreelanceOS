@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { AppState } from "../types";
 
@@ -10,15 +9,18 @@ const getAIClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-// Fixed: calculateDrivingDistance revised to strictly pull the fastest numerical distance from Maps grounding
+/**
+ * Calculates driving distance using Google Maps grounding.
+ * NOTE: responseMimeType and responseSchema are NOT supported when using googleMaps tool.
+ */
 export const calculateDrivingDistance = async (start: string, end: string) => {
   const ai = getAIClient();
   if (!ai) return { miles: null, sources: [], error: "AI Key Missing" };
 
   const model = "gemini-2.5-flash"; 
-  // Ultra-specific prompt to minimize verbose text
-  const prompt = `Task: Calculate the fastest driving distance in miles between UK postcodes "${start}" and "${end}" using Google Maps. 
-  Output Rule: Your response must include the number of miles clearly. For example: "Distance: 12.5 miles".`;
+  // We use a very strict prompt since we cannot enforce a JSON schema with the Maps tool.
+  const prompt = `Calculate the fastest driving distance in miles between UK postcodes "${start}" and "${end}" using Google Maps. 
+  Respond ONLY with the distance number followed by "miles". Example: "12.5 miles".`;
 
   try {
     const response = await ai.models.generateContent({
@@ -37,8 +39,7 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
     const text = response.text || "";
     
-    // Improved regex to find the first number that might be the distance
-    // It looks for decimals or integers.
+    // Improved regex to find a decimal or integer number, ignoring surrounding text.
     const match = text.match(/(\d+(\.\d+)?)/);
     const miles = match ? parseFloat(match[0]) : null;
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { AppState, MileageRecord } from '../types';
 import { DB, generateId } from '../services/db';
@@ -124,7 +123,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-900">Travel & Mileage</h2>
-          <p className="text-slate-500 font-medium">Automatic distance lookup powered by global map protocols.</p>
+          <p className="text-slate-500 font-medium">Automatic distance lookup powered by map protocols.</p>
         </div>
         <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm flex items-center gap-8">
            <div className="text-center">
@@ -144,7 +143,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
           <i className="fa-solid fa-route text-indigo-600"></i> Register New Journey
         </h3>
         
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4 items-end relative z-10">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4 items-end relative z-10">
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-400 uppercase px-1">Date</label>
             <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={newEntry.date} onChange={e => setNewEntry({...newEntry, date: e.target.value})} />
@@ -161,7 +160,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase px-1">Distance (Miles)</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase px-1">Dist. (Miles)</label>
             <div className={`px-4 py-3 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[52px] ${isCalculating ? 'border-indigo-400 animate-pulse' : 'border-indigo-100 text-indigo-700'}`}>
               {isCalculating ? (
                 <div className="w-full flex items-center justify-center">
@@ -181,17 +180,20 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
           </div>
 
           <div className="space-y-2">
-             <label className="text-[10px] font-black text-slate-400 uppercase px-1">Trip Type</label>
-             <div className="flex gap-2">
-                <button type="button" onClick={() => setNewEntry({...newEntry, isReturn: !newEntry.isReturn})} className={`flex-1 px-4 py-3 rounded-2xl font-black text-[10px] uppercase border transition-all ${newEntry.isReturn ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-200'}`}>
-                  {newEntry.isReturn ? 'Return' : 'Single'}
-                </button>
-             </div>
+            <label className="text-[10px] font-black text-slate-400 uppercase px-1">Trips</label>
+            <input type="number" min="1" className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.numTrips} onChange={e => setNewEntry({...newEntry, numTrips: parseInt(e.target.value) || 1})} />
+          </div>
+
+          <div className="space-y-2">
+             <label className="text-[10px] font-black text-slate-400 uppercase px-1">Type</label>
+             <button type="button" onClick={() => setNewEntry({...newEntry, isReturn: !newEntry.isReturn})} className={`w-full px-4 py-3 rounded-2xl font-black text-[10px] uppercase border transition-all h-[52px] ${newEntry.isReturn ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-200'}`}>
+               {newEntry.isReturn ? 'Return' : 'Single'}
+             </button>
           </div>
 
           <button type="submit" disabled={isSaving || newEntry.distanceMiles === 0 || isCalculating} className="h-[52px] bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50">
              {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-floppy-disk"></i>}
-             Save Journey
+             Save
           </button>
         </form>
       </div>
@@ -204,7 +206,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                 <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
                 <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Route</th>
                 <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Type</th>
-                <th className="p-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Miles</th>
+                <th className="p-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Miles</th>
                 <th className="p-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Value</th>
                 <th className="p-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Action</th>
               </tr>
@@ -223,7 +225,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                       </td>
                       <td className="p-6">
                         <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${record.isReturn ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                          {record.isReturn ? 'Return' : 'Single'}
+                          {record.isReturn ? 'Return' : 'Single'} {record.numTrips > 1 ? `x${record.numTrips}` : ''}
                         </span>
                       </td>
                       <td className="p-6 text-right font-black text-slate-900">{totalTripMiles.toFixed(1)}</td>
