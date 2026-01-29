@@ -22,6 +22,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   const [client, setClient] = useState<Client | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [currentUser, setCurrentUser] = useState<Tenant | null>(null);
   
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -79,6 +80,19 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     } catch (err: any) { alert(err.message); } finally { setIsSaving(false); }
   };
 
+  const handleDeleteJob = async () => {
+    if (!job || !window.confirm("Are you sure you want to permanently delete this project? This cannot be undone.")) return;
+    setIsDeleting(true);
+    try {
+      await DB.deleteJob(job.id);
+      await onRefresh();
+      navigate('/jobs');
+    } catch (err) {
+      alert("Failed to delete project.");
+      setIsDeleting(false);
+    }
+  };
+
   const handleDownloadPDF = async (filename: string) => {
     if (!docRef.current) return;
     setIsSaving(true);
@@ -129,15 +143,18 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
             <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Protocol ID: {job.id} — {client?.name}</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setShowPreview('quote')} className="px-6 py-3 bg-white border border-slate-200 text-slate-900 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all">Print Quotation</button>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setShowPreview('quote')} className="px-5 py-3 bg-white border border-slate-200 text-slate-900 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all">Print Quotation</button>
           {!invoice ? (
-            <button onClick={() => setShowInvoiceModal(true)} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all">Print Invoice</button>
+            <button onClick={() => setShowInvoiceModal(true)} className="px-5 py-3 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all">Print Invoice</button>
           ) : (
-            <button onClick={() => setShowPreview('invoice')} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl">View Invoice</button>
+            <button onClick={() => setShowPreview('invoice')} className="px-5 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl">View Invoice</button>
           )}
-          <button onClick={() => handleUpdateJob()} disabled={isSaving} className="px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-black transition-all">
+          <button onClick={() => handleUpdateJob()} disabled={isSaving || isDeleting} className="px-5 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-black transition-all">
             {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : 'Save Changes'}
+          </button>
+          <button onClick={handleDeleteJob} disabled={isSaving || isDeleting} className="w-11 h-11 bg-rose-50 text-rose-500 border border-rose-100 rounded-xl flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all">
+            {isDeleting ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-trash-can"></i>}
           </button>
         </div>
       </header>
@@ -172,7 +189,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
               </div>
               <div className="p-8 bg-slate-100">
                 <div ref={docRef} className="bg-white p-16 border border-slate-100 min-h-[1100px] text-slate-900 shadow-sm font-sans">
-                   {/* High-Fidelity Doc Template */}
                    <div className="flex justify-between items-start mb-20">
                       <div>
                         {currentUser?.logoUrl ? <img src={currentUser.logoUrl} alt="Logo" className="h-28 mb-8 object-contain" /> : <div className="text-3xl font-black italic mb-8">Freelance<span className="text-indigo-600">OS</span></div>}

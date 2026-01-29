@@ -47,7 +47,7 @@ export const Landing: React.FC = () => {
               Professional Workspace Engine
             </div>
             <h1 className="text-6xl md:text-9xl font-black tracking-tighter leading-[0.85] text-white italic drop-shadow-2xl max-w-full">
-              “Jobs, invoices, and time — <br className="hidden md:block" /><span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-emerald-400 to-indigo-400">simplified.”</span>
+              “Jobs, invoices, and time — <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-emerald-400 to-indigo-400">simplified.”</span>
             </h1>
         </div>
 
@@ -65,7 +65,7 @@ export const Landing: React.FC = () => {
                 { icon: 'fa-map-location-dot', title: 'Mileage', desc: 'Precision auto-tracking' }
               ].map((f, i) => (
                 <div key={i} className="flex gap-5 p-6 bg-white/5 border border-white/10 rounded-[32px] hover:bg-white/10 transition-all cursor-default group">
-                  <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center group-hover:bg-indigo-500 transition-all">
+                  <div className="w-10 h-10 bg-indigo-50/10 rounded-xl flex items-center justify-center group-hover:bg-indigo-500 transition-all">
                     <i className={`fa-solid ${f.icon} text-indigo-400 group-hover:text-white text-lg`}></i>
                   </div>
                   <div>
