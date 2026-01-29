@@ -37,6 +37,7 @@ export const getSupabase = () => {
 
 const FIELD_MAP: Record<string, string> = {
   // Tenant Profile mappings
+  email: 'email',
   name: 'name',
   businessName: 'business_name',
   businessAddress: 'business_address',
@@ -87,9 +88,11 @@ const FIELD_MAP: Record<string, string> = {
 
 const toDb = (table: string, obj: any, tenantId: string) => {
   const newObj: any = {};
+  // For non-tenant tables, ensure we have the tenant_id link
   if (table !== 'tenants') newObj['tenant_id'] = tenantId;
   
   for (const key in obj) {
+    // Skip calculated or irrelevant fields
     if (key === '__isSeed' || key === 'tenant_id' || key === 'shifts') continue;
     if (key === 'rechargeAmount' || key === 'actualCost') continue;
 
@@ -107,6 +110,7 @@ const fromDb = (obj: any) => {
     const jsKey = inverseMap[key] || key;
     newObj[jsKey] = obj[key];
   }
+  // Re-calculate recharge amount for items if present
   if (newObj.qty !== undefined && newObj.unitPrice !== undefined) {
     newObj.rechargeAmount = (parseFloat(newObj.qty) || 0) * (parseFloat(newObj.unitPrice) || 0);
   }
@@ -233,6 +237,7 @@ export const DB = {
       if (data) return fromDb(data) as Tenant;
     } catch (e) {}
     
+    // Initial profile if not found
     const n: Tenant = { 
       email, 
       name: email.split('@')[0], 
