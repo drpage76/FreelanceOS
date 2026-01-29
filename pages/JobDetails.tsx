@@ -189,7 +189,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
               </div>
               <div className="p-8 bg-slate-100">
                 <div ref={docRef} className="bg-white p-16 border border-slate-100 min-h-[1100px] text-slate-900 shadow-sm font-sans">
-                   <div className="flex justify-between items-start mb-20">
+                   <div className="flex justify-between items-start mb-16">
                       <div>
                         {currentUser?.logoUrl ? <img src={currentUser.logoUrl} alt="Logo" className="h-28 mb-8 object-contain" /> : <div className="text-3xl font-black italic mb-8">Freelance<span className="text-indigo-600">OS</span></div>}
                         <h1 className="text-6xl font-black uppercase tracking-tighter leading-none mb-2">{showPreview === 'invoice' ? 'Invoice' : 'Quotation'}</h1>
@@ -204,17 +204,25 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                       </div>
                    </div>
 
-                   <div className="grid grid-cols-2 gap-12 mb-20">
+                   <div className="grid grid-cols-2 gap-12 mb-16">
                       <div>
                         <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-3">Client Identity</p>
                         <p className="font-black text-2xl mb-2">{client?.name}</p>
                         <p className="text-sm text-slate-500 whitespace-pre-line leading-relaxed">{client?.address}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-3">Date Details</p>
-                        <p className="text-sm font-bold text-slate-800">Date Issued: {formatDate(showPreview === 'invoice' ? (invoice?.date || '') : (new Date().toISOString()))}</p>
-                        {showPreview === 'invoice' && <p className="text-sm font-black text-indigo-600 mt-1">Due Date: {formatDate(invoice?.dueDate || '')}</p>}
-                        <p className="text-sm font-bold text-slate-600 mt-4 italic">Project: {job.description}</p>
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-3">Project Details</p>
+                        <div className="space-y-1">
+                          <p className="text-sm font-bold text-slate-800">Date Issued: {formatDate(showPreview === 'invoice' ? (invoice?.date || '') : (new Date().toISOString()))}</p>
+                          {showPreview === 'invoice' && <p className="text-sm font-black text-indigo-600 mb-3">Due Date: {formatDate(invoice?.dueDate || '')}</p>}
+                          
+                          <div className="mt-4 pt-4 border-t border-slate-50 space-y-2">
+                             <p className="text-sm font-black text-slate-900 leading-tight">Project: {job.description}</p>
+                             <p className="text-[11px] font-bold text-slate-500 italic">Venue: {job.location || 'TBD'}</p>
+                             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Period: {formatDate(job.startDate)} — {formatDate(job.endDate)}</p>
+                             {job.poNumber && <p className="text-[11px] font-black text-indigo-600 uppercase tracking-widest mt-2">PO Ref: {job.poNumber}</p>}
+                          </div>
+                        </div>
                       </div>
                    </div>
 
