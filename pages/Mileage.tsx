@@ -28,6 +28,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
     description: ''
   });
 
+  // Effect to automatically calculate mileage when postcodes reach valid length
   useEffect(() => {
     const start = newEntry.startPostcode.trim();
     const end = newEntry.endPostcode.trim();
@@ -58,7 +59,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
         setNewEntry(prev => ({ ...prev, distanceMiles: result.miles || 0 }));
       }
     } catch (err) {
-      console.warn("Distance lookup failed:", err);
+      console.warn("Map Protocol lookup failed:", err);
     } finally {
       setIsCalculating(false);
     }
@@ -66,8 +67,10 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSaving || !newEntry.startPostcode || !newEntry.endPostcode || newEntry.distanceMiles <= 0) {
-      if (newEntry.distanceMiles <= 0 && !isCalculating) alert("Please enter valid postcodes to fetch driving distance.");
+    if (isSaving || !newEntry.startPostcode || !newEntry.endPostcode) return;
+    
+    if (newEntry.distanceMiles <= 0 && !isCalculating) {
+      alert("Please enter a valid distance or wait for Map Protocol.");
       return;
     }
 
@@ -93,14 +96,14 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
       lastCalculatedRef.current = "";
       onRefresh();
     } catch (err) {
-      alert("Failed to save record.");
+      alert("Failed to sync record to cloud.");
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("Remove log?")) {
+    if (window.confirm("Remove this entry from the ledger?")) {
       await DB.deleteMileage(id);
       onRefresh();
     }
@@ -121,53 +124,54 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-900 leading-tight">Travel & Mileage</h2>
-          <p className="text-slate-500 font-medium">Automatic calculation powered by Map Protocols.</p>
+          <p className="text-slate-500 font-medium italic">Google Maps Protocol integration active.</p>
         </div>
         <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm flex items-center gap-8">
            <div className="text-center">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cumulative mi</p>
-              <p className="text-2xl font-black text-slate-900">{totals.miles.toFixed(1)}</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fiscal Total</p>
+              <p className="text-2xl font-black text-slate-900">{totals.miles.toFixed(1)} <span className="text-[10px] text-slate-400">mi</span></p>
            </div>
+           <div className="w-px h-10 bg-slate-100"></div>
            <div className="text-center">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total claim</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Reclaim Val</p>
               <p className="text-2xl font-black text-indigo-600">{formatCurrency(totals.value, state.user)}</p>
            </div>
         </div>
       </header>
 
       <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden">
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-4 items-end relative z-10">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4 items-end relative z-10">
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase px-1">Journey Date</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Date</label>
             <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={newEntry.date} onChange={e => setNewEntry({...newEntry, date: e.target.value})} />
           </div>
           
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase px-1">Start Postcode</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Start Postcode</label>
             <input placeholder="SW1..." className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase" value={newEntry.startPostcode} onChange={e => setNewEntry({...newEntry, startPostcode: e.target.value.toUpperCase()})} />
           </div>
           
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase px-1">End Postcode</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">End Postcode</label>
             <input placeholder="E1..." className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase" value={newEntry.endPostcode} onChange={e => setNewEntry({...newEntry, endPostcode: e.target.value.toUpperCase()})} />
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase px-1">Unit Miles</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Unit Miles</label>
             <div className={`px-4 py-3 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[52px] ${isCalculating ? 'border-indigo-400 animate-pulse' : 'border-indigo-100 text-indigo-700'}`}>
               <input 
                 type="number" 
                 step="0.1" 
                 className="w-full bg-transparent outline-none font-black text-indigo-700 placeholder:text-indigo-200" 
                 value={newEntry.distanceMiles || ''} 
-                placeholder={isCalculating ? "..." : "0.0"}
+                placeholder={isCalculating ? "LOOKUP..." : "0.0"}
                 onChange={e => setNewEntry({...newEntry, distanceMiles: parseFloat(e.target.value) || 0})} 
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase px-1">No. of Trips</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Trips</label>
             <input 
               type="number" 
               min="1" 
@@ -178,7 +182,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
           </div>
 
           <div className="space-y-2">
-             <label className="text-[10px] font-black text-slate-400 uppercase px-1">Protocol</label>
+             <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Protocol</label>
              <button type="button" onClick={() => setNewEntry({...newEntry, isReturn: !newEntry.isReturn})} className={`w-full px-4 py-3 rounded-2xl font-black text-[10px] uppercase border transition-all h-[52px] ${newEntry.isReturn ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-200'}`}>
                {newEntry.isReturn ? 'Return' : 'Single'}
              </button>
@@ -186,7 +190,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
 
           <button type="submit" disabled={isSaving || newEntry.distanceMiles === 0 || isCalculating} className="h-[52px] bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50">
              {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-floppy-disk"></i>}
-             Save Log
+             Save
           </button>
         </form>
       </div>
@@ -197,16 +201,16 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
             <thead className="bg-slate-50/50 border-b border-slate-100">
               <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <th className="p-6">Journey Date</th>
-                <th className="p-6">Route Protocol</th>
-                <th className="p-6">Details</th>
+                <th className="p-6">Route</th>
+                <th className="p-6">Type</th>
                 <th className="p-6 text-right">Total mi</th>
-                <th className="p-6 text-right">Claim val</th>
+                <th className="p-6 text-right">Reclaim</th>
                 <th className="p-6 text-center">Manage</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {state.mileage.length === 0 ? (
-                <tr><td colSpan={6} className="p-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest italic">No journey history found</td></tr>
+                <tr><td colSpan={6} className="p-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest italic">No records found</td></tr>
               ) : (
                 state.mileage.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(record => {
                   const totalTripMiles = (record.distanceMiles || 0) * (record.numTrips || 1) * (record.isReturn ? 2 : 1);

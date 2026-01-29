@@ -11,16 +11,18 @@ const getAIClient = () => {
 
 /**
  * Calculates driving distance using Google Maps grounding.
+ * This effectively 'links' the app to Google Maps data via Gemini's grounding tool.
  */
 export const calculateDrivingDistance = async (start: string, end: string) => {
   const ai = getAIClient();
   if (!ai) return { miles: null, sources: [], error: "AI Key Missing" };
 
   const model = "gemini-2.5-flash"; 
-  const prompt = `Task: Find the fastest driving distance in miles between UK postcodes "${start}" and "${end}" using Google Maps. 
-  Rule: Your response MUST contain the phrase "Distance: [number] miles". 
-  Example: "Distance: 12.5 miles". 
-  Do not provide extra conversation.`;
+  // We use an extremely strict prompt to ensure the model behaves as a data relay.
+  const prompt = `Use Google Maps to find the fastest driving distance in miles between UK postcodes "${start}" and "${end}". 
+  Response Requirement: You must ONLY output the number. 
+  Example: 12.5
+  Do not include the word 'miles' or any other text.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -37,16 +39,16 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
     });
 
     const text = response.text || "";
-    // Regex isolates the first decimal or integer found in the text
-    const match = text.match(/(\d+(\.\d+)?)/);
-    const miles = match ? parseFloat(match[0]) : null;
+    // Clean the string of anything that isn't a digit or decimal point
+    const cleanedText = text.replace(/[^0-9.]/g, '');
+    const miles = parseFloat(cleanedText);
 
     return {
-      miles: miles,
+      miles: isNaN(miles) ? null : miles,
       sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
     };
   } catch (error) {
-    console.error("Mileage Protocol Error:", error);
+    console.error("Mileage AI Protocol Error:", error);
     return { miles: null, sources: [] };
   }
 };
