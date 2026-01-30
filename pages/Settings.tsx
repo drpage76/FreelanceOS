@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { DB } from '../services/db';
 import { Tenant, UserPlan, InvoiceNumberingType } from '../types';
 import { checkSubscriptionStatus } from '../utils';
 import { format, addMonths } from 'date-fns';
+import { startStripeCheckout, openStripePortal } from '../services/payment';
 
 interface SettingsProps {
   user: Tenant | null;
@@ -83,25 +85,21 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
   const handleUpgrade = async () => {
     if (!user) return;
     setIsUpgrading(true);
-    
-    // Protip: To actually work with Stripe, you would call a Supabase Edge Function here
-    // that returns a Stripe Checkout sessionId.
-    setTimeout(async () => {
-      try {
-        const upgraded: Tenant = {
-          ...user,
-          plan: UserPlan.ACTIVE,
-          paymentStatus: 'PAID',
-          subscriptionExpiry: addMonths(new Date(), 1).toISOString()
-        };
-        await DB.updateTenant(upgraded);
-        await onRefresh();
-        setIsUpgrading(false);
-        alert("Success: Stripe secure handoff completed. Elite Subscription is now ACTIVE.");
-      } catch (e) {
-        setIsUpgrading(false);
-      }
-    }, 2800);
+    try {
+      await startStripeCheckout(user.email);
+    } catch (e: any) {
+      setIsUpgrading(false);
+      alert(e.message || "Failed to reach payment gateway. Please check your cloud connection.");
+    }
+  };
+
+  const handleManageBilling = async () => {
+    if (!user) return;
+    try {
+      await openStripePortal(user.email);
+    } catch (e) {
+      alert("Could not open billing portal.");
+    }
   };
 
   if (!user) return (
@@ -159,7 +157,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                      className={`w-full py-5 rounded-3xl font-black text-xs uppercase transition-all shadow-xl flex items-center justify-center gap-3 ${sub.isTrialExpired ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20' : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'}`}
                    >
                      {isUpgrading ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-shield-check"></i>}
-                     {isUpgrading ? 'Contacting Stripe...' : sub.isTrialExpired ? 'Pay to Reactivate Elite' : 'Add Payment for Auto-Billing'}
+                     {isUpgrading ? 'Redirecting to Stripe...' : sub.isTrialExpired ? 'Pay to Reactivate Elite' : 'Add Payment for Auto-Billing'}
                    </button>
                  ) : (
                    <div className="w-full py-5 bg-emerald-500/10 border border-emerald-500/20 rounded-3xl font-black text-xs uppercase text-emerald-400 text-center tracking-widest">
@@ -195,11 +193,11 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
 
                        <div className="pt-8 border-t border-slate-50">
                           <p className="text-[9px] text-slate-400 font-bold leading-relaxed mb-6">
-                            By adding a payment method, you ensure uninterrupted service when the 3-month trial ends. You can cancel at any time before the first billing date.
+                            By adding a payment method, you ensure uninterrupted service when the 3-month trial ends. You can manage your subscription via the Stripe portal.
                           </p>
                           <button 
                             type="button" 
-                            onClick={() => alert("Redirecting to Stripe Customer Portal...")} 
+                            onClick={handleManageBilling} 
                             className="w-full py-4 bg-slate-50 text-slate-600 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all"
                           >
                             Access Stripe Billing Portal
