@@ -1,4 +1,3 @@
-
 import { 
   format, 
   parseISO, 
@@ -14,9 +13,10 @@ import {
   addMonths, 
   subMonths,
   isWithinInterval,
-  differenceInDays
+  differenceInDays,
+  isValid
 } from 'date-fns';
-import { Tenant } from './types';
+import { Tenant, UserPlan } from './types';
 
 export const formatCurrency = (amount: number, userSettings?: Tenant | null): string => {
   const currency = userSettings?.currency || 'GBP';
@@ -36,6 +36,27 @@ export const formatDate = (dateStr: string): string => {
   }
 };
 
+export const checkSubscriptionStatus = (user: Tenant | null) => {
+  if (!user) return { isTrialExpired: false, daysLeft: 0, plan: UserPlan.TRIAL };
+  if (user.plan === UserPlan.ACTIVE) return { isTrialExpired: false, daysLeft: 0, plan: UserPlan.ACTIVE };
+
+  let startDate = new Date();
+  if (user.trialStartDate) {
+    const parsed = parseISO(user.trialStartDate);
+    if (isValid(parsed)) startDate = parsed;
+  }
+
+  const expiryDate = addMonths(startDate, 3);
+  const daysLeft = Math.max(0, differenceInDays(expiryDate, new Date()));
+  
+  return {
+    isTrialExpired: daysLeft <= 0,
+    daysLeft,
+    expiryDate,
+    plan: user.plan
+  };
+};
+
 export const generateJobId = (startDate: string, sequence: number): string => {
   const date = parseISO(startDate);
   const yy = format(date, 'yy');
@@ -51,7 +72,6 @@ export const generateInvoiceId = (userSettings: Tenant | null): string => {
     const now = new Date();
     const yy = format(now, 'yy');
     const mm = format(now, 'MM');
-    // Using simple incrementing logic for the month's sequence
     const seq = (userSettings.invoiceNextNumber || 1).toString().padStart(2, '0');
     return `${yy}${mm}${seq}`;
   } else {
@@ -68,10 +88,8 @@ export const calculateDueDate = (startDate: string, terms: number): string => {
 
 export const calculateRevenueStats = (jobs: any[], userSettings: Tenant | null, goal: number = 50000) => {
   const now = new Date();
-  
-  // Custom Fiscal Year Logic
   const startDay = userSettings?.fiscalYearStartDay ?? 5;
-  const startMonth = (userSettings?.fiscalYearStartMonth ?? 4) - 1; // Month is 0-indexed
+  const startMonth = (userSettings?.fiscalYearStartMonth ?? 4) - 1; 
   
   let fiscalYearStart = new Date(now.getFullYear(), startMonth, startDay);
   if (now < fiscalYearStart) {

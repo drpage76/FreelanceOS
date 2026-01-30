@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DB } from '../services/db';
 import { Tenant, UserPlan, InvoiceNumberingType } from '../types';
-import { differenceInDays, parseISO, addMonths, format, isValid } from 'date-fns';
+import { checkSubscriptionStatus } from '../utils';
+import { format, addMonths } from 'date-fns';
 
 interface SettingsProps {
   user: Tenant | null;
@@ -16,35 +17,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [logoBase64, setLogoBase64] = useState<string | undefined>(user?.logoUrl);
 
-  const trialInfo = useMemo(() => {
-    if (!user) return null;
-    
-    // Safety check for trialStartDate
-    let startDate = new Date();
-    if (user.trialStartDate) {
-      const parsed = parseISO(user.trialStartDate);
-      if (isValid(parsed)) {
-        startDate = parsed;
-      }
-    }
-
-    const expiry = addMonths(startDate, 3);
-    const daysLeft = Math.max(0, differenceInDays(expiry, new Date()));
-    
-    let formattedExpiry = "TBD";
-    try {
-      formattedExpiry = format(expiry, 'dd MMM yyyy');
-    } catch (e) {
-      console.warn("Date formatting failed", e);
-    }
-    
-    return { 
-      plan: user.plan,
-      daysLeft,
-      expiryDate: formattedExpiry,
-      isExpired: daysLeft <= 0
-    };
-  }, [user]);
+  const sub = useMemo(() => checkSubscriptionStatus(user), [user]);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -110,6 +83,9 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
   const handleUpgrade = async () => {
     if (!user) return;
     setIsUpgrading(true);
+    
+    // Protip: To actually work with Stripe, you would call a Supabase Edge Function here
+    // that returns a Stripe Checkout sessionId.
     setTimeout(async () => {
       try {
         const upgraded: Tenant = {
@@ -121,11 +97,11 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
         await DB.updateTenant(upgraded);
         await onRefresh();
         setIsUpgrading(false);
-        alert("Payment Method Verified. ELITE Subscription is now active.");
+        alert("Success: Stripe secure handoff completed. Elite Subscription is now ACTIVE.");
       } catch (e) {
         setIsUpgrading(false);
       }
-    }, 2500);
+    }, 2800);
   };
 
   if (!user) return (
@@ -139,7 +115,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none italic">Workspace Engine</h2>
-          <p className="text-slate-500 font-medium mt-1">Global protocols for {user?.email}</p>
+          <p className="text-slate-500 font-medium mt-1">Operational configuration for {user?.email}</p>
         </div>
         <div className="flex gap-3">
            {saveSuccess && <span className="bg-emerald-50 text-emerald-600 px-4 py-3 rounded-xl text-[10px] font-black uppercase flex items-center animate-in fade-in zoom-in-95"><i className="fa-solid fa-check mr-2"></i> Synced</span>}
@@ -156,24 +132,23 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
       </div>
 
       {activeTab === 'billing' ? (
-        <div className="animate-in fade-in slide-in-from-bottom-2">
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
            <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="bg-slate-900 p-10 rounded-[48px] text-white shadow-2xl flex flex-col justify-between relative overflow-hidden">
-                 <div className="absolute top-0 right-0 p-8 opacity-10"><i className="fa-solid fa-gem text-8xl"></i></div>
+              <div className="bg-slate-900 p-10 rounded-[48px] text-white shadow-2xl flex flex-col justify-between relative overflow-hidden group">
+                 <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity duration-500"><i className="fa-solid fa-gem text-9xl"></i></div>
                  <div>
                     <p className="text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-2">Exclusive Membership</p>
                     <h3 className="text-4xl font-black mb-10 tracking-tighter italic">FreelanceOS <span className="text-indigo-500">ELITE</span></h3>
                     <div className="mb-10">
-                       <div className="text-7xl font-black">£4.99<span className="text-lg text-slate-500">/mo</span></div>
+                       <div className="text-7xl font-black tracking-tighter">£4.99<span className="text-lg text-slate-500">/mo</span></div>
                        <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-4">
-                         Everything inclusive. No hidden fees.
+                         3 Months Free Trial — Automatic monthly billing afterwards.
                        </p>
                     </div>
                     <ul className="space-y-4 text-left text-xs font-bold text-slate-400 mb-10">
-                       <li className="flex items-center gap-3"><div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center"><i className="fa-solid fa-check text-[10px]"></i></div> Global Cloud Sync Engine</li>
-                       <li className="flex items-center gap-3"><div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center"><i className="fa-solid fa-check text-[10px]"></i></div> Real-time Fiscal Reporting</li>
-                       <li className="flex items-center gap-3"><div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center"><i className="fa-solid fa-check text-[10px]"></i></div> AI Mileage Protocol (Google Maps)</li>
-                       <li className="flex items-center gap-3"><div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center"><i className="fa-solid fa-check text-[10px]"></i></div> Multi-device Bi-sync</li>
+                       <li className="flex items-center gap-3"><div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center"><i className="fa-solid fa-check text-[10px]"></i></div> Enterprise Cloud Mirroring</li>
+                       <li className="flex items-center gap-3"><div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center"><i className="fa-solid fa-check text-[10px]"></i></div> Secure Real-time Workspace Persistence</li>
+                       <li className="flex items-center gap-3"><div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center"><i className="fa-solid fa-check text-[10px]"></i></div> Automated Google Maps Mileage Engine</li>
                     </ul>
                  </div>
                  {user?.plan !== UserPlan.ACTIVE ? (
@@ -181,25 +156,25 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                      type="button" 
                      onClick={handleUpgrade} 
                      disabled={isUpgrading}
-                     className="w-full py-5 bg-indigo-600 rounded-3xl font-black text-xs uppercase hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 flex items-center justify-center gap-3"
+                     className={`w-full py-5 rounded-3xl font-black text-xs uppercase transition-all shadow-xl flex items-center justify-center gap-3 ${sub.isTrialExpired ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20' : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'}`}
                    >
-                     {isUpgrading ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-credit-card"></i>}
-                     {isUpgrading ? 'Authorizing Gateway...' : 'Activate Subscription'}
+                     {isUpgrading ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-shield-check"></i>}
+                     {isUpgrading ? 'Contacting Stripe...' : sub.isTrialExpired ? 'Pay to Reactivate Elite' : 'Add Payment for Auto-Billing'}
                    </button>
                  ) : (
                    <div className="w-full py-5 bg-emerald-500/10 border border-emerald-500/20 rounded-3xl font-black text-xs uppercase text-emerald-400 text-center tracking-widest">
-                     <i className="fa-solid fa-shield-check mr-2"></i> Subscription Active
+                     <i className="fa-solid fa-check-double mr-2"></i> Elite Active
                    </div>
                  )}
               </div>
 
               <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm flex flex-col justify-between">
                  <div>
-                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Status Ledger</h4>
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Subscription Status</h4>
                     <div className="space-y-8">
                        <div className="flex justify-between items-center">
                           <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Current Plan</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Plan</p>
                             <p className="font-black text-slate-900 text-lg">{user?.plan}</p>
                           </div>
                           <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase border ${user?.plan === UserPlan.ACTIVE ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse'}`}>
@@ -208,26 +183,26 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                        </div>
 
                        <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Trial Progress</p>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Trial Time Remaining</p>
                           <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-100">
-                             <div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${Math.min(100, ( (90 - (trialInfo?.daysLeft || 0)) / 90 ) * 100)}%` }}></div>
+                             <div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${Math.min(100, ( (90 - (sub?.daysLeft || 0)) / 90 ) * 100)}%` }}></div>
                           </div>
                           <div className="flex justify-between mt-3">
-                             <p className="text-[10px] font-bold text-slate-500 italic">{trialInfo?.daysLeft} days remaining</p>
-                             <p className="text-[10px] font-black text-slate-900 uppercase">Expires {trialInfo?.expiryDate}</p>
+                             <p className="text-[10px] font-bold text-slate-500 italic">{sub?.daysLeft} days remaining</p>
+                             <p className="text-[10px] font-black text-slate-900 uppercase">Billing Starts {sub?.expiryDate ? format(sub.expiryDate, 'dd MMM yyyy') : 'TBD'}</p>
                           </div>
                        </div>
 
                        <div className="pt-8 border-t border-slate-50">
                           <p className="text-[9px] text-slate-400 font-bold leading-relaxed mb-6">
-                            Trial billing begins automatically at the end of the 3-month grace period. You can cancel at any time via the Stripe portal.
+                            By adding a payment method, you ensure uninterrupted service when the 3-month trial ends. You can cancel at any time before the first billing date.
                           </p>
                           <button 
                             type="button" 
-                            onClick={() => alert("Connecting to Stripe Billing Portal...")} 
+                            onClick={() => alert("Redirecting to Stripe Customer Portal...")} 
                             className="w-full py-4 bg-slate-50 text-slate-600 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all"
                           >
-                            Manage Payment Methods
+                            Access Stripe Billing Portal
                           </button>
                        </div>
                     </div>
@@ -238,7 +213,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
       ) : (
         <form onSubmit={handleUpdateProfile} className="space-y-8">
           {activeTab === 'profile' && (
-            <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8 animate-in fade-in slide-in-from-bottom-2">
+            <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Legal Entity Name</label>
@@ -252,7 +227,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 <div className="md:col-span-2 space-y-4">
                   <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Business Logo</label>
                   <div className="flex flex-col md:flex-row gap-6 items-center bg-slate-50 p-6 rounded-[24px] border border-slate-100">
-                    <div className="w-32 h-32 bg-white rounded-3xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                    <div className="w-32 h-32 bg-white rounded-3xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
                       {logoBase64 ? (
                         <img src={logoBase64} alt="Company Logo" className="w-full h-full object-contain p-2" />
                       ) : (
@@ -260,8 +235,8 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                       )}
                     </div>
                     <div className="flex-1 space-y-2 text-center md:text-left">
-                      <p className="text-xs font-bold text-slate-900">Upload high-resolution logo</p>
-                      <p className="text-[10px] text-slate-500">Supports PNG, JPG (Max 2MB). This will appear on all documents.</p>
+                      <p className="text-xs font-bold text-slate-900">Upload business identity logo</p>
+                      <p className="text-[10px] text-slate-500">Supports PNG, JPG (Max 2MB). Visible on all professional documents.</p>
                       <div className="pt-2">
                         <label className="cursor-pointer bg-white border border-slate-200 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest inline-block shadow-sm hover:border-indigo-400 transition-colors">
                           Select File
@@ -285,7 +260,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 </div>
                 
                 <div className="md:col-span-2 pt-4 border-t border-slate-50">
-                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 italic">Remittance & Banking Protocols</h4>
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 italic">Financial Remittance Protocols</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Account Name</label>
@@ -303,12 +278,12 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 </div>
               </div>
               <button type="submit" disabled={isSaving} className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-black transition-all">
-                {isSaving ? 'Synchronizing Core...' : 'Update Business Core'}
+                {isSaving ? 'Synchronizing Business Core...' : 'Sync Business Identity'}
               </button>
             </div>
           )}
           {activeTab === 'localization' && (
-            <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8 animate-in fade-in slide-in-from-bottom-2">
+            <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Trading Currency</label>

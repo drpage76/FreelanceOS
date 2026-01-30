@@ -35,7 +35,6 @@ export const getSupabase = () => {
 };
 
 const FIELD_MAP: Record<string, string> = {
-  // Tenant Profile mappings
   email: 'email',
   name: 'name',
   businessName: 'business_name',
@@ -59,8 +58,6 @@ const FIELD_MAP: Record<string, string> = {
   invoiceNumberingType: 'invoice_numbering_type',
   trialStartDate: 'trial_start_date',
   plan: 'plan',
-  
-  // App Entities mappings
   paymentTermsDays: 'payment_terms_days',
   clientId: 'client_id',
   startDate: 'start_date',
@@ -92,7 +89,6 @@ const toDb = (table: string, obj: any, tenantId: string) => {
   for (const key in obj) {
     if (key === '__isSeed' || key === 'tenant_id' || key === 'shifts') continue;
     if (key === 'rechargeAmount' || key === 'actualCost') continue;
-
     const dbKey = FIELD_MAP[key] || key;
     newObj[dbKey] = obj[key];
   }
@@ -158,7 +154,6 @@ export const DB = {
     const effectiveId = await DB.getTenantId();
     const tenantId = effectiveId || LOCAL_USER_EMAIL;
 
-    // Handle Local Upsert
     if (method === 'upsert' && payload) {
       const raw = Array.isArray(payload) ? payload : [payload];
       raw.forEach(p => {
@@ -172,7 +167,6 @@ export const DB = {
       saveLocalData(localData);
     }
 
-    // Handle Cloud
     if (DB.isCloudConfigured() && effectiveId) {
       const client = getSupabase();
       if (client) {
@@ -224,7 +218,7 @@ export const DB = {
       if (data) return fromDb(data) as Tenant;
     } catch (e) {}
     
-    // Default fallback profile
+    // First time user setup: establish trial date firmly
     const n: Tenant = { 
       email, 
       name: email.split('@')[0], 
@@ -240,7 +234,8 @@ export const DB = {
       invoiceNextNumber: 1,
       invoiceNumberingType: 'INCREMENTAL',
       plan: UserPlan.TRIAL,
-      trialStartDate: new Date().toISOString()
+      trialStartDate: new Date().toISOString(),
+      paymentStatus: 'TRIALING'
     };
     await DB.updateTenant(n);
     return n;
