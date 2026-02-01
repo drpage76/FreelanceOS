@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import { Job, JobItem, JobStatus, Client, Invoice, InvoiceStatus, JobShift, Tenant } from '../types';
+import { Job, JobItem, JobStatus, Client, Invoice, InvoiceStatus, JobShift, Tenant, SchedulingType } from '../types';
 import { DB, generateId } from '../services/db';
 import { formatCurrency, formatDate, calculateDueDate, generateInvoiceId } from '../utils';
 import { STATUS_COLORS } from '../constants';
@@ -70,8 +70,20 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     if (e) e.preventDefault();
     if (!job || isSaving) return;
     setIsSaving(true);
+    
+    // Calculate final start/end dates based on shifts if applicable
+    let startDate = job.startDate;
+    let endDate = job.endDate;
+    if (job.schedulingType === SchedulingType.SHIFT_BASED && shifts.length > 0) {
+      const startDates = shifts.map(s => s.startDate).filter(Boolean).sort();
+      const endDates = shifts.map(s => s.endDate).filter(Boolean).sort();
+      if (startDates.length > 0) startDate = startDates[0]!;
+      if (endDates.length > 0) endDate = endDates[endDates.length - 1]!;
+    }
+
     const formEl = document.getElementById('job-full-edit-form') as HTMLFormElement;
     const formData = new FormData(formEl);
+    
     const updatedJob: Job = {
       ...job,
       description: (formData.get('description') as string) || job.description,
@@ -80,8 +92,11 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       status: (formData.get('status') as JobStatus) || job.status,
       totalRecharge: totalRecharge,
       shifts: shifts,
+      startDate,
+      endDate,
       syncToCalendar: job.syncToCalendar
     };
+
     try {
       await DB.saveJob(updatedJob);
       await DB.saveJobItems(job.id, items);
@@ -96,13 +111,13 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     const nextVal = !job.syncToCalendar;
     const updatedJob = { ...job, syncToCalendar: nextVal };
     setJob(updatedJob);
-    // Explicitly call update and sync
+    // Persist immediately and trigger cloud sync protocol
     try {
       await DB.saveJob(updatedJob);
       if (googleAccessToken) await syncJobToGoogle(updatedJob, googleAccessToken, client?.name);
       await onRefresh();
     } catch (e) {
-      console.error("Sync flip failed", e);
+      console.error("Sync flip protocol error:", e);
     }
   };
 
@@ -266,7 +281,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
               </div>
               <div className="p-8 bg-slate-100 overflow-x-auto">
                 <div ref={docRef} className="bg-white p-16 pb-32 border border-slate-100 min-h-[1120px] w-[800px] mx-auto text-slate-900 shadow-sm font-sans">
-                   {/* PDF Content (Static Preview) */}
                    <div className="flex justify-between items-start mb-16">
                       <div>
                         {currentUser?.logoUrl ? <img src={currentUser.logoUrl} alt="Logo" className="h-28 mb-8 object-contain" /> : <div className="text-3xl font-black italic mb-8">Freelance<span className="text-indigo-600">OS</span></div>}
@@ -397,17 +411,81 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                        <i className="fa-brands fa-google text-indigo-600"></i>
-                       <span className="text-[10px] font-black text-slate-900 uppercase">Calendar Sync</span>
+                       <span className="text-[10px] font-black text-slate-900 uppercase">Cloud Calendar Sync</span>
                     </div>
                     <button 
                       type="button" 
                       onClick={toggleSync}
-                      className={`w-12 h-6 rounded-full transition-all relative ${job.syncToCalendar ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                      className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${job.syncToCalendar ? 'bg-white text-indigo-600 border-indigo-100 hover:bg-slate-100' : 'bg-rose-600 text-white border-rose-600 shadow-md'}`}
                     >
-                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${job.syncToCalendar ? 'left-7' : 'left-1'}`} />
+                      {job.syncToCalendar ? 'CALENDAR ACTIVE' : "DON'T SHOW IN CALENDAR"}
                     </button>
                  </div>
               </div>
+            </div>
+
+            {/* Permanent Scheduling UI */}
+            <div className="pt-8 border-t border-slate-50 space-y-6">
+               <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest italic">Production Schedule</h4>
+                  <div className="flex bg-slate-100 p-1 rounded-xl">
+                    <button 
+                      type="button" 
+                      onClick={() => setJob({...job, schedulingType: SchedulingType.CONTINUOUS})}
+                      className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${job.schedulingType === SchedulingType.CONTINUOUS ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                    >
+                      Continuous
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setJob({...job, schedulingType: SchedulingType.SHIFT_BASED})}
+                      className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${job.schedulingType === SchedulingType.SHIFT_BASED ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                    >
+                      Shift-based
+                    </button>
+                  </div>
+               </div>
+
+               {job.schedulingType === SchedulingType.SHIFT_BASED ? (
+                 <div className="space-y-4">
+                    {shifts.map((s, idx) => (
+                      <div key={s.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                         <div className="md:col-span-3 flex items-center justify-between">
+                           <input className="bg-transparent border-none outline-none font-black text-indigo-600 uppercase text-xs w-full" value={s.title} onChange={e => {
+                             const next = [...shifts]; next[idx].title = e.target.value; setShifts(next);
+                           }} />
+                           <button type="button" onClick={() => setShifts(shifts.filter((_, i) => i !== idx))} className="text-rose-400 hover:text-rose-600"><i className="fa-solid fa-trash-can text-xs"></i></button>
+                         </div>
+                         <div>
+                            <label className="text-[8px] font-black text-slate-400 uppercase block mb-1">Start</label>
+                            <input type="date" value={s.startDate} onChange={e => { const next = [...shifts]; next[idx].startDate = e.target.value; setShifts(next); }} className="w-full bg-white px-3 py-2 rounded-lg text-xs font-bold outline-none border border-slate-100" />
+                         </div>
+                         <div>
+                            <label className="text-[8px] font-black text-slate-400 uppercase block mb-1">End</label>
+                            <input type="date" value={s.endDate} onChange={e => { const next = [...shifts]; next[idx].endDate = e.target.value; setShifts(next); }} className="w-full bg-white px-3 py-2 rounded-lg text-xs font-bold outline-none border border-slate-100" />
+                         </div>
+                         <div className="flex items-center gap-2">
+                            <label className="flex items-center gap-2 cursor-pointer pt-4">
+                               <input type="checkbox" checked={s.isFullDay} onChange={e => { const next = [...shifts]; next[idx].isFullDay = e.target.checked; setShifts(next); }} className="w-4 h-4 rounded accent-indigo-600" />
+                               <span className="text-[9px] font-black text-slate-400 uppercase">Full Day</span>
+                            </label>
+                         </div>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setShifts([...shifts, { id: generateId(), jobId: job.id, title: 'New Shift', startDate: job.startDate, endDate: job.startDate, startTime: '09:00', endTime: '17:30', isFullDay: true, tenant_id: job.tenant_id }])} className="w-full py-4 border-2 border-dashed border-indigo-100 rounded-2xl text-[10px] font-black text-indigo-400 uppercase tracking-widest hover:bg-indigo-50/30 transition-all">+ Add Work Session</button>
+                 </div>
+               ) : (
+                 <div className="grid grid-cols-2 gap-8">
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase block px-1">Start Date</label>
+                       <input type="date" name="startDate" defaultValue={job.startDate} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase block px-1">End Date</label>
+                       <input type="date" name="endDate" defaultValue={job.endDate} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" />
+                    </div>
+                 </div>
+               )}
             </div>
             
             <div className="pt-8 border-t border-slate-50">

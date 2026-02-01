@@ -22,7 +22,7 @@ const DEFAULT_JOB_DETAILS = {
   endDate: new Date().toISOString().split('T')[0],
   status: JobStatus.POTENTIAL,
   schedulingType: SchedulingType.CONTINUOUS,
-  syncToCalendar: true
+  syncToCalendar: true // True by default, user can opt-out
 };
 
 export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose, clients, onSave, tenant_id }) => {
@@ -172,6 +172,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-8 max-h-[75vh] overflow-y-auto custom-scrollbar">
+          {/* Client Selection */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Client Identity</label>
@@ -210,6 +211,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
             )}
           </div>
 
+          {/* Project Details */}
           <div className="grid grid-cols-2 gap-6">
             <div className="col-span-2">
               <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 px-1">Project Title / Description</label>
@@ -233,33 +235,43 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
               <input required value={jobDetails.location} onChange={e => setJobDetails({...jobDetails, location: e.target.value})} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" placeholder="Event Venue Name" />
             </div>
             
+            {/* Scheduling Section - PERMANENTLY VISIBLE */}
             <div className="col-span-2 p-6 bg-indigo-50/50 border border-indigo-100 rounded-[32px]">
                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                      <i className="fa-brands fa-google text-indigo-600"></i>
-                     <span className="text-[11px] font-black text-slate-900 uppercase">Sync to Google Calendar</span>
+                     <span className="text-[11px] font-black text-slate-900 uppercase">Production Cloud Sync</span>
                   </div>
                   <button 
                     type="button" 
                     onClick={() => setJobDetails({ ...jobDetails, syncToCalendar: !jobDetails.syncToCalendar })}
-                    className={`w-12 h-6 rounded-full transition-all relative ${jobDetails.syncToCalendar ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                    className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${jobDetails.syncToCalendar ? 'bg-white text-emerald-600 border-emerald-100' : 'bg-rose-600 text-white border-rose-600 shadow-lg'}`}
                   >
-                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${jobDetails.syncToCalendar ? 'left-7' : 'left-1'}`} />
+                    {jobDetails.syncToCalendar ? 'SYNC ACTIVE' : "DON'T SHOW IN CALENDAR"}
                   </button>
                </div>
                
               <div className="flex items-center justify-between mb-6 pt-4 border-t border-indigo-100">
                 <div>
-                  <h4 className="font-black text-slate-900 text-sm">Production Schedule</h4>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Toggle schedule mode</p>
+                  <h4 className="font-black text-slate-900 text-sm">Production Timeline</h4>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Select scheduling mode</p>
                 </div>
-                <button 
-                  type="button" 
-                  onClick={() => setJobDetails({ ...jobDetails, schedulingType: jobDetails.schedulingType === SchedulingType.CONTINUOUS ? SchedulingType.SHIFT_BASED : SchedulingType.CONTINUOUS })}
-                  className={`w-14 h-8 rounded-full transition-all relative ${jobDetails.schedulingType === SchedulingType.SHIFT_BASED ? 'bg-indigo-600' : 'bg-slate-200'}`}
-                >
-                  <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${jobDetails.schedulingType === SchedulingType.SHIFT_BASED ? 'left-7' : 'left-1 shadow-sm'}`} />
-                </button>
+                <div className="flex bg-white/50 p-1 rounded-xl border border-indigo-50">
+                  <button 
+                    type="button" 
+                    onClick={() => setJobDetails({ ...jobDetails, schedulingType: SchedulingType.CONTINUOUS })}
+                    className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${jobDetails.schedulingType === SchedulingType.CONTINUOUS ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
+                  >
+                    Continuous
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setJobDetails({ ...jobDetails, schedulingType: SchedulingType.SHIFT_BASED })}
+                    className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${jobDetails.schedulingType === SchedulingType.SHIFT_BASED ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
+                  >
+                    Shift-based
+                  </button>
+                </div>
               </div>
 
               {jobDetails.schedulingType === SchedulingType.SHIFT_BASED ? (
@@ -319,6 +331,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
             </div>
           </div>
 
+          {/* Line Items */}
           <div className="space-y-4 pt-4 border-t border-slate-100">
              <div className="flex items-center justify-between px-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deliverables & Rate</label>
