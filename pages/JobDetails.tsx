@@ -24,6 +24,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<Tenant | null>(null);
   
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -35,6 +36,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
   const fetchData = async () => {
     if (!id) return;
+    setIsLoading(true);
     try {
       const user = await DB.getCurrentUser();
       setCurrentUser(user);
@@ -50,8 +52,14 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         setClient(allClients.find(c => c.id === foundJob.clientId) || null);
         const allInvoices = await DB.getInvoices();
         setInvoice(allInvoices.find(inv => inv.jobId === foundJob.id) || null);
-      } else { navigate('/jobs'); }
-    } catch (err) { console.error(err); }
+      } else { 
+        navigate('/jobs'); 
+      }
+    } catch (err) { 
+      console.error("Fetch Data Protocol Error:", err); 
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => { fetchData(); }, [id]);
@@ -117,7 +125,11 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
         pdf.save(filename);
-      } catch (err) { alert("Export failed."); } finally { setIsSaving(false); }
+      } catch (err) { 
+        alert("Export failed. Please ensure the preview window is fully loaded."); 
+      } finally { 
+        setIsSaving(false); 
+      }
     }, 200);
   };
 
@@ -139,16 +151,28 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       setInvoice(newInvoice);
       setShowInvoiceModal(false);
       setShowPreview('invoice');
-    } catch (err) { alert("Failed."); } finally { setIsSaving(false); }
+    } catch (err) { alert("Failed to issue invoice."); } finally { setIsSaving(false); }
   };
 
-  if (!job) return null;
+  if (isLoading) return (
+    <div className="flex-1 flex flex-col items-center justify-center p-20 gap-4">
+      <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest animate-pulse">Syncing Project Protocol...</p>
+    </div>
+  );
+
+  if (!job) return (
+    <div className="flex-1 flex flex-col items-center justify-center p-20">
+      <p className="text-slate-400 font-bold uppercase tracking-widest">Project Not Found</p>
+      <Link to="/jobs" className="mt-4 text-indigo-600 font-black uppercase text-xs">Back to Archive</Link>
+    </div>
+  );
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20 px-4">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Link to="/jobs" className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all"><i className="fa-solid fa-arrow-left"></i></Link>
+          <Link to="/jobs" className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all shadow-sm"><i className="fa-solid fa-arrow-left"></i></Link>
           <div>
             <h2 className="text-3xl font-black text-slate-900">{job.description}</h2>
             <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Protocol ID: {job.id} — {client?.name}</p>
@@ -164,7 +188,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           <button onClick={() => handleUpdateJob()} disabled={isSaving || isDeleting} className="px-5 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-black transition-all">
             {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : 'Save Changes'}
           </button>
-          <button onClick={handleDeleteJob} disabled={isSaving || isDeleting} className="w-11 h-11 bg-rose-50 text-rose-500 border border-rose-100 rounded-xl flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all">
+          <button onClick={handleDeleteJob} disabled={isSaving || isDeleting} className="w-11 h-11 bg-rose-50 text-rose-500 border border-rose-100 rounded-xl flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all shadow-sm">
             {isDeleting ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-trash-can"></i>}
           </button>
         </div>
@@ -393,7 +417,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Postal Reference</p>
                     <p className="text-xs font-medium text-slate-500 leading-relaxed italic">{client?.address}</p>
                  </div>
-                 <Link to="/clients" className="block text-center py-3 bg-slate-50 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors">Edit Client Network</Link>
+                 <Link to="/clients" className="block text-center py-3 bg-slate-50 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors shadow-sm">Edit Client Network</Link>
               </div>
            </div>
         </div>
