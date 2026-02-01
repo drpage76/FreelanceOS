@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-// Use direct named imports from react-router to resolve missing export errors in unified environments
 import { useParams, useNavigate, Link } from 'react-router';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import { Job, JobItem, JobStatus, Client, Invoice, InvoiceStatus, JobShift, SchedulingType, Tenant } from '../types';
+import { Job, JobItem, JobStatus, Client, Invoice, InvoiceStatus, JobShift, Tenant } from '../types';
 import { DB, generateId } from '../services/db';
 import { formatCurrency, formatDate, calculateDueDate, generateInvoiceId } from '../utils';
 import { STATUS_COLORS } from '../constants';
 import { syncJobToGoogle } from '../services/googleCalendar';
+import { uploadToGoogleDrive } from '../services/googleDrive';
 
 interface JobDetailsProps {
   onRefresh: () => void;
@@ -102,18 +102,14 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     }
   };
 
-  const handleDownloadPDF = async (filename: string) => {
-    if (!docRef.current) return;
+  const handleDownloadPDF = async () => {
+    if (!docRef.current || !job || !client) return;
     setIsSaving(true);
     
-    // Crucial: Wait for modal animations to settle
     await new Promise(r => setTimeout(r, 100));
 
     try {
       const element = docRef.current;
-      
-      // We capture the element's scrollHeight and set it as the windowHeight
-      // to ensure html2canvas captures everything outside the visible scroll area.
       const canvas = await html2canvas(element, { 
         scale: 2, 
         useCORS: true, 
@@ -130,12 +126,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       const imgData = canvas.toDataURL('image/png');
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
-      
-      // Calculate PDF dimensions in mm (Standard A4 width is 210mm)
       const pdfWidth = 210;
       const pdfHeight = (imgHeight * pdfWidth) / imgWidth;
       
-      // Create PDF with exactly the required height to fit the full document
       const pdf = new jsPDF({ 
         orientation: 'portrait', 
         unit: 'mm', 
@@ -143,10 +136,20 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       });
       
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(filename);
+      
+      const docLabel = showPreview === 'invoice' ? (invoice?.id || 'INV') : 'Quote';
+      const finalFileName = `${docLabel} ${job.id} ${client.name}.pdf`;
+      pdf.save(finalFileName);
+
+      // Google Drive Background Sync
+      if (googleAccessToken && currentUser?.businessName) {
+        const pdfBlob = pdf.output('blob');
+        const folderName = `${currentUser.businessName} Invoices`;
+        await uploadToGoogleDrive(googleAccessToken, folderName, finalFileName, pdfBlob);
+      }
     } catch (err) { 
       console.error(err);
-      alert("Export failed. Please ensure the preview is fully loaded."); 
+      alert("Export failed."); 
     } finally { 
       setIsSaving(false); 
     }
@@ -237,7 +240,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
               <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center sticky top-0 z-50">
                  <span className="text-[10px] font-black uppercase text-indigo-600 px-4">Document Preview — {showPreview === 'invoice' ? invoice?.id : 'Quote Protocol'}</span>
                  <div className="flex gap-2">
-                    <button onClick={() => handleDownloadPDF(`${showPreview === 'invoice' ? 'Invoice' : 'Quote'}_${job.id}.pdf`)} disabled={isSaving} className="px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center gap-2">
+                    <button onClick={handleDownloadPDF} disabled={isSaving} className="px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center gap-2">
                       {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-download"></i>} Download
                     </button>
                     <button onClick={() => setShowPreview(null)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-rose-500 border border-slate-200"><i className="fa-solid fa-xmark"></i></button>
@@ -289,7 +292,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                         <tr className="border-b-2 border-slate-900">
                           <th className="py-4 text-left text-[11px] font-black uppercase tracking-[0.2em]">Deliverable</th>
                           <th className="py-4 text-center text-[11px] font-black uppercase tracking-[0.2em]">Qty</th>
-                          <th className="py-4 text-right text-[11px] font-black uppercase tracking-[0.2em]">Rate</th>
                           <th className="py-4 text-right text-[11px] font-black uppercase tracking-[0.2em]">Total</th>
                         </tr>
                       </thead>

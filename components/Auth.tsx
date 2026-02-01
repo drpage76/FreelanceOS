@@ -56,9 +56,6 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
     try {
       const origin = window.location.origin;
       
-      // Dynamic Redirect:
-      // If we are on the custom domain (freelanceos.org), redirect to root.
-      // If we are on GitHub Pages (github.io), redirect to the subfolder.
       let redirectTo = origin + '/';
       if (origin.includes('github.io')) {
         redirectTo = origin + '/FreelanceOS/';
@@ -73,7 +70,8 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess }) => {
           queryParams: {
             prompt: 'select_account',
             access_type: 'offline',
-            scope: 'openid email profile https://www.googleapis.com/auth/calendar'
+            // Added drive.file scope to allow PDF saving
+            scope: 'openid email profile https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.file'
           }
         }
       });

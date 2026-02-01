@@ -167,7 +167,6 @@ const App: React.FC = () => {
     </div>
   );
 
-  // Authenticated Layout Wrapper
   const AppLayout = ({ children }: { children: React.ReactNode }) => (
     <div className="flex flex-col md:flex-row h-screen bg-slate-50 overflow-hidden">
       <Navigation isSyncing={isSyncing} user={currentUser} />
@@ -193,11 +192,9 @@ const App: React.FC = () => {
   return (
     <HashRouter>
       <Routes>
-        {/* Public Routes (No login required) */}
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         
-        {/* Auth Protected Routes */}
         {!currentUser ? (
           <>
             <Route path="/" element={<Landing />} />
@@ -209,7 +206,7 @@ const App: React.FC = () => {
             <Route path="/jobs" element={<AppLayout><Jobs state={appState} onNewJobClick={() => setIsNewJobModalOpen(true)} onRefresh={loadData} /></AppLayout>} />
             <Route path="/jobs/:id" element={<AppLayout><JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} /></AppLayout>} />
             <Route path="/clients" element={<AppLayout><Clients state={appState} onRefresh={loadData} /></AppLayout>} />
-            <Route path="/invoices" element={<AppLayout><Invoices state={appState} onRefresh={loadData} /></AppLayout>} />
+            <Route path="/invoices" element={<AppLayout><Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} /></AppLayout>} />
             <Route path="/mileage" element={<AppLayout><Mileage state={appState} onRefresh={loadData} /></AppLayout>} />
             <Route path="/settings" element={<AppLayout><Settings user={currentUser} onLogout={() => DB.signOut().then(() => window.location.reload())} onRefresh={loadData} /></AppLayout>} />
             <Route path="*" element={<Navigate to="/" />} />

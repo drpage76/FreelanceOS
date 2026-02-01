@@ -1,27 +1,23 @@
 import React, { useState, useRef, useMemo } from 'react';
-// Use direct named imports from react-router to resolve missing Link export in unified environments
 import { Link } from 'react-router';
-
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import { AppState, InvoiceStatus, Invoice, Job, Client, JobItem, JobStatus, UserPlan } from '../types';
-import { formatCurrency, formatDate, generateInvoiceId, calculateDueDate } from '../utils';
+import { AppState, InvoiceStatus, Invoice, Job, Client, JobItem, JobStatus } from '../types';
+import { formatCurrency, formatDate } from '../utils';
 import { STATUS_COLORS } from '../constants';
 import { DB } from '../services/db';
+import { uploadToGoogleDrive } from '../services/googleDrive';
 
 interface InvoicesProps {
   state: AppState;
   onRefresh: () => void;
+  googleAccessToken?: string;
 }
 
-export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
+export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh, googleAccessToken }) => {
   const [previewData, setPreviewData] = useState<{inv: Invoice, job: Job, client: Client, items: JobItem[]} | null>(null);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
-  const [showPaymentModal, setShowPaymentModal] = useState<Invoice | null>(null);
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const docRef = useRef<HTMLDivElement>(null);
-
-  const isPro = !!state.user?.plan;
 
   const financialStats = useMemo(() => {
     let totalPaid = 0;
@@ -84,7 +80,6 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
     if (!docRef.current || !previewData) return;
     setIsProcessing('downloading');
     
-    // Crucial: Wait for any layout shifts
     await new Promise(r => setTimeout(r, 100));
 
     try {
@@ -105,12 +100,9 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
       const imgData = canvas.toDataURL('image/png');
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
-      
-      // Calculate dimensions in MM (A4 width is 210mm)
       const pdfWidth = 210;
       const pdfHeight = (imgHeight * pdfWidth) / imgWidth;
       
-      // Create PDF with dynamic height to ensure no content is clipped
       const pdf = new jsPDF({ 
         orientation: 'portrait', 
         unit: 'mm', 
@@ -118,7 +110,16 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
       });
       
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Invoice_${previewData.inv.id}.pdf`);
+      
+      const finalFileName = `Invoice ${previewData.inv.id} ${previewData.client.name}.pdf`;
+      pdf.save(finalFileName);
+
+      // Cloud Sync to Google Drive
+      if (googleAccessToken && state.user?.businessName) {
+        const pdfBlob = pdf.output('blob');
+        const folderName = `${state.user.businessName} Invoices`;
+        await uploadToGoogleDrive(googleAccessToken, folderName, finalFileName, pdfBlob);
+      }
     } catch (err) { 
       console.error(err);
       alert("PDF Export failed."); 
@@ -128,7 +129,7 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-20">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20 px-4">
       {previewData && (
         <div className="fixed inset-0 z-[200] flex items-start justify-center bg-slate-900/80 backdrop-blur-sm p-4 overflow-y-auto">
           <div className="bg-white w-full max-w-4xl rounded-[40px] shadow-2xl overflow-hidden my-8 border border-slate-200">
@@ -151,10 +152,7 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
                       {state.user?.logoUrl ? (
                         <img src={state.user.logoUrl} alt="Logo" className="h-32 mb-6 object-contain" />
                       ) : (
-                        <div className="flex items-center gap-2 mb-6">
-                           <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white"><i className="fa-solid fa-bolt text-lg"></i></div>
-                           <span className="text-2xl font-black tracking-tighter">Freelance<span className="text-indigo-400">OS</span></span>
-                        </div>
+                        <div className="flex items-center gap-2 mb-6 text-3xl font-black italic">Freelance<span className="text-indigo-600">OS</span></div>
                       )}
                       <h1 className="text-5xl font-black uppercase tracking-tight">Invoice</h1>
                       <p className="text-slate-400 font-bold uppercase text-xs mt-2 tracking-widest">Ref: {previewData.inv.id}</p>
