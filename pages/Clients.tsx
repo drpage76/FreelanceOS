@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { AppState, Client } from '../types';
 import { AddClientModal } from '../components/AddClientModal';
 import { DB } from '../services/db';
-// Use direct named imports from react-router-dom to avoid property access errors
-import { Link } from 'react-router-dom';
+// Use direct named imports from react-router to resolve missing Link export in unified environments
+import { Link } from 'react-router';
 
 interface ClientsProps {
   state: AppState;

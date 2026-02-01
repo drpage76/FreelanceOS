@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+// Use direct named imports from react-router to resolve missing export errors in unified environments
+import { HashRouter, Routes, Route, Navigate } from 'react-router';
 
 import { Navigation } from './components/Navigation';
 import { Dashboard } from './pages/Dashboard';
@@ -167,49 +167,54 @@ const App: React.FC = () => {
     </div>
   );
 
+  // Authenticated Layout Wrapper
+  const AppLayout = ({ children }: { children: React.ReactNode }) => (
+    <div className="flex flex-col md:flex-row h-screen bg-slate-50 overflow-hidden">
+      <Navigation isSyncing={isSyncing} user={currentUser} />
+      <main className="flex-1 p-3 md:p-6 overflow-y-auto flex flex-col custom-scrollbar">
+        {children}
+      </main>
+      <CreateJobModal 
+        isOpen={isNewJobModalOpen} 
+        onClose={() => setIsNewJobModalOpen(false)} 
+        clients={appState.clients} 
+        tenant_id={currentUser?.email || ''}
+        onSave={async (job, items, clientName) => {
+          await DB.saveJob(job);
+          await DB.saveJobItems(job.id, items);
+          const token = await getLatestToken();
+          if (token) await syncJobToGoogle(job, token, clientName);
+          await loadData();
+        }} 
+      />
+    </div>
+  );
+
   return (
     <HashRouter>
       <Routes>
+        {/* Public Routes (No login required) */}
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         
-        {/* Main App Layout */}
-        <Route path="/*" element={
-          !currentUser ? (
-            <Landing />
-          ) : (
-            <>
-              <div className="flex flex-col md:flex-row h-screen bg-slate-50 overflow-hidden">
-                <Navigation isSyncing={isSyncing} user={currentUser} />
-                <main className="flex-1 p-3 md:p-6 overflow-y-auto flex flex-col custom-scrollbar">
-                  <Routes>
-                    <Route path="/" element={<Dashboard state={appState} onNewJobClick={() => setIsNewJobModalOpen(true)} onSyncCalendar={() => loadData(currentUser)} isSyncing={isSyncing} />} />
-                    <Route path="/jobs" element={<Jobs state={appState} onNewJobClick={() => setIsNewJobModalOpen(true)} onRefresh={loadData} />} />
-                    <Route path="/jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
-                    <Route path="/clients" element={<Clients state={appState} onRefresh={loadData} />} />
-                    <Route path="/invoices" element={<Invoices state={appState} onRefresh={loadData} />} />
-                    <Route path="/mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
-                    <Route path="/settings" element={<Settings user={currentUser} onLogout={() => DB.signOut().then(() => window.location.reload())} onRefresh={loadData} />} />
-                    <Route path="*" element={<Navigate to="/" />} />
-                  </Routes>
-                </main>
-              </div>
-              <CreateJobModal 
-                isOpen={isNewJobModalOpen} 
-                onClose={() => setIsNewJobModalOpen(false)} 
-                clients={appState.clients} 
-                tenant_id={currentUser?.email}
-                onSave={async (job, items, clientName) => {
-                  await DB.saveJob(job);
-                  await DB.saveJobItems(job.id, items);
-                  const token = await getLatestToken();
-                  if (token) await syncJobToGoogle(job, token, clientName);
-                  await loadData();
-                }} 
-              />
-            </>
-          )
-        } />
+        {/* Auth Protected Routes */}
+        {!currentUser ? (
+          <>
+            <Route path="/" element={<Landing />} />
+            <Route path="*" element={<Navigate to="/" />} />
+          </>
+        ) : (
+          <>
+            <Route path="/" element={<AppLayout><Dashboard state={appState} onNewJobClick={() => setIsNewJobModalOpen(true)} onSyncCalendar={() => loadData(currentUser)} isSyncing={isSyncing} /></AppLayout>} />
+            <Route path="/jobs" element={<AppLayout><Jobs state={appState} onNewJobClick={() => setIsNewJobModalOpen(true)} onRefresh={loadData} /></AppLayout>} />
+            <Route path="/jobs/:id" element={<AppLayout><JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} /></AppLayout>} />
+            <Route path="/clients" element={<AppLayout><Clients state={appState} onRefresh={loadData} /></AppLayout>} />
+            <Route path="/invoices" element={<AppLayout><Invoices state={appState} onRefresh={loadData} /></AppLayout>} />
+            <Route path="/mileage" element={<AppLayout><Mileage state={appState} onRefresh={loadData} /></AppLayout>} />
+            <Route path="/settings" element={<AppLayout><Settings user={currentUser} onLogout={() => DB.signOut().then(() => window.location.reload())} onRefresh={loadData} /></AppLayout>} />
+            <Route path="*" element={<Navigate to="/" />} />
+          </>
+        )}
       </Routes>
     </HashRouter>
   );

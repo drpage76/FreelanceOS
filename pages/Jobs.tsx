@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+// Use direct named imports from react-router to resolve missing export errors in unified environments
+import { Link, useNavigate } from 'react-router';
 import { AppState, JobStatus, InvoiceStatus, Invoice, Job, Client } from '../types';
 import { formatCurrency, formatDate, calculateDueDate, generateInvoiceId } from '../utils';
 import { STATUS_COLORS } from '../constants';

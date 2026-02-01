@@ -1,6 +1,6 @@
-
 import React from 'react';
-import { Link } from 'react-router-dom';
+// Use direct named imports from react-router to resolve missing Link export in unified environments
+import { Link } from 'react-router';
 
 export const Privacy: React.FC = () => {
   return (

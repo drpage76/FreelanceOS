@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+// Use direct named imports from react-router to resolve missing export errors in unified environments
+import { useParams, useNavigate, Link } from 'react-router';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Job, JobItem, JobStatus, Client, Invoice, InvoiceStatus, JobShift, SchedulingType, Tenant } from '../types';
@@ -26,7 +27,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   const [currentUser, setCurrentUser] = useState<Tenant | null>(null);
   
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [showPreview, setShowPreview] = useState<'invoice' | 'quote' | null>(null);
+  const [showPreview, setShowPreview] = refugee<'invoice' | 'quote' | null>(null);
   const [selectedInvoiceDate, setSelectedInvoiceDate] = useState('');
   
   const docRef = useRef<HTMLDivElement>(null);
@@ -96,9 +97,18 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   const handleDownloadPDF = async (filename: string) => {
     if (!docRef.current) return;
     setIsSaving(true);
+    
+    // Ensure capture starts from top
+    window.scrollTo(0, 0);
+
     setTimeout(async () => {
       try {
-        const canvas = await html2canvas(docRef.current!, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+        const canvas = await html2canvas(docRef.current!, { 
+          scale: 2, 
+          useCORS: true, 
+          backgroundColor: '#ffffff',
+          width: 800 // Consistent width for PDF aspect ratio
+        });
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
         const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -107,7 +117,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
         pdf.save(filename);
       } catch (err) { alert("Export failed."); } finally { setIsSaving(false); }
-    }, 150);
+    }, 200);
   };
 
   const finalizeInvoice = async () => {
@@ -187,8 +197,8 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                     <button onClick={() => setShowPreview(null)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-rose-500 border border-slate-200"><i className="fa-solid fa-xmark"></i></button>
                  </div>
               </div>
-              <div className="p-8 bg-slate-100">
-                <div ref={docRef} className="bg-white p-16 border border-slate-100 min-h-[1100px] text-slate-900 shadow-sm font-sans">
+              <div className="p-8 bg-slate-100 overflow-x-auto">
+                <div ref={docRef} className="bg-white p-16 pb-32 border border-slate-100 min-h-[1120px] w-[800px] mx-auto text-slate-900 shadow-sm font-sans">
                    <div className="flex justify-between items-start mb-16">
                       <div>
                         {currentUser?.logoUrl ? <img src={currentUser.logoUrl} alt="Logo" className="h-28 mb-8 object-contain" /> : <div className="text-3xl font-black italic mb-8">Freelance<span className="text-indigo-600">OS</span></div>}
@@ -249,7 +259,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                       </tbody>
                    </table>
 
-                   <div className="flex justify-end pt-12 border-t-2 border-slate-900 mb-24">
+                   <div className="flex justify-end pt-12 border-t-2 border-slate-900 mb-20">
                       <div className="w-72 space-y-5">
                         <div className="flex justify-between items-center text-sm font-black uppercase tracking-widest text-slate-400">
                            <span>Subtotal</span>
@@ -270,7 +280,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                       </div>
                    </div>
 
-                   <div className="mt-auto pt-16 border-t border-slate-100 grid grid-cols-2 gap-12">
+                   <div className="mt-20 pt-16 border-t border-slate-100 grid grid-cols-2 gap-12">
                       <div>
                         <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-4">Remittance & Banking</p>
                         <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 shadow-inner font-mono text-[12px] leading-relaxed text-slate-700">

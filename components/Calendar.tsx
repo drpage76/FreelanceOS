@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-// Use direct named imports from react-router-dom to avoid property access errors
-import { useNavigate } from 'react-router-dom';
+// Use direct named imports from react-router to resolve missing useNavigate export in unified environments
+import { useNavigate } from 'react-router';
 
 import { 
   format, isSameMonth, isSameDay, addMonths, subMonths, 

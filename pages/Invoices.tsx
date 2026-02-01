@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
-// Use direct named imports from react-router-dom to avoid property access errors
-import { Link } from 'react-router-dom';
+// Use direct named imports from react-router to resolve missing Link export in unified environments
+import { Link } from 'react-router';
 
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -83,18 +83,30 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
   const handleDownloadPDF = async () => {
     if (!docRef.current || !previewData) return;
     setIsProcessing('downloading');
+    
+    // Ensure the capture starts from the top
+    window.scrollTo(0, 0);
+    
     setTimeout(async () => {
       try {
-        const canvas = await html2canvas(docRef.current!, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+        const canvas = await html2canvas(docRef.current!, { 
+          scale: 2, 
+          useCORS: true, 
+          backgroundColor: '#ffffff',
+          logging: false,
+          width: 800 // Force standard width for capture
+        });
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
         const imgProps = pdf.getImageProperties(imgData);
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        
+        // Add image - if height exceeds standard A4, jsPDF usually handles it by placing it on one long page
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
         pdf.save(`Invoice_${previewData.inv.id}.pdf`);
       } catch (err) { alert("PDF Export failed."); } finally { setIsProcessing(null); }
-    }, 150);
+    }, 200);
   };
 
   return (
@@ -114,8 +126,8 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
                 <button onClick={() => setPreviewData(null)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-rose-500 border border-slate-200"><i className="fa-solid fa-xmark"></i></button>
               </div>
             </div>
-            <div className="p-10 bg-slate-50 custom-scrollbar">
-               <div ref={docRef} className="bg-white p-12 border border-slate-100 min-h-[1000px] shadow-sm text-slate-900">
+            <div className="p-10 bg-slate-50 custom-scrollbar overflow-x-auto">
+               <div ref={docRef} className="bg-white p-12 pb-32 border border-slate-100 min-h-[1120px] w-[800px] mx-auto shadow-sm text-slate-900">
                  <div className="flex justify-between items-start mb-20">
                     <div>
                       {state.user?.logoUrl ? (
@@ -202,7 +214,7 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
                     </div>
                  </div>
 
-                 <div className="mt-40 pt-10 border-t border-slate-100 grid grid-cols-2 gap-10">
+                 <div className="mt-20 pt-10 border-t border-slate-100 grid grid-cols-2 gap-10">
                     <div>
                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Remittance Details</p>
                        <div className="bg-slate-50 p-6 rounded-2xl font-mono text-[11px] text-slate-700 leading-relaxed border border-slate-100 shadow-inner">

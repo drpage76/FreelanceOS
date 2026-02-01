@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { AppState } from "../types";
 
 const getAIClient = () => {
@@ -66,21 +66,22 @@ export const smartExtractJob = async (rawText: string) => {
       contents: prompt,
       config: {
         responseMimeType: "application/json",
+        // Updated to use the correct Type enum from @google/genai
         responseSchema: {
-          type: "OBJECT" as any,
+          type: Type.OBJECT,
           properties: {
-            description: { type: "STRING" as any },
-            location: { type: "STRING" as any },
-            startDate: { type: "STRING" as any },
-            endDate: { type: "STRING" as any },
+            description: { type: Type.STRING },
+            location: { type: Type.STRING },
+            startDate: { type: Type.STRING },
+            endDate: { type: Type.STRING },
             suggestedItems: {
-              type: "ARRAY" as any,
+              type: Type.ARRAY,
               items: {
-                type: "OBJECT" as any,
+                type: Type.OBJECT,
                 properties: {
-                  description: { type: "STRING" as any },
-                  qty: { type: "NUMBER" as any },
-                  unitPrice: { type: "NUMBER" as any }
+                  description: { type: Type.STRING },
+                  qty: { type: Type.NUMBER },
+                  unitPrice: { type: Type.NUMBER }
                 }
               }
             }

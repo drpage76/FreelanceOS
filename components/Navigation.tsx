@@ -1,7 +1,6 @@
-
 import React, { useEffect, useState } from 'react';
-// Use direct named imports from react-router-dom to avoid property access errors
-import { Link, useLocation } from 'react-router-dom';
+// Use direct named imports from react-router to resolve missing export errors in unified environments
+import { Link, useLocation } from 'react-router';
 
 import { Tenant, UserPlan } from '../types';
 import { DB } from '../services/db';

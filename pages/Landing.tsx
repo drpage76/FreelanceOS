@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Auth } from '../components/Auth';
-import { Link } from 'react-router-dom';
+// Use direct named imports from react-router to resolve missing Link export in unified environments
+import { Link } from 'react-router';
 
 export const Landing: React.FC = () => {
   const [showAuth, setShowAuth] = useState(false);

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-// Use direct named imports from react-router-dom to avoid property access errors
-import { Link } from 'react-router-dom';
+// Use direct named imports from react-router to resolve missing Link export in unified environments
+import { Link } from 'react-router';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip
 } from 'recharts';
