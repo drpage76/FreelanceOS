@@ -1,5 +1,5 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-// Use direct named imports from react-router to resolve missing export errors in unified environments
 import { HashRouter, Routes, Route, Navigate } from 'react-router';
 
 import { Navigation } from './components/Navigation';
@@ -158,20 +158,21 @@ const App: React.FC = () => {
   }, [loadData, isLoading]);
 
   if (isLoading) return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-6">
-      <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-6 p-4">
+      <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
       <div className="text-center">
         <p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Establishing Secure Workspace</p>
-        <p className="text-slate-500 text-[8px] font-bold uppercase tracking-widest mt-4">Checking Cloud Protocols...</p>
       </div>
     </div>
   );
 
   const AppLayout = ({ children }: { children: React.ReactNode }) => (
-    <div className="flex flex-col md:flex-row h-screen bg-slate-50 overflow-hidden">
+    <div className="flex flex-col md:flex-row h-screen w-full bg-slate-50 overflow-hidden relative">
       <Navigation isSyncing={isSyncing} user={currentUser} />
-      <main className="flex-1 p-3 md:p-6 overflow-y-auto flex flex-col custom-scrollbar">
-        {children}
+      <main className="flex-1 overflow-x-hidden overflow-y-auto custom-scrollbar p-3 sm:p-4 md:p-6 pb-24 md:pb-6">
+        <div className="max-w-7xl mx-auto w-full">
+          {children}
+        </div>
       </main>
       <CreateJobModal 
         isOpen={isNewJobModalOpen} 
