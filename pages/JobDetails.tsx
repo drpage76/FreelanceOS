@@ -137,8 +137,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       
-      const docLabel = showPreview === 'invoice' ? (invoice?.id || 'INV') : 'Quote';
-      const finalFileName = `${docLabel} ${job.id} ${client.name}.pdf`;
+      const docPrefix = showPreview === 'invoice' ? 'Invoice' : 'Quote';
+      const docId = showPreview === 'invoice' ? (invoice?.id || job.id) : job.id;
+      const finalFileName = `${docPrefix} ${docId} ${client.name}.pdf`;
       pdf.save(finalFileName);
 
       // Google Drive Background Sync
@@ -292,6 +293,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                         <tr className="border-b-2 border-slate-900">
                           <th className="py-4 text-left text-[11px] font-black uppercase tracking-[0.2em]">Deliverable</th>
                           <th className="py-4 text-center text-[11px] font-black uppercase tracking-[0.2em]">Qty</th>
+                          <th className="py-4 text-right text-[11px] font-black uppercase tracking-[0.2em]">Rate</th>
                           <th className="py-4 text-right text-[11px] font-black uppercase tracking-[0.2em]">Total</th>
                         </tr>
                       </thead>
