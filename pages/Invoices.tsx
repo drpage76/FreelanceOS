@@ -84,29 +84,47 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
     if (!docRef.current || !previewData) return;
     setIsProcessing('downloading');
     
-    // Ensure the capture starts from the top
-    window.scrollTo(0, 0);
-    
-    setTimeout(async () => {
-      try {
-        const canvas = await html2canvas(docRef.current!, { 
-          scale: 2, 
-          useCORS: true, 
-          backgroundColor: '#ffffff',
-          logging: false,
-          width: 800 // Force standard width for capture
-        });
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        const imgProps = pdf.getImageProperties(imgData);
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-        
-        // Add image - if height exceeds standard A4, jsPDF usually handles it by placing it on one long page
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save(`Invoice_${previewData.inv.id}.pdf`);
-      } catch (err) { alert("PDF Export failed."); } finally { setIsProcessing(null); }
-    }, 200);
+    // Crucial: Wait for any layout shifts
+    await new Promise(r => setTimeout(r, 100));
+
+    try {
+      const element = docRef.current;
+      const canvas = await html2canvas(element, { 
+        scale: 2, 
+        useCORS: true, 
+        backgroundColor: '#ffffff',
+        logging: false,
+        width: element.offsetWidth,
+        height: element.scrollHeight,
+        windowHeight: element.scrollHeight,
+        y: 0,
+        scrollX: 0,
+        scrollY: 0
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      
+      // Calculate dimensions in MM (A4 width is 210mm)
+      const pdfWidth = 210;
+      const pdfHeight = (imgHeight * pdfWidth) / imgWidth;
+      
+      // Create PDF with dynamic height to ensure no content is clipped
+      const pdf = new jsPDF({ 
+        orientation: 'portrait', 
+        unit: 'mm', 
+        format: [pdfWidth, pdfHeight] 
+      });
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Invoice_${previewData.inv.id}.pdf`);
+    } catch (err) { 
+      console.error(err);
+      alert("PDF Export failed."); 
+    } finally { 
+      setIsProcessing(null); 
+    }
   };
 
   return (
@@ -121,7 +139,7 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh }) => {
                   <button onClick={() => handleSendInvoice(previewData.inv)} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase shadow-lg">Issue Invoice</button>
                 )}
                 <button onClick={handleDownloadPDF} disabled={isProcessing === 'downloading'} className="px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-xs uppercase shadow-lg flex items-center gap-2">
-                  <i className="fa-solid fa-file-arrow-down"></i> PDF
+                  {isProcessing === 'downloading' ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-file-arrow-down"></i>} PDF
                 </button>
                 <button onClick={() => setPreviewData(null)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-rose-500 border border-slate-200"><i className="fa-solid fa-xmark"></i></button>
               </div>

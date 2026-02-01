@@ -28,7 +28,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   const [currentUser, setCurrentUser] = useState<Tenant | null>(null);
   
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  // Corrected 'refugee' to 'useState'
   const [showPreview, setShowPreview] = useState<'invoice' | 'quote' | null>(null);
   const [selectedInvoiceDate, setSelectedInvoiceDate] = useState('');
   
@@ -107,30 +106,50 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     if (!docRef.current) return;
     setIsSaving(true);
     
-    // Ensure capture starts from top
-    window.scrollTo(0, 0);
+    // Crucial: Wait for modal animations to settle
+    await new Promise(r => setTimeout(r, 100));
 
-    setTimeout(async () => {
-      try {
-        const canvas = await html2canvas(docRef.current!, { 
-          scale: 2, 
-          useCORS: true, 
-          backgroundColor: '#ffffff',
-          width: 800 // Consistent width for PDF aspect ratio
-        });
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const imgProps = pdf.getImageProperties(imgData);
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save(filename);
-      } catch (err) { 
-        alert("Export failed. Please ensure the preview window is fully loaded."); 
-      } finally { 
-        setIsSaving(false); 
-      }
-    }, 200);
+    try {
+      const element = docRef.current;
+      
+      // We capture the element's scrollHeight and set it as the windowHeight
+      // to ensure html2canvas captures everything outside the visible scroll area.
+      const canvas = await html2canvas(element, { 
+        scale: 2, 
+        useCORS: true, 
+        backgroundColor: '#ffffff',
+        logging: false,
+        width: element.offsetWidth,
+        height: element.scrollHeight,
+        windowHeight: element.scrollHeight,
+        y: 0,
+        scrollX: 0,
+        scrollY: 0
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      
+      // Calculate PDF dimensions in mm (Standard A4 width is 210mm)
+      const pdfWidth = 210;
+      const pdfHeight = (imgHeight * pdfWidth) / imgWidth;
+      
+      // Create PDF with exactly the required height to fit the full document
+      const pdf = new jsPDF({ 
+        orientation: 'portrait', 
+        unit: 'mm', 
+        format: [pdfWidth, pdfHeight] 
+      });
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(filename);
+    } catch (err) { 
+      console.error(err);
+      alert("Export failed. Please ensure the preview is fully loaded."); 
+    } finally { 
+      setIsSaving(false); 
+    }
   };
 
   const finalizeInvoice = async () => {
@@ -218,7 +237,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
               <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center sticky top-0 z-50">
                  <span className="text-[10px] font-black uppercase text-indigo-600 px-4">Document Preview — {showPreview === 'invoice' ? invoice?.id : 'Quote Protocol'}</span>
                  <div className="flex gap-2">
-                    <button onClick={() => handleDownloadPDF(`${showPreview === 'invoice' ? 'Invoice' : 'Quote'}_${job.id}.pdf`)} className="px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center gap-2"><i className="fa-solid fa-download"></i> Download</button>
+                    <button onClick={() => handleDownloadPDF(`${showPreview === 'invoice' ? 'Invoice' : 'Quote'}_${job.id}.pdf`)} disabled={isSaving} className="px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center gap-2">
+                      {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-download"></i>} Download
+                    </button>
                     <button onClick={() => setShowPreview(null)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-rose-500 border border-slate-200"><i className="fa-solid fa-xmark"></i></button>
                  </div>
               </div>
