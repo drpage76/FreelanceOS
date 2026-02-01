@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Client, Job, JobStatus, JobItem, JobShift, SchedulingType } from '../types';
 import { generateJobId } from '../utils';
@@ -52,7 +53,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
   const handleAddShift = () => {
     setShifts([...shifts, { 
       id: generateId(), 
-      title: 'Shift ' + (shifts.length + 1), 
+      title: 'Session ' + (shifts.length + 1), 
       startDate: jobDetails.startDate, 
       endDate: jobDetails.startDate,
       startTime: '09:00', 
@@ -151,7 +152,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
       await onSave(newJob, jobItems, clientName);
       onClose();
     } catch (err: any) { 
-      alert(`Save Interrupted: ${err.message || 'Check your internet connection.'}`); 
+      alert(`Save Interrupted: ${err.message}`); 
     } finally { 
       setIsSaving(false); 
     }
@@ -163,14 +164,13 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 overflow-y-auto">
       <div className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200 my-auto">
         <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <h3 className="text-2xl font-black text-slate-900 tracking-tight">Project Builder</h3>
+          <h3 className="text-2xl font-black text-slate-900 tracking-tight italic">Project Builder</h3>
           <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-rose-500 border border-slate-200 transition-all">
             <i className="fa-solid fa-xmark"></i>
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-8 max-h-[75vh] overflow-y-auto custom-scrollbar">
-          {/* Client Selection */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Client Identity</label>
@@ -232,7 +232,6 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
               <input required value={jobDetails.location} onChange={e => setJobDetails({...jobDetails, location: e.target.value})} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" placeholder="Event Venue Name" />
             </div>
             
-            {/* SCHEDULING SECTION - ALWAYS VISIBLE */}
             <div className="col-span-2 p-8 bg-slate-50/80 border border-slate-200 rounded-[32px] space-y-6">
                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -242,9 +241,9 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
                   <button 
                     type="button" 
                     onClick={() => setJobDetails({ ...jobDetails, syncToCalendar: !jobDetails.syncToCalendar })}
-                    className={`px-4 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all border shadow-sm ${!jobDetails.syncToCalendar ? 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700' : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'}`}
+                    className={`px-4 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all border shadow-lg ${!jobDetails.syncToCalendar ? 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700' : 'bg-white text-indigo-600 border-indigo-100 hover:bg-slate-50'}`}
                   >
-                    {!jobDetails.syncToCalendar ? "DONT SHOW IN CALENDAR" : "SYNC TO CALENDAR"}
+                    {!jobDetails.syncToCalendar ? "DONT SHOW IN CALENDAR" : "SYNC ACTIVE"}
                   </button>
                </div>
                
@@ -273,14 +272,8 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
                   {shifts.map((s, idx) => (
                     <div key={idx} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3 animate-in slide-in-from-left-1">
                       <div className="flex items-center justify-between">
-                        <input className="px-3 py-2 bg-slate-50 rounded-lg text-xs font-black border-none outline-none flex-1 mr-2 text-indigo-600" placeholder="Shift Name (e.g. Load-in)" value={s.title || ''} onChange={e => handleShiftChange(idx, 'title', e.target.value)} />
-                        <div className="flex items-center gap-2">
-                          <label className="flex items-center gap-1 cursor-pointer">
-                            <input type="checkbox" className="w-3 h-3 rounded accent-indigo-600" checked={s.isFullDay || false} onChange={e => handleShiftChange(idx, 'isFullDay', e.target.checked)} />
-                            <span className="text-[9px] font-black text-slate-400 uppercase">Full Day</span>
-                          </label>
-                          <button type="button" onClick={() => handleRemoveShift(idx)} className="text-slate-300 hover:text-rose-500 transition-colors"><i className="fa-solid fa-trash-can text-[10px]"></i></button>
-                        </div>
+                        <input className="px-3 py-2 bg-slate-50 rounded-lg text-xs font-black border-none outline-none flex-1 mr-2 text-indigo-600" placeholder="Session Title" value={s.title || ''} onChange={e => handleShiftChange(idx, 'title', e.target.value)} />
+                        <button type="button" onClick={() => handleRemoveShift(idx)} className="text-slate-300 hover:text-rose-500 transition-colors"><i className="fa-solid fa-trash-can text-[10px]"></i></button>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-2">
@@ -293,31 +286,24 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
                           <input type="date" className="w-full px-2 py-2 bg-slate-50 rounded-lg text-[10px] font-bold border-none outline-none" value={s.endDate || ''} onChange={e => handleShiftChange(idx, 'endDate', e.target.value)} />
                         </div>
                       </div>
-
-                      {!s.isFullDay && (
-                        <div className="grid grid-cols-2 gap-2 animate-in fade-in duration-200">
-                          <div className="space-y-1">
-                            <span className="text-[8px] font-black text-slate-300 uppercase px-1">Start Time</span>
-                            <input type="time" className="w-full px-2 py-2 bg-slate-50 rounded-lg text-[10px] font-bold border-none outline-none" value={s.startTime || ''} onChange={e => handleShiftChange(idx, 'startTime', e.target.value)} />
-                          </div>
-                          <div className="space-y-1">
-                            <span className="text-[8px] font-black text-slate-300 uppercase px-1">End Time</span>
-                            <input type="time" className="w-full px-2 py-2 bg-slate-50 rounded-lg text-[10px] font-bold border-none outline-none" value={s.endTime || ''} onChange={e => handleShiftChange(idx, 'endTime', e.target.value)} />
-                          </div>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                         <label className="flex items-center gap-1 cursor-pointer">
+                           <input type="checkbox" className="w-3 h-3 rounded accent-indigo-600" checked={s.isFullDay || false} onChange={e => handleShiftChange(idx, 'isFullDay', e.target.checked)} />
+                           <span className="text-[9px] font-black text-slate-400 uppercase">Full Day</span>
+                         </label>
+                      </div>
                     </div>
                   ))}
-                  <button type="button" onClick={handleAddShift} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-white hover:text-indigo-600 hover:border-indigo-100 transition-all">+ Add Work Session</button>
+                  <button type="button" onClick={handleAddShift} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-white hover:text-indigo-600 transition-all">+ Add Work Session</button>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <span className="text-[8px] font-black text-slate-400 uppercase px-1">Project Start</span>
+                    <span className="text-[8px] font-black text-slate-400 uppercase px-1">Start Date</span>
                     <input type="date" className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold shadow-sm" value={jobDetails.startDate} onChange={e => setJobDetails({...jobDetails, startDate: e.target.value})} />
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[8px] font-black text-slate-400 uppercase px-1">Project Completion</span>
+                    <span className="text-[8px] font-black text-slate-400 uppercase px-1">End Date</span>
                     <input type="date" className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold shadow-sm" value={jobDetails.endDate} onChange={e => setJobDetails({...jobDetails, endDate: e.target.value})} />
                   </div>
                 </div>
@@ -325,7 +311,6 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
             </div>
           </div>
 
-          {/* Line Items */}
           <div className="space-y-4 pt-4 border-t border-slate-100">
              <div className="flex items-center justify-between px-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deliverables & Rate</label>
