@@ -88,12 +88,27 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     };
 
     try {
+      // Clear calendar first if needed
       await DB.saveJob(updatedJob);
       await DB.saveJobItems(job.id, items);
       if (googleAccessToken) await syncJobToGoogle(updatedJob, googleAccessToken, client?.name);
-      await onRefresh();
+      
+      // Update local state and global refresh
       setJob(updatedJob);
-    } catch (err: any) { alert(err.message); } finally { setIsSaving(false); }
+      await onRefresh();
+      
+      // Visual feedback
+      const btn = document.getElementById('save-feedback');
+      if (btn) {
+        btn.textContent = 'Changes Saved';
+        setTimeout(() => { if (btn) btn.textContent = 'Save Changes'; }, 2000);
+      }
+    } catch (err: any) { 
+      console.error("Save Error:", err);
+      alert(`System failed to save changes: ${err.message || 'Check your internet connection.'}`); 
+    } finally { 
+      setIsSaving(false); 
+    }
   };
 
   const toggleSync = async () => {
@@ -105,8 +120,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       await DB.saveJob(updatedJob);
       if (googleAccessToken) await syncJobToGoogle(updatedJob, googleAccessToken, client?.name);
       await onRefresh();
-    } catch (e) {
+    } catch (e: any) {
       console.error("Sync flip protocol error:", e);
+      alert(`Sync update failed: ${e.message}`);
     }
   };
 
@@ -172,14 +188,33 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           ) : (
             <button onClick={() => setShowPreview('invoice')} className="px-5 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl">View Invoice</button>
           )}
-          <button onClick={() => handleUpdateJob()} disabled={isSaving || isDeleting} className="px-5 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-black transition-all">
-            {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : 'Save Changes'}
+          <button onClick={() => handleUpdateJob()} disabled={isSaving || isDeleting} className="px-5 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-black transition-all min-w-[140px]">
+            {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <span id="save-feedback">Save Changes</span>}
           </button>
           <button onClick={() => { if(window.confirm('Delete project?')) DB.deleteJob(job.id).then(() => navigate('/jobs')) }} disabled={isSaving || isDeleting} className="w-11 h-11 bg-rose-50 text-rose-500 border border-rose-100 rounded-xl flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all shadow-sm">
             <i className="fa-solid fa-trash-can"></i>
           </button>
         </div>
       </header>
+
+      {/* Invoice Modal Rebranding */}
+      {showInvoiceModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+          <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200">
+             <h3 className="text-xl font-black text-slate-900 mb-6 uppercase tracking-tight">Issue Invoice</h3>
+             <div className="space-y-4">
+               <div>
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Invoice Date</label>
+                  <input type="date" value={selectedInvoiceDate} onChange={e => setSelectedInvoiceDate(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
+               </div>
+               <div className="flex gap-3 pt-4">
+                 <button onClick={() => setShowInvoiceModal(false)} className="flex-1 py-4 bg-slate-50 text-slate-400 rounded-2xl font-black text-[10px] uppercase border border-slate-100">Cancel</button>
+                 <button onClick={finalizeInvoice} className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl">Confirm & Issue</button>
+               </div>
+             </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
@@ -195,7 +230,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">PO Protocol</label>
-                <input value={job.poNumber || ''} onChange={e => handleFieldChange('poNumber', e.target.value)} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-indigo-500 transition-colors" placeholder="e.g. 50029" />
+                <input value={job.poNumber || ''} onChange={e => handleFieldChange('poNumber', e.target.value)} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-indigo-500 transition-colors" placeholder="e.g. TPF-PO-0082" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Process Status</label>
@@ -205,7 +240,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
               </div>
             </div>
 
-            {/* SCHEDULING UI - ALWAYS VISIBLE */}
+            {/* SCHEDULING UI - PERMANENTLY VISIBLE */}
             <div className="pt-10 border-t border-slate-100 space-y-8">
                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">

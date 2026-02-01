@@ -152,7 +152,8 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
       await onSave(newJob, jobItems, clientName);
       onClose();
     } catch (err: any) { 
-      alert(`Save Interrupted: ${err.message}`); 
+      console.error("Save Error:", err);
+      alert(`Save Interrupted: ${err.message || 'Check your internet connection.'}`); 
     } finally { 
       setIsSaving(false); 
     }
@@ -164,7 +165,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 overflow-y-auto">
       <div className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200 my-auto">
         <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <h3 className="text-2xl font-black text-slate-900 tracking-tight italic">Project Builder</h3>
+          <h3 className="text-2xl font-black text-slate-900 tracking-tight italic">New Job Workspace</h3>
           <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-rose-500 border border-slate-200 transition-all">
             <i className="fa-solid fa-xmark"></i>
           </button>
@@ -335,7 +336,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
             </div>
             <button type="submit" disabled={isSaving} className="px-12 py-4 bg-slate-900 text-white rounded-[24px] font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-3 hover:bg-black transition-all disabled:opacity-50">
               {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-cloud-arrow-up text-indigo-400"></i>}
-              Issue Protocol
+              Create Job
             </button>
           </div>
         </form>

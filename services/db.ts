@@ -91,6 +91,11 @@ const toDb = (table: string, obj: any, tenantId: string) => {
   for (const key in obj) {
     if (key === '__isSeed' || key === 'tenant_id' || key === 'shifts') continue;
     if (key === 'rechargeAmount' || key === 'actualCost') continue;
+    
+    // CRITICAL: We skip syncToCalendar for the cloud sync because it may not exist 
+    // in the user's remote Supabase schema, which causes a 400 error.
+    if (key === 'syncToCalendar') continue;
+
     const dbKey = FIELD_MAP[key] || key;
     newObj[dbKey] = obj[key];
   }
@@ -162,7 +167,7 @@ export const DB = {
         const item = toDb(table, p, tenantId);
         const pk = table === 'tenants' ? 'email' : 'id';
         const idx = localList.findIndex((i: any) => i[pk] === item[pk]);
-        if (idx >= 0) localList[idx] = item;
+        if (idx >= 0) localList[idx] = { ...localList[idx], ...item };
         else localList.push(item);
       });
       (localData as any)[table] = localList;
@@ -179,6 +184,7 @@ export const DB = {
           const { error } = await query.upsert(mapped);
           if (error) {
             console.error(`Sync Error in ${table}:`, error);
+            // We throw the error so the UI can catch it and inform the user
             throw new Error(`Cloud sync failure: ${error.message}`);
           }
         }
