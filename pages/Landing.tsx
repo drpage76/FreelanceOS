@@ -5,6 +5,12 @@ import { Link } from 'react-router';
 
 export const Landing: React.FC = () => {
   const [showAuth, setShowAuth] = useState(false);
+  const [initialIsSignUp, setInitialIsSignUp] = useState(false);
+
+  const openAuth = (isSignUp: boolean) => {
+    setInitialIsSignUp(isSignUp);
+    setShowAuth(true);
+  };
 
   return (
     <div className="min-h-screen w-full bg-slate-900 text-white selection:bg-indigo-500 selection:text-white overflow-x-hidden flex flex-col relative">
@@ -16,21 +22,24 @@ export const Landing: React.FC = () => {
 
       {/* Auth Modal Overlay */}
       {showAuth && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
           <div 
-            className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl cursor-pointer" 
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-xl cursor-pointer" 
             onClick={() => setShowAuth(false)}
           />
-          <div className="relative z-[110] w-full max-w-md animate-in zoom-in-95 slide-in-from-bottom-10 duration-500">
-            <div className="absolute -top-12 right-0 sm:-right-12">
+          <div className="relative z-[110] w-full max-w-md my-auto animate-in zoom-in-95 slide-in-from-bottom-10 duration-500 flex flex-col items-center">
+            <div className="w-full flex justify-end mb-2">
               <button 
                 onClick={() => setShowAuth(false)}
-                className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-all"
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-all border border-white/10"
               >
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
-            <Auth onSuccess={() => window.location.reload()} />
+            <Auth 
+              initialIsSignUp={initialIsSignUp}
+              onSuccess={() => window.location.reload()} 
+            />
           </div>
         </div>
       )}
@@ -44,45 +53,60 @@ export const Landing: React.FC = () => {
         </div>
         <div className="flex gap-2 sm:gap-4">
           <button 
-            onClick={() => setShowAuth(true)}
+            onClick={() => openAuth(false)}
             className="px-4 sm:px-6 py-2.5 sm:py-3 bg-white/5 border border-white/10 text-white rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-[11px] uppercase tracking-widest hover:bg-white/10 transition-all"
           >
             Sign In
           </button>
           <button 
-            onClick={() => setShowAuth(true)}
-            className="hidden xs:block px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:bg-indigo-500 transition-all"
+            onClick={() => openAuth(true)}
+            className="px-4 sm:px-6 py-2.5 sm:py-3 bg-indigo-600 text-white rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-[11px] uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:bg-indigo-500 transition-all"
           >
-            Join Elite
+            Register
           </button>
         </div>
       </nav>
 
       <main className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-8 pt-6 sm:pt-10 pb-20 flex-1 flex flex-col">
         <div className="space-y-6 sm:space-y-12 mb-12 sm:mb-20 text-center lg:text-left">
-           <div className="inline-flex items-center gap-3 px-4 sm:px-6 py-2 sm:py-2.5 bg-white/5 border border-white/10 rounded-full text-[9px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-emerald-400 mb-2 shadow-inner">
+           <div className="inline-flex items-center gap-3 px-4 sm:px-6 py-2 sm:py-2.5 bg-white/5 border border-white/10 rounded-full text-[9px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-emerald-400 mb-2 shadow-inner mx-auto lg:mx-0">
               <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_#10b981]"></span>
               High-Performance Workspace
             </div>
-            <h1 className="text-4xl sm:text-6xl md:text-9xl font-black tracking-tighter leading-[0.9] text-white italic drop-shadow-2xl break-words">
+            <h1 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black tracking-tighter leading-[0.9] text-white italic drop-shadow-2xl overflow-hidden break-words lg:max-w-4xl">
               “Jobs, invoices, and time — <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-emerald-400 to-indigo-400">simplified.”</span>
             </h1>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-start">
           <div className="space-y-8 sm:space-y-10">
-            <p className="text-slate-400 text-lg sm:text-2xl font-medium leading-relaxed max-w-xl">
+            <p className="text-slate-400 text-lg sm:text-2xl font-medium leading-relaxed max-w-xl mx-auto lg:mx-0">
               The high-performance operating system for the modern independent professional. Built to command your business lifecycle.
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+               <button 
+                 onClick={() => openAuth(true)}
+                 className="px-8 py-4 bg-indigo-600 text-white rounded-[24px] font-black text-xs uppercase tracking-widest shadow-2xl shadow-indigo-500/40 hover:bg-indigo-500 transition-all transform hover:scale-[1.02]"
+               >
+                 Start Free Trial
+               </button>
+               <button 
+                 onClick={() => openAuth(false)}
+                 className="px-8 py-4 bg-white/5 border border-white/10 text-white rounded-[24px] font-black text-xs uppercase tracking-widest hover:bg-white/10 transition-all transform hover:scale-[1.02]"
+               >
+                 Sign In to OS
+               </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pt-4">
               {[
                 { icon: 'fa-cloud-arrow-up', title: 'Global Sync', desc: 'Secure real-time cloud backup' },
                 { icon: 'fa-calendar-check', title: 'Schedule', desc: 'Google Calendar bi-sync' },
                 { icon: 'fa-file-invoice-dollar', title: 'Financials', desc: 'Full automated ledger' },
                 { icon: 'fa-map-location-dot', title: 'Mileage', desc: 'Precision auto-tracking' }
               ].map((f, i) => (
-                <div key={i} className="flex gap-4 sm:gap-5 p-5 sm:p-6 bg-white/5 border border-white/10 rounded-[24px] sm:rounded-[32px] hover:bg-white/10 transition-all cursor-default group">
+                <div key={i} className="flex gap-4 sm:gap-5 p-5 sm:p-6 bg-white/5 border border-white/10 rounded-[24px] sm:rounded-[32px] hover:bg-white/10 transition-all cursor-default group text-left">
                   <div className="w-10 h-10 bg-indigo-50/10 rounded-xl flex items-center justify-center group-hover:bg-indigo-500 transition-all shrink-0">
                     <i className={`fa-solid ${f.icon} text-indigo-400 group-hover:text-white text-lg`}></i>
                   </div>
