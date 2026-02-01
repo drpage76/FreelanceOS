@@ -50,8 +50,11 @@ const deleteExistingEvents = async (jobId: string, accessToken: string) => {
 export const syncJobToGoogle = async (job: Job, accessToken?: string, clientName?: string): Promise<boolean> => {
   if (!accessToken) return false;
   try {
+    // Always clean first to prevent duplicates or clean up if sync is disabled
     await deleteExistingEvents(job.id, accessToken);
-    if (job.status === JobStatus.CANCELLED) return true;
+    
+    // Respect the manual sync flag
+    if (job.status === JobStatus.CANCELLED || job.syncToCalendar === false) return true;
 
     const eventsToCreate = [];
     const colorId = STATUS_TO_GOOGLE_COLOR[job.status] || '1';
@@ -67,7 +70,6 @@ export const syncJobToGoogle = async (job: Job, accessToken?: string, clientName
 
         if (shift.isFullDay) {
           event.start = { date: shift.startDate };
-          // Google all-day events are exclusive on end date
           event.end = { date: format(addDays(parseISO(shift.endDate), 1), 'yyyy-MM-dd') };
         } else {
           event.start = { dateTime: `${shift.startDate}T${shift.startTime}:00Z` };

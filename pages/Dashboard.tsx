@@ -1,10 +1,11 @@
+
 import React, { useMemo, useState } from 'react';
 // Use direct named imports from react-router to resolve missing Link export in unified environments
 import { Link } from 'react-router';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip
 } from 'recharts';
-import { parseISO, isAfter, startOfDay, addDays, isBefore, isValid, format, differenceInDays } from 'date-fns';
+import { parseISO, isAfter, startOfDay, addDays, isBefore, isValid, format, differenceInDays, isSameDay } from 'date-fns';
 
 import { AppState, JobStatus, InvoiceStatus, UserPlan } from '../types';
 import { formatCurrency, calculateRevenueStats } from '../utils';
@@ -35,6 +36,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSy
         const daysRemaining = differenceInDays(parseISO(inv.dueDate), today);
         return { ...inv, job, client, daysRemaining };
       })
+      // CRITICAL: Filter out invoices where the job no longer exists (due to deletion ghosts)
+      .filter(p => p.job !== undefined)
       .sort((a, b) => a.daysRemaining - b.daysRemaining);
   }, [state.invoices, state.jobs, state.clients]);
 
@@ -261,10 +264,4 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onNewJobClick, onSy
       </div>
     </div>
   );
-};
-
-const isSameDay = (d1: Date, d2: Date) => {
-  return d1.getFullYear() === d2.getFullYear() &&
-         d1.getMonth() === d2.getMonth() &&
-         d1.getDate() === d2.getDate();
 };

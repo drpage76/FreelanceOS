@@ -81,6 +81,7 @@ export interface Job {
   poNumber?: string;
   schedulingType: SchedulingType;
   shifts?: JobShift[];
+  syncToCalendar: boolean;
 }
 
 export interface Quote {

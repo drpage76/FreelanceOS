@@ -21,7 +21,8 @@ const DEFAULT_JOB_DETAILS = {
   startDate: new Date().toISOString().split('T')[0],
   endDate: new Date().toISOString().split('T')[0],
   status: JobStatus.POTENTIAL,
-  schedulingType: SchedulingType.CONTINUOUS
+  schedulingType: SchedulingType.CONTINUOUS,
+  syncToCalendar: true
 };
 
 export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose, clients, onSave, tenant_id }) => {
@@ -233,7 +234,21 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
             </div>
             
             <div className="col-span-2 p-6 bg-indigo-50/50 border border-indigo-100 rounded-[32px]">
-              <div className="flex items-center justify-between mb-6">
+               <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                     <i className="fa-brands fa-google text-indigo-600"></i>
+                     <span className="text-[11px] font-black text-slate-900 uppercase">Sync to Google Calendar</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => setJobDetails({ ...jobDetails, syncToCalendar: !jobDetails.syncToCalendar })}
+                    className={`w-12 h-6 rounded-full transition-all relative ${jobDetails.syncToCalendar ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                  >
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${jobDetails.syncToCalendar ? 'left-7' : 'left-1'}`} />
+                  </button>
+               </div>
+               
+              <div className="flex items-center justify-between mb-6 pt-4 border-t border-indigo-100">
                 <div>
                   <h4 className="font-black text-slate-900 text-sm">Production Schedule</h4>
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Toggle schedule mode</p>

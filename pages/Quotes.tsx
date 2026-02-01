@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { AppState, Quote, QuoteStatus, Client, JobItem, JobStatus, SchedulingType, Job } from '../types';
 import { DB, generateId } from '../services/db';
@@ -82,6 +83,7 @@ export const Quotes: React.FC<QuotesProps> = ({ state, onRefresh }) => {
     setIsProcessing(quote.id);
     try {
       const jobId = generateJobId(quote.date, Math.floor(Math.random() * 90) + 10);
+      // Fix: Add missing 'syncToCalendar' property to the Job object
       const newJob: Job = {
         id: jobId,
         clientId: quote.clientId,
@@ -93,7 +95,8 @@ export const Quotes: React.FC<QuotesProps> = ({ state, onRefresh }) => {
         totalRecharge: quote.totalAmount,
         totalCost: 0,
         tenant_id: quote.tenant_id,
-        schedulingType: SchedulingType.CONTINUOUS
+        schedulingType: SchedulingType.CONTINUOUS,
+        syncToCalendar: true
       };
       
       await DB.saveJob(newJob);

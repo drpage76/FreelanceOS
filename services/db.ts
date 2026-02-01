@@ -1,3 +1,4 @@
+
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Client, Job, JobItem, Invoice, Tenant, UserPlan, MileageRecord, JobShift, SchedulingType, Quote } from '../types';
 
@@ -79,7 +80,8 @@ const FIELD_MAP: Record<string, string> = {
   endTime: 'end_time',
   isFullDay: 'is_full_day',
   expiryDate: 'expiry_date',
-  totalAmount: 'total_amount'
+  totalAmount: 'total_amount',
+  syncToCalendar: 'sync_to_calendar'
 };
 
 const toDb = (table: string, obj: any, tenantId: string) => {
@@ -285,6 +287,7 @@ export const DB = {
     await DB.call('jobs', 'delete', null, { id });
     await DB.call('job_shifts', 'delete', null, { jobId: id });
     await DB.call('job_items', 'delete', null, { jobId: id });
+    await DB.call('invoices', 'delete', null, { jobId: id }); // Purge associated invoices
   },
   deleteJobItem: async (id: string) => DB.call('job_items', 'delete', null, { id }),
   deleteInvoice: async (id: string) => DB.call('invoices', 'delete', null, { id }),

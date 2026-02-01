@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { jsPDF } from 'jspdf';
@@ -78,7 +79,8 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       poNumber: (formData.get('poNumber') as string) || job.poNumber,
       status: (formData.get('status') as JobStatus) || job.status,
       totalRecharge: totalRecharge,
-      shifts: shifts
+      shifts: shifts,
+      syncToCalendar: job.syncToCalendar
     };
     try {
       await DB.saveJob(updatedJob);
@@ -87,6 +89,21 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       setJob(updatedJob);
       await onRefresh();
     } catch (err: any) { alert(err.message); } finally { setIsSaving(false); }
+  };
+
+  const toggleSync = async () => {
+    if (!job) return;
+    const nextVal = !job.syncToCalendar;
+    const updatedJob = { ...job, syncToCalendar: nextVal };
+    setJob(updatedJob);
+    // Explicitly call update and sync
+    try {
+      await DB.saveJob(updatedJob);
+      if (googleAccessToken) await syncJobToGoogle(updatedJob, googleAccessToken, client?.name);
+      await onRefresh();
+    } catch (e) {
+      console.error("Sync flip failed", e);
+    }
   };
 
   const handleDeleteJob = async () => {
@@ -249,6 +266,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
               </div>
               <div className="p-8 bg-slate-100 overflow-x-auto">
                 <div ref={docRef} className="bg-white p-16 pb-32 border border-slate-100 min-h-[1120px] w-[800px] mx-auto text-slate-900 shadow-sm font-sans">
+                   {/* PDF Content (Static Preview) */}
                    <div className="flex justify-between items-start mb-16">
                       <div>
                         {currentUser?.logoUrl ? <img src={currentUser.logoUrl} alt="Logo" className="h-28 mb-8 object-contain" /> : <div className="text-3xl font-black italic mb-8">Freelance<span className="text-indigo-600">OS</span></div>}
@@ -374,6 +392,21 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 <select name="status" defaultValue={job.status} className={`w-full px-6 py-4 border rounded-2xl font-black text-[11px] uppercase outline-none appearance-none ${STATUS_COLORS[job.status]}`}>
                   {Object.values(JobStatus).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
+              </div>
+              <div className="space-y-2 flex flex-col justify-end">
+                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                       <i className="fa-brands fa-google text-indigo-600"></i>
+                       <span className="text-[10px] font-black text-slate-900 uppercase">Calendar Sync</span>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={toggleSync}
+                      className={`w-12 h-6 rounded-full transition-all relative ${job.syncToCalendar ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                    >
+                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${job.syncToCalendar ? 'left-7' : 'left-1'}`} />
+                    </button>
+                 </div>
               </div>
             </div>
             
