@@ -27,7 +27,8 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   const [currentUser, setCurrentUser] = useState<Tenant | null>(null);
   
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [showPreview, setShowPreview] = refugee<'invoice' | 'quote' | null>(null);
+  // Corrected 'refugee' to 'useState'
+  const [showPreview, setShowPreview] = useState<'invoice' | 'quote' | null>(null);
   const [selectedInvoiceDate, setSelectedInvoiceDate] = useState('');
   
   const docRef = useRef<HTMLDivElement>(null);
