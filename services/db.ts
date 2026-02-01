@@ -172,27 +172,33 @@ export const DB = {
     if (DB.isCloudConfigured() && effectiveId) {
       const client = getSupabase();
       if (client) {
-        try {
-          const query = client.from(table);
-          if (method === 'upsert' && payload) {
-            const raw = Array.isArray(payload) ? payload : [payload];
-            const mapped = raw.map(p => toDb(table, p, effectiveId));
-            const { error } = await query.upsert(mapped);
-            if (error) console.error(`Sync Error in ${table}:`, error);
+        const query = client.from(table);
+        if (method === 'upsert' && payload) {
+          const raw = Array.isArray(payload) ? payload : [payload];
+          const mapped = raw.map(p => toDb(table, p, effectiveId));
+          const { error } = await query.upsert(mapped);
+          if (error) {
+            console.error(`Sync Error in ${table}:`, error);
+            throw new Error(`Cloud sync failure: ${error.message}`);
           }
-          if (method === 'delete') {
-            const pk = table === 'tenants' ? 'email' : 'id';
-            if (filter?.id) await query.delete().eq(pk, filter.id);
-            else if (filter?.jobId) await query.delete().eq('job_id', filter.jobId);
+        }
+        if (method === 'delete') {
+          const pk = table === 'tenants' ? 'email' : 'id';
+          if (filter?.id) {
+            const { error } = await query.delete().eq(pk, filter.id);
+            if (error) throw error;
           }
-          if (method === 'select') {
-            let q = query.select('*').eq(table === 'tenants' ? 'email' : 'tenant_id', effectiveId);
-            if (filter) Object.entries(filter).forEach(([k, v]) => q = q.eq(FIELD_MAP[k] || k, v));
-            const { data, error } = await q;
-            if (!error && data && data.length > 0) return data.map(fromDb);
+          else if (filter?.jobId) {
+            const { error } = await query.delete().eq('job_id', filter.jobId);
+            if (error) throw error;
           }
-        } catch (cloudErr) {
-          console.warn(`Cloud fallback in ${table}.${method}`);
+        }
+        if (method === 'select') {
+          let q = query.select('*').eq(table === 'tenants' ? 'email' : 'tenant_id', effectiveId);
+          if (filter) Object.entries(filter).forEach(([k, v]) => q = q.eq(FIELD_MAP[k] || k, v));
+          const { data, error } = await q;
+          if (error) throw error;
+          if (data && data.length > 0) return data.map(fromDb);
         }
       }
     }
@@ -220,7 +226,6 @@ export const DB = {
       if (data) return fromDb(data) as Tenant;
     } catch (e) {}
     
-    // First time user setup: establish trial date firmly
     const n: Tenant = { 
       email, 
       name: email.split('@')[0], 
@@ -287,7 +292,7 @@ export const DB = {
     await DB.call('jobs', 'delete', null, { id });
     await DB.call('job_shifts', 'delete', null, { jobId: id });
     await DB.call('job_items', 'delete', null, { jobId: id });
-    await DB.call('invoices', 'delete', null, { jobId: id }); // Purge associated invoices
+    await DB.call('invoices', 'delete', null, { jobId: id }); 
   },
   deleteJobItem: async (id: string) => DB.call('job_items', 'delete', null, { id }),
   deleteInvoice: async (id: string) => DB.call('invoices', 'delete', null, { id }),
