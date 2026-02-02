@@ -92,10 +92,16 @@ const toDb = (table: string, obj: any, tenantId: string) => {
     if (key === '__isSeed' || key === 'tenant_id' || key === 'shifts') continue;
     if (key === 'rechargeAmount' || key === 'actualCost') continue;
     
-    // CRITICAL FIX: Skip syncToCalendar and skip endDate specifically for job_shifts
-    // as it frequently causes schema mismatch errors on user Supabase instances.
+    // UI-only and Session-only flags
     if (key === 'syncToCalendar') continue;
-    if (table === 'job_shifts' && key === 'endDate') continue;
+
+    // DEFENSIVE SCHEMA MAPPING:
+    // Some user databases do not have the extended columns for job_shifts.
+    // We exclude them from cloud sync to prevent 400 errors while keeping them in local storage.
+    if (table === 'job_shifts') {
+      const excludedShiftFields = ['endDate', 'isFullDay', 'startTime', 'endTime'];
+      if (excludedShiftFields.includes(key)) continue;
+    }
 
     const dbKey = FIELD_MAP[key] || key;
     newObj[dbKey] = obj[key];
@@ -162,11 +168,11 @@ export const DB = {
     const effectiveId = await DB.getTenantId();
     const tenantId = effectiveId || LOCAL_USER_EMAIL;
 
-    // Handle Upsert Locally
+    // Local-First: Update local storage immediately to prevent UI lag or ghost records
     if (method === 'upsert' && payload) {
       const raw = Array.isArray(payload) ? payload : [payload];
       raw.forEach(p => {
-        const item = toDb(table, p, tenantId);
+        const item = { ...p, tenant_id: tenantId };
         const pk = table === 'tenants' ? 'email' : 'id';
         const idx = localList.findIndex((i: any) => i[pk] === item[pk]);
         if (idx >= 0) localList[idx] = { ...localList[idx], ...item };
@@ -176,19 +182,18 @@ export const DB = {
       saveLocalData(localData);
     }
 
-    // CRITICAL FIX: Handle Delete Locally to prevent "ghost" items
     if (method === 'delete') {
       const pk = table === 'tenants' ? 'email' : 'id';
       localList = localList.filter((item: any) => {
         if (filter?.id) return item[pk] !== filter.id;
-        if (filter?.jobId) return item['job_id'] !== filter.jobId;
+        if (filter?.jobId) return item['jobId'] !== filter.jobId && item['job_id'] !== filter.jobId;
         return true;
       });
       (localData as any)[table] = localList;
       saveLocalData(localData);
     }
 
-    // Handle Cloud Sync
+    // Cloud-Mirror: Attempt to sync with Supabase if configured
     if (DB.isCloudConfigured() && effectiveId) {
       const client = getSupabase();
       if (client) {
@@ -223,16 +228,15 @@ export const DB = {
       }
     }
 
-    // Handle Select Locally (as fallback or standard mode)
+    // Return filtered local data as default source of truth for the session
     if (method === 'select') {
       let base = localList.filter((i: any) => i.tenant_id === tenantId || i.email === tenantId);
       if (filter) {
         Object.entries(filter).forEach(([k, v]) => {
-          const dbKey = FIELD_MAP[k] || k;
-          base = base.filter((i: any) => i[dbKey] === v);
+          base = base.filter((i: any) => i[k] === v || i[FIELD_MAP[k] || k] === v);
         });
       }
-      return base.map(fromDb);
+      return base;
     }
     return payload;
   },

@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { AppState } from "../types";
 
@@ -11,18 +12,15 @@ const getAIClient = () => {
 
 /**
  * Calculates driving distance using Google Maps grounding.
- * This effectively 'links' the app to Google Maps data via Gemini's grounding tool.
  */
 export const calculateDrivingDistance = async (start: string, end: string) => {
   const ai = getAIClient();
   if (!ai) return { miles: null, sources: [], error: "AI Key Missing" };
 
   const model = "gemini-2.5-flash"; 
-  // We use an extremely strict prompt to ensure the model behaves as a data relay.
-  const prompt = `Use Google Maps to find the fastest driving distance in miles between UK postcodes "${start}" and "${end}". 
-  Response Requirement: You must ONLY output the number. 
-  Example: 12.5
-  Do not include the word 'miles' or any other text.`;
+  const prompt = `Task: Use Google Maps tool to determine the driving distance in MILES between UK postcodes "${start}" and "${end}". 
+  CRITICAL: Your entire response must consist of exactly one decimal number representing the miles. Do NOT use markdown, do NOT include the word "miles", do NOT explain. 
+  Example Valid Response: 14.8`;
 
   try {
     const response = await ai.models.generateContent({
@@ -38,13 +36,13 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
       },
     });
 
-    const text = response.text || "";
-    // Clean the string of anything that isn't a digit or decimal point
-    const cleanedText = text.replace(/[^0-9.]/g, '');
-    const miles = parseFloat(cleanedText);
+    const text = response.text?.trim() || "";
+    // Robust parsing: extract the first sequence of digits/decimals
+    const match = text.match(/[0-9.]+/);
+    const miles = match ? parseFloat(match[0]) : null;
 
     return {
-      miles: isNaN(miles) ? null : miles,
+      miles: (miles && !isNaN(miles)) ? miles : null,
       sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
     };
   } catch (error) {
@@ -66,7 +64,6 @@ export const smartExtractJob = async (rawText: string) => {
       contents: prompt,
       config: {
         responseMimeType: "application/json",
-        // Updated to use the correct Type enum from @google/genai
         responseSchema: {
           type: Type.OBJECT,
           properties: {

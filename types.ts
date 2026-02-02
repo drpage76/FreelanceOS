@@ -119,6 +119,7 @@ export interface Invoice {
 export interface MileageRecord {
   id: string;
   date: string;
+  endDate?: string;
   startPostcode: string;
   endPostcode: string;
   numTrips: number;
