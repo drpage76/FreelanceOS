@@ -103,6 +103,7 @@ export interface ExternalEvent {
   endDate: string;
   source: 'google' | 'other';
   color?: string;
+  link?: string;
 }
 
 export interface Invoice {

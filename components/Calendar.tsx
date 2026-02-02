@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 // Use direct named imports from react-router to resolve missing useNavigate export in unified environments
 import { useNavigate } from 'react-router';
@@ -93,6 +94,16 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
       case JobStatus.POTENTIAL: return '#fbbf24';
       case JobStatus.COMPLETED: return '#0ea5e9';
       default: return '#94a3b8';
+    }
+  };
+
+  const handleEntryClick = (entry: any) => {
+    if (entry.link) {
+      window.open(entry.link, '_blank');
+      return;
+    }
+    if (entry.jobId) {
+      navigate(`/jobs/${entry.jobId}`);
     }
   };
 
@@ -212,7 +223,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
                       return (
                         <div 
                           key={`${entry.id}-${wIdx}`}
-                          onClick={() => entry.jobId && navigate(`/jobs/${entry.jobId}`)}
+                          onClick={() => handleEntryClick(entry)}
                           style={{ gridColumn: `${offset + 1} / span ${duration}`, backgroundColor: bgColor }}
                           className={`h-5 rounded-lg shadow-sm flex items-center px-3 z-10 transition-all hover:brightness-105 hover:scale-[1.01] cursor-pointer ${textColor}`}
                         >

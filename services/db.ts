@@ -92,9 +92,10 @@ const toDb = (table: string, obj: any, tenantId: string) => {
     if (key === '__isSeed' || key === 'tenant_id' || key === 'shifts') continue;
     if (key === 'rechargeAmount' || key === 'actualCost') continue;
     
-    // CRITICAL: We skip syncToCalendar for the cloud sync because it may not exist 
-    // in the user's remote Supabase schema, which causes a 400 error.
+    // CRITICAL FIX: Skip syncToCalendar and skip endDate specifically for job_shifts
+    // as it frequently causes schema mismatch errors on user Supabase instances.
     if (key === 'syncToCalendar') continue;
+    if (table === 'job_shifts' && key === 'endDate') continue;
 
     const dbKey = FIELD_MAP[key] || key;
     newObj[dbKey] = obj[key];
@@ -157,10 +158,11 @@ export const DB = {
 
   async call(table: string, method: 'select' | 'upsert' | 'delete', payload?: any, filter?: any): Promise<any> {
     const localData = getLocalData();
-    const localList = (localData as any)[table] || [];
+    let localList = (localData as any)[table] || [];
     const effectiveId = await DB.getTenantId();
     const tenantId = effectiveId || LOCAL_USER_EMAIL;
 
+    // Handle Upsert Locally
     if (method === 'upsert' && payload) {
       const raw = Array.isArray(payload) ? payload : [payload];
       raw.forEach(p => {
@@ -174,6 +176,19 @@ export const DB = {
       saveLocalData(localData);
     }
 
+    // CRITICAL FIX: Handle Delete Locally to prevent "ghost" items
+    if (method === 'delete') {
+      const pk = table === 'tenants' ? 'email' : 'id';
+      localList = localList.filter((item: any) => {
+        if (filter?.id) return item[pk] !== filter.id;
+        if (filter?.jobId) return item['job_id'] !== filter.jobId;
+        return true;
+      });
+      (localData as any)[table] = localList;
+      saveLocalData(localData);
+    }
+
+    // Handle Cloud Sync
     if (DB.isCloudConfigured() && effectiveId) {
       const client = getSupabase();
       if (client) {
@@ -184,7 +199,6 @@ export const DB = {
           const { error } = await query.upsert(mapped);
           if (error) {
             console.error(`Sync Error in ${table}:`, error);
-            // We throw the error so the UI can catch it and inform the user
             throw new Error(`Cloud sync failure: ${error.message}`);
           }
         }
@@ -209,6 +223,7 @@ export const DB = {
       }
     }
 
+    // Handle Select Locally (as fallback or standard mode)
     if (method === 'select') {
       let base = localList.filter((i: any) => i.tenant_id === tenantId || i.email === tenantId);
       if (filter) {

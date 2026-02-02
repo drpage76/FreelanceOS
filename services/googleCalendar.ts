@@ -26,6 +26,7 @@ export const fetchGoogleEvents = async (email: string, accessToken?: string): Pr
       startDate: format(parseISO(item.start?.dateTime || item.start?.date), 'yyyy-MM-dd'),
       endDate: format(parseISO(item.end?.dateTime || item.end?.date), 'yyyy-MM-dd'),
       source: 'google',
+      link: item.htmlLink,
       color: item.colorId ? '#6366f1' : '#6366f1' // Simplify color mapping for brevity
     }));
   } catch { return []; }
