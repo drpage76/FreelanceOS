@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { HashRouter, Routes, Route, Navigate, Link } from 'react-router';
 
 import { Navigation } from './components/Navigation';
 import { Dashboard } from './pages/Dashboard';
@@ -14,9 +14,10 @@ import { Landing } from './pages/Landing';
 import { Privacy } from './pages/Privacy';
 import { Terms } from './pages/Terms';
 import { CreateJobModal } from './components/CreateJobModal';
-import { AppState, Tenant, JobStatus, InvoiceStatus } from './types';
+import { AppState, Tenant, JobStatus, InvoiceStatus, UserPlan } from './types';
 import { DB, getSupabase } from './services/db';
 import { fetchGoogleEvents, syncJobToGoogle } from './services/googleCalendar';
+import { checkSubscriptionStatus } from './utils';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<Tenant | null>(null);
@@ -32,6 +33,9 @@ const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>({
     user: null, clients: [], jobs: [], quotes: [], externalEvents: [], jobItems: [], invoices: [], mileage: [],
   });
+
+  const subStatus = useMemo(() => checkSubscriptionStatus(currentUser), [currentUser]);
+  const isReadOnly = useMemo(() => subStatus.isTrialExpired && currentUser?.plan !== UserPlan.ACTIVE, [subStatus, currentUser]);
 
   const getLatestToken = useCallback(async () => {
     const client = getSupabase();
@@ -173,7 +177,13 @@ const App: React.FC = () => {
   const AppLayout = ({ children }: { children: React.ReactNode }) => (
     <div className="flex flex-col md:flex-row h-screen w-full bg-slate-50 overflow-hidden relative">
       <Navigation isSyncing={isSyncing} user={currentUser} />
-      <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar">
+      {/* Fix: Added Link to the imports from react-router to enable navigation from the read-only banner */}
+      {isReadOnly && (
+        <div className="fixed top-0 left-0 right-0 bg-rose-600 text-white py-2 text-center z-[200] text-[10px] font-black uppercase tracking-[0.2em] shadow-lg animate-in slide-in-from-top duration-500">
+           Trial Period Expired. Access is currently Read-Only. <Link to="/settings" className="underline ml-2 hover:text-rose-100 transition-colors">Reactivate Elite Plan</Link>
+        </div>
+      )}
+      <main className={`flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar ${isReadOnly ? 'pt-12' : ''}`}>
         <div className="max-w-7xl mx-auto w-full">
           {children}
         </div>
@@ -184,6 +194,10 @@ const App: React.FC = () => {
         clients={appState.clients} 
         tenant_id={currentUser?.email || ''}
         onSave={async (job, items, clientName) => {
+          if (isReadOnly) {
+            alert("Workspace is currently read-only. Please reactivate your subscription.");
+            return;
+          }
           await DB.saveJob(job);
           await DB.saveJobItems(job.id, items);
           const token = await getLatestToken();
@@ -206,8 +220,8 @@ const App: React.FC = () => {
           </>
         ) : (
           <>
-            <Route path="/" element={<AppLayout><Dashboard state={appState} onNewJobClick={() => setIsNewJobModalOpen(true)} onSyncCalendar={() => loadData(currentUser)} isSyncing={isSyncing} /></AppLayout>} />
-            <Route path="/jobs" element={<AppLayout><Jobs state={appState} onNewJobClick={() => setIsNewJobModalOpen(true)} onRefresh={loadData} /></AppLayout>} />
+            <Route path="/" element={<AppLayout><Dashboard state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onSyncCalendar={() => loadData(currentUser)} isSyncing={isSyncing} /></AppLayout>} />
+            <Route path="/jobs" element={<AppLayout><Jobs state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onRefresh={loadData} /></AppLayout>} />
             <Route path="/jobs/:id" element={<AppLayout><JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} /></AppLayout>} />
             <Route path="/clients" element={<AppLayout><Clients state={appState} onRefresh={loadData} /></AppLayout>} />
             <Route path="/invoices" element={<AppLayout><Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} /></AppLayout>} />

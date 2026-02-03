@@ -1,3 +1,4 @@
+
 import { 
   format, 
   parseISO, 
@@ -47,7 +48,8 @@ export const checkSubscriptionStatus = (user: Tenant | null) => {
     if (isValid(parsed)) startDate = parsed;
   }
 
-  const expiryDate = addMonths(startDate, 3);
+  // Updated to 30-day free trial as per specification
+  const expiryDate = addDays(startDate, 30);
   const daysLeft = Math.max(0, differenceInDays(expiryDate, new Date()));
   
   return {

@@ -135,17 +135,17 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
               <div className="bg-slate-900 p-10 rounded-[48px] text-white shadow-2xl flex flex-col justify-between relative overflow-hidden group">
                  <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity duration-500"><i className="fa-solid fa-gem text-9xl"></i></div>
                  <div>
-                    <p className="text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-2">Exclusive Membership</p>
+                    <p className="text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-2">Simple Pricing. Full Access.</p>
                     <h3 className="text-4xl font-black mb-10 tracking-tighter italic">FreelanceOS <span className="text-indigo-500">ELITE</span></h3>
                     <div className="mb-10">
-                       <div className="text-7xl font-black tracking-tighter">£4.99<span className="text-lg text-slate-500">/mo</span></div>
-                       <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-4">
-                         3 Months Free Trial — Automatic monthly billing afterwards.
+                       <div className="text-7xl font-black tracking-tighter">£9.99<span className="text-lg text-slate-500">/mo</span></div>
+                       <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-4 italic">
+                         + VAT where applicable
                        </p>
                     </div>
                     <ul className="space-y-4 text-left text-xs font-bold text-slate-400 mb-10">
+                       <li className="flex items-center gap-3"><div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center"><i className="fa-solid fa-check text-[10px]"></i></div> Managed by PageTech Solutions Ltd</li>
                        <li className="flex items-center gap-3"><div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center"><i className="fa-solid fa-check text-[10px]"></i></div> Enterprise Cloud Mirroring</li>
-                       <li className="flex items-center gap-3"><div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center"><i className="fa-solid fa-check text-[10px]"></i></div> Secure Real-time Workspace Persistence</li>
                        <li className="flex items-center gap-3"><div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center"><i className="fa-solid fa-check text-[10px]"></i></div> Automated Google Maps Mileage Engine</li>
                     </ul>
                  </div>
@@ -173,7 +173,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                        <div className="flex justify-between items-center">
                           <div>
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Plan</p>
-                            <p className="font-black text-slate-900 text-lg">{user?.plan}</p>
+                            <p className="font-black text-slate-900 text-lg">FreelanceOS Elite</p>
                           </div>
                           <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase border ${user?.plan === UserPlan.ACTIVE ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse'}`}>
                              {user?.plan === UserPlan.ACTIVE ? 'Operational' : 'On Trial'}
@@ -183,7 +183,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                        <div>
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Trial Time Remaining</p>
                           <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-100">
-                             <div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${Math.min(100, ( (90 - (sub?.daysLeft || 0)) / 90 ) * 100)}%` }}></div>
+                             <div className="h-full bg-indigo-600 transition-all duration-1000" style={{ width: `${Math.min(100, ( (30 - (sub?.daysLeft || 0)) / 30 ) * 100)}%` }}></div>
                           </div>
                           <div className="flex justify-between mt-3">
                              <p className="text-[10px] font-bold text-slate-500 italic">{sub?.daysLeft} days remaining</p>
@@ -193,7 +193,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
 
                        <div className="pt-8 border-t border-slate-50">
                           <p className="text-[9px] text-slate-400 font-bold leading-relaxed mb-6">
-                            By adding a payment method, you ensure uninterrupted service when the 3-month trial ends. You can manage your subscription via the Stripe portal.
+                            FreelanceOS is designed to be part of your real workflow. By adding a payment method, you ensure uninterrupted service when the 30-day trial ends. All billing managed by PageTech Solutions Ltd.
                           </p>
                           <button 
                             type="button" 

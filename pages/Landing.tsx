@@ -81,7 +81,7 @@ export const Landing: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-start">
           <div className="space-y-8">
             <p className="text-slate-400 text-lg sm:text-2xl font-medium leading-relaxed max-w-xl">
-              The high-performance workspace for modern independent professionals. Built to command your business lifecycle with precision.
+              The high-performance workspace for modern independent professionals. £9.99/mo + VAT. Start your 30-day full access free trial today.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">
@@ -89,7 +89,7 @@ export const Landing: React.FC = () => {
                  onClick={() => openAuth(true)}
                  className="px-8 py-4 bg-indigo-600 text-white rounded-[20px] font-black text-xs uppercase tracking-widest shadow-2xl shadow-indigo-500/40 hover:bg-indigo-500 transition-all text-center"
                >
-                 Start Free Trial
+                 Start 30-Day Trial
                </button>
                <button 
                  onClick={() => openAuth(false)}
@@ -143,7 +143,7 @@ export const Landing: React.FC = () => {
              <Link to="/privacy" className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400">Privacy</Link>
              <Link to="/terms" className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400">Terms</Link>
           </div>
-          <p className="text-slate-600 text-[9px] font-black uppercase tracking-[0.2em] text-center">© 2026 PROFESSIONAL BUSINESS OPERATING SYSTEM.</p>
+          <p className="text-slate-600 text-[9px] font-black uppercase tracking-[0.2em] text-center">© 2026 PAGETECH SOLUTIONS LTD. PROFESSIONAL BUSINESS OPERATING SYSTEM.</p>
         </div>
       </footer>
     </div>
