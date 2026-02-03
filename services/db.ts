@@ -6,6 +6,7 @@ const SUPABASE_URL = 'https://hucvermrtjxsjcsjirwj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1Y3Zlcm1ydGp4c2pjc2ppcndqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNDQ1NDAsImV4cCI6MjA4MzgyMDU0MH0.hpdDWrdQubhBW2ga3Vho8J_fOtVw7Xr6GZexF8ksSmA';
 const CLOUD_CONFIG_KEY = 'freelance_os_cloud_config';
 const LOCAL_STORAGE_KEY = 'freelance_os_local_data_v2'; 
+const DELETED_ITEMS_KEY = 'freelance_os_deleted_ids';
 const LOCAL_USER_EMAIL = 'local@freelanceos.internal';
 
 const getStoredConfig = () => {
@@ -93,7 +94,6 @@ const toDb = (table: string, obj: any, tenantId: string) => {
     if (key === 'rechargeAmount' || key === 'actualCost') continue;
     if (key === 'syncToCalendar') continue;
 
-    // DEFENSIVE SCHEMA MAPPING FOR USER SUPABASE INSTANCES
     if (table === 'job_shifts') {
       const excludedShiftFields = ['endDate', 'isFullDay', 'startTime', 'endTime', 'is_full_day', 'start_time', 'end_time', 'end_date'];
       if (excludedShiftFields.includes(key) || excludedShiftFields.includes(FIELD_MAP[key])) continue;
@@ -126,6 +126,27 @@ const getLocalData = () => {
 
 const saveLocalData = (data: any) => {
   try { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data)); } catch (e) { }
+};
+
+const getDeletedIds = (): Set<string> => {
+  const stored = localStorage.getItem(DELETED_ITEMS_KEY);
+  if (!stored) return new Set();
+  try {
+    return new Set(JSON.parse(stored));
+  } catch { return new Set(); }
+};
+
+const markAsDeleted = (id: string) => {
+  const ids = getDeletedIds();
+  ids.add(id);
+  localStorage.setItem(DELETED_ITEMS_KEY, JSON.stringify(Array.from(ids)));
+};
+
+const removeFromDeletions = (id: string) => {
+  const ids = getDeletedIds();
+  if (ids.delete(id)) {
+    localStorage.setItem(DELETED_ITEMS_KEY, JSON.stringify(Array.from(ids)));
+  }
 };
 
 export const generateId = () => crypto.randomUUID();
@@ -163,6 +184,7 @@ export const DB = {
     let localList = (localData as any)[table] || [];
     const effectiveId = await DB.getTenantId();
     const tenantId = effectiveId || LOCAL_USER_EMAIL;
+    const deletedIds = getDeletedIds();
 
     if (method === 'upsert' && payload) {
       const raw = Array.isArray(payload) ? payload : [payload];
@@ -172,6 +194,7 @@ export const DB = {
         const idx = localList.findIndex((i: any) => i[pk] === item[pk]);
         if (idx >= 0) localList[idx] = { ...localList[idx], ...item };
         else localList.push(item);
+        if (item[pk]) removeFromDeletions(item[pk]);
       });
       (localData as any)[table] = localList;
       saveLocalData(localData);
@@ -179,6 +202,7 @@ export const DB = {
 
     if (method === 'delete') {
       const pk = table === 'tenants' ? 'email' : 'id';
+      if (filter?.id) markAsDeleted(filter.id);
       (localData as any)[table] = localList.filter((item: any) => {
         if (filter?.id) return item[pk] !== filter.id;
         if (filter?.jobId) return item['jobId'] !== filter.jobId && item['job_id'] !== filter.jobId;
@@ -205,7 +229,14 @@ export const DB = {
           let q = query.select('*').eq(table === 'tenants' ? 'email' : 'tenant_id', effectiveId);
           if (filter) Object.entries(filter).forEach(([k, v]) => q = q.eq(FIELD_MAP[k] || k, v));
           const { data } = await q;
-          if (data && data.length > 0) return data.map(fromDb);
+          if (data && data.length > 0) {
+            return data
+              .map(fromDb)
+              .filter(item => {
+                const pk = table === 'tenants' ? 'email' : 'id';
+                return !deletedIds.has(item[pk]);
+              });
+          }
         }
       }
     }
@@ -217,7 +248,10 @@ export const DB = {
           base = base.filter((i: any) => i[k] === v || i[FIELD_MAP[k] || k] === v);
         });
       }
-      return base;
+      return base.filter(item => {
+        const pk = table === 'tenants' ? 'email' : 'id';
+        return !deletedIds.has(item[pk]);
+      });
     }
     return payload;
   },
@@ -254,8 +288,8 @@ export const DB = {
     }));
   },
   saveJob: async (j: Job) => {
+    await DB.saveShifts(j.id, j.shifts || []);
     await DB.call('jobs', 'upsert', j);
-    if (j.shifts) await DB.saveShifts(j.id, j.shifts);
   },
   getQuotes: async () => DB.call('quotes', 'select'),
   saveQuote: async (q: Quote) => DB.call('quotes', 'upsert', q),

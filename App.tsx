@@ -27,6 +27,7 @@ const App: React.FC = () => {
   
   const hasLoadedOnce = useRef(false);
   const syncInProgress = useRef(false);
+  const initializationStarted = useRef(false);
   
   const [appState, setAppState] = useState<AppState>({
     user: null, clients: [], jobs: [], quotes: [], externalEvents: [], jobItems: [], invoices: [], mileage: [],
@@ -91,7 +92,7 @@ const App: React.FC = () => {
       });
       hasLoadedOnce.current = true;
     } catch (err) {
-      console.error("Critical Load Error:", err);
+      console.error("Data Load Error:", err);
     } finally {
       setIsSyncing(false);
       syncInProgress.current = false;
@@ -100,6 +101,17 @@ const App: React.FC = () => {
   }, [getLatestToken]);
 
   useEffect(() => {
+    if (initializationStarted.current) return;
+    initializationStarted.current = true;
+
+    // Failsafe timer to prevent stuck loading screen
+    const failsafe = setTimeout(() => {
+      if (isLoading) {
+        console.warn("Failsafe triggered: Initialization timeout. Starting app.");
+        setIsLoading(false);
+      }
+    }, 5000);
+
     const init = async () => {
       try {
         await DB.initializeSession();
@@ -111,15 +123,18 @@ const App: React.FC = () => {
           setIsLoading(false);
         }
       } catch (e) {
+        console.error("Initialization error:", e);
         setIsLoading(false);
+      } finally {
+        clearTimeout(failsafe);
       }
     };
     init();
 
     const client = getSupabase();
     if (client) {
-      const { data: { subscription } } = (client.auth as any).onAuthStateChange(async (event: string) => {
-        if (event === 'SIGNED_IN') {
+      const { data: { subscription } } = (client.auth as any).onAuthStateChange(async (event: string, session: any) => {
+        if (event === 'SIGNED_IN' && !hasLoadedOnce.current) {
           const user = await DB.getCurrentUser();
           if (user) {
             setCurrentUser(user);
@@ -133,21 +148,32 @@ const App: React.FC = () => {
           setIsLoading(false);
         }
       });
-      return () => subscription.unsubscribe();
+      return () => {
+        subscription.unsubscribe();
+        clearTimeout(failsafe);
+      };
     }
-  }, [loadData]);
+  }, [loadData, isLoading]);
 
   if (isLoading) return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-6 p-4">
       <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-      <p className="text-white text-[10px] font-black uppercase tracking-[0.4em]">Establishing Secure Workspace</p>
+      <div className="text-center">
+        <p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Establishing Secure Workspace</p>
+        <button 
+          onClick={() => setIsLoading(false)} 
+          className="mt-8 text-slate-500 text-[9px] font-black uppercase tracking-widest hover:text-white transition-colors"
+        >
+          Skip Synchronization
+        </button>
+      </div>
     </div>
   );
 
   const AppLayout = ({ children }: { children: React.ReactNode }) => (
-    <div className="flex flex-col md:flex-row h-screen w-full bg-slate-50 overflow-hidden">
+    <div className="flex flex-col md:flex-row h-screen w-full bg-slate-50 overflow-hidden relative">
       <Navigation isSyncing={isSyncing} user={currentUser} />
-      <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6">
+      <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar">
         <div className="max-w-7xl mx-auto w-full">
           {children}
         </div>
