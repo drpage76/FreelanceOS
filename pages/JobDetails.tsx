@@ -8,7 +8,6 @@ import { DB, generateId } from '../services/db';
 import { formatCurrency, formatDate, calculateDueDate, generateInvoiceId } from '../utils';
 import { STATUS_COLORS } from '../constants';
 import { syncJobToGoogle } from '../services/googleCalendar';
-import { uploadToGoogleDrive } from '../services/googleDrive';
 
 interface JobDetailsProps {
   onRefresh: () => void;
@@ -88,62 +87,28 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     };
 
     try {
-      // Clear calendar first if needed
       await DB.saveJob(updatedJob);
       await DB.saveJobItems(job.id, items);
       if (googleAccessToken) await syncJobToGoogle(updatedJob, googleAccessToken, client?.name);
-      
-      // Update local state and global refresh
       setJob(updatedJob);
       await onRefresh();
-      
-      // Visual feedback
-      const btn = document.getElementById('save-feedback');
-      if (btn) {
-        btn.textContent = 'Changes Saved';
-        setTimeout(() => { if (btn) btn.textContent = 'Save Changes'; }, 2000);
-      }
     } catch (err: any) { 
-      console.error("Save Error:", err);
-      alert(`System failed to save changes: ${err.message || 'Check your internet connection.'}`); 
+      alert(`Save Error: ${err.message}`); 
     } finally { 
       setIsSaving(false); 
     }
   };
 
-  const toggleSync = async () => {
-    if (!job) return;
-    const nextVal = !job.syncToCalendar;
-    const updatedJob = { ...job, syncToCalendar: nextVal };
-    setJob(updatedJob);
-    try {
-      await DB.saveJob(updatedJob);
-      if (googleAccessToken) await syncJobToGoogle(updatedJob, googleAccessToken, client?.name);
-      await onRefresh();
-    } catch (e: any) {
-      console.error("Sync flip protocol error:", e);
-      alert(`Sync update failed: ${e.message}`);
-    }
-  };
-
-  const handleFieldChange = (field: keyof Job, value: any) => {
-    if (!job) return;
-    setJob({ ...job, [field]: value });
-  };
-
   const handleDownloadPDF = async () => {
     if (!docRef.current || !job || !client) return;
     setIsSaving(true);
-    await new Promise(r => setTimeout(r, 100));
     try {
       const element = docRef.current;
       const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const pdfWidth = 210;
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Job_${job.id}.pdf`);
+      pdf.addImage(imgData, 'PNG', 0, 0, 210, (canvas.height * 210) / canvas.width);
+      pdf.save(`${showPreview === 'invoice' ? 'Invoice' : 'Quotation'}_${id}.pdf`);
     } catch (err) { alert("Export failed."); } finally { setIsSaving(false); }
   };
 
@@ -168,220 +133,190 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     } catch (err) { alert("Failed to issue invoice."); } finally { setIsSaving(false); }
   };
 
-  if (isLoading) return <div className="p-20 text-center animate-pulse font-black uppercase text-[10px] tracking-widest text-slate-400">Syncing Engine...</div>;
-  if (!job) return <div className="p-20 text-center">Project Not Found</div>;
+  if (isLoading) return <div className="p-20 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Syncing Engine...</div>;
+  if (!job) return null;
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-20 px-4">
+    <div className="space-y-6 max-w-full overflow-x-hidden pb-20 px-1 md:px-4">
+      {/* Document Preview Modal */}
+      {showPreview && client && (
+        <div className="fixed inset-0 z-[300] flex flex-col bg-slate-900/95 backdrop-blur-xl p-4 md:p-8 overflow-y-auto">
+          <div className="max-w-4xl mx-auto w-full flex justify-between items-center mb-6">
+            <h3 className="text-white font-black uppercase tracking-widest text-xs">{showPreview === 'invoice' ? 'Invoice View' : 'Quotation Protocol'}</h3>
+            <div className="flex gap-4">
+              <button onClick={handleDownloadPDF} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg">Download PDF</button>
+              <button onClick={() => setShowPreview(null)} className="w-10 h-10 bg-white/10 text-white rounded-xl flex items-center justify-center hover:bg-white/20"><i className="fa-solid fa-xmark"></i></button>
+            </div>
+          </div>
+          <div className="max-w-4xl mx-auto w-full bg-white p-8 md:p-16 rounded-[40px] shadow-2xl overflow-x-auto">
+            <div ref={docRef} className="w-[700px] mx-auto text-slate-900 bg-white p-4">
+               {/* Minimal Preview Component Inline */}
+               <div className="flex justify-between mb-12">
+                  <div>
+                    {currentUser?.logoUrl ? <img src={currentUser.logoUrl} className="h-20 mb-4 object-contain" /> : <div className="text-2xl font-black mb-4">FreelanceOS</div>}
+                    <h2 className="text-4xl font-black uppercase">{showPreview === 'invoice' ? 'Invoice' : 'Quote'}</h2>
+                    <p className="text-[10px] font-bold text-slate-400 mt-1">Ref: {showPreview === 'invoice' ? invoice?.id : 'EST-'+job.id}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-black">{currentUser?.businessName}</p>
+                    <p className="text-[10px] text-slate-400 whitespace-pre-line leading-relaxed">{currentUser?.businessAddress}</p>
+                  </div>
+               </div>
+               <div className="grid grid-cols-2 gap-8 mb-12">
+                  <div>
+                    <p className="text-[9px] font-black text-slate-300 uppercase mb-2">Billed To</p>
+                    <p className="font-black text-lg">{client.name}</p>
+                    <p className="text-[10px] text-slate-500 whitespace-pre-line leading-relaxed">{client.address}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[9px] font-black text-slate-300 uppercase mb-2">Details</p>
+                    <p className="text-[11px] font-bold">Issue Date: {formatDate(showPreview === 'invoice' ? invoice?.date || '' : job.startDate)}</p>
+                    {showPreview === 'invoice' && <p className="text-[11px] font-black text-indigo-600">Due: {formatDate(invoice?.dueDate || '')}</p>}
+                    <p className="text-[11px] font-bold mt-4 italic">{job.description}</p>
+                  </div>
+               </div>
+               <table className="w-full mb-12">
+                  <thead className="border-b-2 border-slate-900">
+                    <tr className="text-[10px] font-black uppercase">
+                      <th className="py-3 text-left">Description</th>
+                      <th className="py-3 text-center">Qty</th>
+                      <th className="py-3 text-right">Price</th>
+                      <th className="py-3 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {items.map(it => (
+                      <tr key={it.id}>
+                        <td className="py-4 text-xs font-bold">{it.description}</td>
+                        <td className="py-4 text-center text-xs">{it.qty}</td>
+                        <td className="py-4 text-right text-xs">{formatCurrency(it.unitPrice, currentUser)}</td>
+                        <td className="py-4 text-right text-xs font-black">{formatCurrency(it.qty * it.unitPrice, currentUser)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+               </table>
+               <div className="flex justify-end border-t-2 border-slate-900 pt-6">
+                  <div className="w-64 space-y-2">
+                    <div className="flex justify-between text-xs"><span>Net Total</span><span className="font-bold">{formatCurrency(totalRecharge, currentUser)}</span></div>
+                    {currentUser?.isVatRegistered && <div className="flex justify-between text-xs"><span>{currentUser.taxName}</span><span className="font-bold">{formatCurrency(totalRecharge * (currentUser.taxRate/100), currentUser)}</span></div>}
+                    <div className="flex justify-between text-lg font-black border-t pt-2"><span>Total</span><span className="text-indigo-600">{formatCurrency(totalRecharge * (currentUser?.isVatRegistered ? (1 + (currentUser.taxRate/100)) : 1), currentUser)}</span></div>
+                  </div>
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Link to="/jobs" className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-all shadow-sm"><i className="fa-solid fa-arrow-left"></i></Link>
-          <div>
-            <h2 className="text-3xl font-black text-slate-900">{job.description}</h2>
-            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Protocol ID: {job.id} — {client?.name}</p>
+          <Link to="/jobs" className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center shadow-sm"><i className="fa-solid fa-arrow-left"></i></Link>
+          <div className="min-w-0">
+            <h2 className="text-2xl md:text-3xl font-black text-slate-900 truncate">{job.description}</h2>
+            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Protocol {job.id}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => setShowPreview('quote')} className="px-5 py-3 bg-white border border-slate-200 text-slate-900 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all">Quotation</button>
+          <button onClick={() => setShowPreview('quote')} className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-black text-[10px] uppercase shadow-sm">Quotation</button>
           {!invoice ? (
-            <button onClick={() => setShowInvoiceModal(true)} className="px-5 py-3 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all">Issue Invoice</button>
+            <button onClick={() => setShowInvoiceModal(true)} className="px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg">Issue Invoice</button>
           ) : (
-            <button onClick={() => setShowPreview('invoice')} className="px-5 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl">View Invoice</button>
+            <button onClick={() => setShowPreview('invoice')} className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg">View Invoice</button>
           )}
-          <button onClick={() => handleUpdateJob()} disabled={isSaving || isDeleting} className="px-5 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-black transition-all min-w-[140px]">
-            {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <span id="save-feedback">Save Changes</span>}
+          <button onClick={() => handleUpdateJob()} disabled={isSaving} className="px-4 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase shadow-xl hover:bg-black">
+            {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : 'Save Changes'}
           </button>
-          <button onClick={() => { if(window.confirm('Delete project?')) DB.deleteJob(job.id).then(() => navigate('/jobs')) }} disabled={isSaving || isDeleting} className="w-11 h-11 bg-rose-50 text-rose-500 border border-rose-100 rounded-xl flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all shadow-sm">
-            <i className="fa-solid fa-trash-can"></i>
-          </button>
+          <button onClick={() => { if(window.confirm('Delete project?')) DB.deleteJob(job.id).then(() => { onRefresh(); navigate('/jobs'); }) }} className="w-10 h-10 bg-rose-50 text-rose-500 rounded-xl border border-rose-100"><i className="fa-solid fa-trash-can"></i></button>
         </div>
       </header>
 
-      {/* Invoice Modal Rebranding */}
+      {/* Invoice Date Modal */}
       {showInvoiceModal && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
-          <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200">
-             <h3 className="text-xl font-black text-slate-900 mb-6 uppercase tracking-tight">Issue Invoice</h3>
-             <div className="space-y-4">
-               <div>
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Invoice Date</label>
-                  <input type="date" value={selectedInvoiceDate} onChange={e => setSelectedInvoiceDate(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
-               </div>
-               <div className="flex gap-3 pt-4">
-                 <button onClick={() => setShowInvoiceModal(false)} className="flex-1 py-4 bg-slate-50 text-slate-400 rounded-2xl font-black text-[10px] uppercase border border-slate-100">Cancel</button>
-                 <button onClick={finalizeInvoice} className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl">Confirm & Issue</button>
-               </div>
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+          <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl">
+             <h3 className="text-xl font-black mb-6">Issue Invoice Date</h3>
+             <input type="date" value={selectedInvoiceDate} onChange={e => setSelectedInvoiceDate(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none mb-6" />
+             <div className="flex gap-4">
+               <button onClick={() => setShowInvoiceModal(false)} className="flex-1 py-4 bg-slate-50 text-slate-400 rounded-2xl font-black text-[10px] uppercase">Cancel</button>
+               <button onClick={finalizeInvoice} className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl">Confirm</button>
              </div>
           </div>
         </div>
       )}
 
+      {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-10">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="md:col-span-2 space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Project Heading</label>
-                <input value={job.description} onChange={e => handleFieldChange('description', e.target.value)} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-lg outline-none focus:border-indigo-500 transition-colors" />
+          <div className="bg-white p-6 md:p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Heading</label>
+                <input value={job.description} onChange={e => setJob({...job, description: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 border rounded-2xl font-black text-lg outline-none" />
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Location / Site</label>
-                <input value={job.location} onChange={e => handleFieldChange('location', e.target.value)} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-indigo-500 transition-colors" />
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Location</label>
+                <input value={job.location} onChange={e => setJob({...job, location: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 border rounded-2xl font-bold outline-none" />
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">PO Protocol</label>
-                <input value={job.poNumber || ''} onChange={e => handleFieldChange('poNumber', e.target.value)} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-indigo-500 transition-colors" placeholder="e.g. TPF-PO-0082" />
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">PO Protocol</label>
+                <input value={job.poNumber || ''} onChange={e => setJob({...job, poNumber: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 border rounded-2xl font-bold outline-none" />
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Process Status</label>
-                <select value={job.status} onChange={e => handleFieldChange('status', e.target.value)} className={`w-full px-6 py-4 border rounded-2xl font-black text-[11px] uppercase outline-none appearance-none ${STATUS_COLORS[job.status]}`}>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">Status</label>
+                <select value={job.status} onChange={e => setJob({...job, status: e.target.value as JobStatus})} className={`w-full px-5 py-3.5 border rounded-2xl font-black text-[11px] uppercase ${STATUS_COLORS[job.status]}`}>
                   {Object.values(JobStatus).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
             </div>
 
-            {/* SCHEDULING UI - PERMANENTLY VISIBLE */}
-            <div className="pt-10 border-t border-slate-100 space-y-8">
-               <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                     <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center"><i className="fa-solid fa-calendar-days"></i></div>
-                     <div>
-                        <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest italic">Production Schedule</h4>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">Define work sessions and cloud sync</p>
-                     </div>
-                  </div>
-                  <button 
-                    type="button" 
-                    onClick={toggleSync}
-                    className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase transition-all border shadow-lg ${!job.syncToCalendar ? 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700' : 'bg-white text-indigo-600 border-indigo-100 hover:bg-slate-50'}`}
-                  >
-                    {!job.syncToCalendar ? "DONT SHOW IN CALENDAR" : "SYNC ACTIVE"}
-                  </button>
-               </div>
-
-               <div className="flex bg-slate-100 p-1 rounded-2xl w-fit">
-                  <button 
-                    type="button" 
-                    onClick={() => handleFieldChange('schedulingType', SchedulingType.CONTINUOUS)}
-                    className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${job.schedulingType === SchedulingType.CONTINUOUS ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400'}`}
-                  >
-                    Continuous
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={() => handleFieldChange('schedulingType', SchedulingType.SHIFT_BASED)}
-                    className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${job.schedulingType === SchedulingType.SHIFT_BASED ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400'}`}
-                  >
-                    Shift-based
-                  </button>
-               </div>
-
-               {job.schedulingType === SchedulingType.SHIFT_BASED ? (
-                 <div className="space-y-4">
-                    {shifts.map((s, idx) => (
-                      <div key={s.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 bg-slate-50 rounded-[28px] border border-slate-200 animate-in slide-in-from-top-2">
-                         <div className="md:col-span-3 flex items-center justify-between border-b border-slate-200 pb-3">
-                           <input className="bg-transparent border-none outline-none font-black text-indigo-600 uppercase text-xs w-full" value={s.title} onChange={e => {
-                             const next = [...shifts]; next[idx].title = e.target.value; setShifts(next);
-                           }} />
-                           <button type="button" onClick={() => setShifts(shifts.filter((_, i) => i !== idx))} className="text-slate-300 hover:text-rose-500"><i className="fa-solid fa-trash-can text-xs"></i></button>
-                         </div>
-                         <div>
-                            <label className="text-[9px] font-black text-slate-400 uppercase block mb-1 px-1">Start Date</label>
-                            <input type="date" value={s.startDate} onChange={e => { const next = [...shifts]; next[idx].startDate = e.target.value; setShifts(next); }} className="w-full bg-white px-4 py-3 rounded-xl text-xs font-bold outline-none border border-slate-200" />
-                         </div>
-                         <div>
-                            <label className="text-[9px] font-black text-slate-400 uppercase block mb-1 px-1">End Date</label>
-                            <input type="date" value={s.endDate} onChange={e => { const next = [...shifts]; next[idx].endDate = e.target.value; setShifts(next); }} className="w-full bg-white px-4 py-3 rounded-xl text-xs font-bold outline-none border border-slate-200" />
-                         </div>
-                         <div className="flex items-center gap-4">
-                            <label className="flex items-center gap-2 cursor-pointer pt-4">
-                               <input type="checkbox" checked={s.isFullDay} onChange={e => { const next = [...shifts]; next[idx].isFullDay = e.target.checked; setShifts(next); }} className="w-5 h-5 rounded accent-indigo-600" />
-                               <span className="text-[10px] font-black text-slate-900 uppercase">Full Day</span>
-                            </label>
-                         </div>
-                      </div>
-                    ))}
-                    <button type="button" onClick={() => setShifts([...shifts, { id: generateId(), jobId: job.id, title: 'New Work Session', startDate: job.startDate, endDate: job.startDate, startTime: '09:00', endTime: '17:30', isFullDay: true, tenant_id: job.tenant_id }])} className="w-full py-5 border-2 border-dashed border-indigo-100 rounded-3xl text-[10px] font-black text-indigo-400 uppercase tracking-widest hover:bg-indigo-50/30 transition-all">+ Add Work Session</button>
-                 </div>
-               ) : (
-                 <div className="grid grid-cols-2 gap-8 animate-in fade-in duration-300">
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase block px-1 tracking-widest">Start Date</label>
-                       <input type="date" value={job.startDate} onChange={e => handleFieldChange('startDate', e.target.value)} className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl font-bold shadow-sm outline-none" />
-                    </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-slate-400 uppercase block px-1 tracking-widest">End Date</label>
-                       <input type="date" value={job.endDate} onChange={e => handleFieldChange('endDate', e.target.value)} className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl font-bold shadow-sm outline-none" />
-                    </div>
-                 </div>
-               )}
-            </div>
-            
-            <div className="pt-10 border-t border-slate-100">
-               <div className="flex items-center justify-between mb-6">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Project Deliverables</label>
-                  <button type="button" onClick={() => setItems([...items, { id: generateId(), jobId: job.id, description: '', qty: 1, unitPrice: 0, rechargeAmount: 0, actualCost: 0 }])} className="text-[10px] font-black text-indigo-600 uppercase hover:underline">+ New Entry</button>
-               </div>
-               <div className="space-y-3">
-                  {items.map((it, idx) => (
-                    <div key={it.id} className="grid grid-cols-12 gap-3 p-3 bg-slate-50 border border-slate-100 rounded-2xl items-center shadow-inner">
-                       <input className="col-span-6 px-4 py-2 bg-white rounded-xl text-xs font-bold outline-none border border-slate-100 focus:border-indigo-200" value={it.description} onChange={e => {
-                         const n = [...items]; n[idx].description = e.target.value; setItems(n);
-                       }} />
-                       <input type="number" className="col-span-2 px-1 py-2 bg-white rounded-xl text-xs font-black text-center outline-none border border-slate-100" value={it.qty} onChange={e => {
-                         const n = [...items]; n[idx].qty = parseFloat(e.target.value) || 0; setItems(n);
-                       }} />
-                       <input type="number" className="col-span-3 px-1 py-2 bg-white rounded-xl text-xs font-black text-right outline-none border border-slate-100" value={it.unitPrice} onChange={e => {
-                         const n = [...items]; n[idx].unitPrice = parseFloat(e.target.value) || 0; setItems(n);
-                       }} />
-                       <button type="button" onClick={() => setItems(items.filter((_, i) => i !== idx))} className="col-span-1 text-slate-200 hover:text-rose-500 flex justify-center"><i className="fa-solid fa-trash-can text-xs"></i></button>
+            {/* Production Schedule */}
+            <div className="pt-8 border-t border-slate-100">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <h4 className="text-xs font-black uppercase tracking-widest italic">Production Schedule</h4>
+                <div className="flex bg-slate-100 p-1 rounded-xl">
+                  <button onClick={() => setJob({...job, schedulingType: SchedulingType.CONTINUOUS})} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase ${job.schedulingType === SchedulingType.CONTINUOUS ? 'bg-white shadow-sm' : 'text-slate-400'}`}>Continuous</button>
+                  <button onClick={() => setJob({...job, schedulingType: SchedulingType.SHIFT_BASED})} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase ${job.schedulingType === SchedulingType.SHIFT_BASED ? 'bg-white shadow-sm' : 'text-slate-400'}`}>Shift-based</button>
+                </div>
+              </div>
+              
+              {job.schedulingType === SchedulingType.SHIFT_BASED ? (
+                <div className="space-y-4">
+                  {shifts.map((s, idx) => (
+                    <div key={s.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col md:flex-row gap-4 items-center">
+                      <input className="bg-white px-4 py-2 rounded-xl text-xs font-black w-full md:flex-1" value={s.title} onChange={e => { const n = [...shifts]; n[idx].title = e.target.value; setShifts(n); }} />
+                      <input type="date" value={s.startDate} className="bg-white px-4 py-2 rounded-xl text-xs font-bold" onChange={e => { const n = [...shifts]; n[idx].startDate = e.target.value; setShifts(n); }} />
+                      <button onClick={() => setShifts(shifts.filter((_, i) => i !== idx))} className="text-slate-300 hover:text-rose-500"><i className="fa-solid fa-trash-can"></i></button>
                     </div>
                   ))}
-               </div>
+                  <button onClick={() => setShifts([...shifts, { id: generateId(), jobId: job.id, title: 'New Session', startDate: job.startDate, endDate: job.startDate, startTime: '09:00', endTime: '17:30', isFullDay: true, tenant_id: job.tenant_id }])} className="w-full py-4 border-2 border-dashed border-indigo-100 rounded-3xl text-[10px] font-black text-indigo-400 uppercase">+ Add Session</button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-6">
+                  <input type="date" value={job.startDate} onChange={e => setJob({...job, startDate: e.target.value})} className="w-full px-5 py-3.5 bg-white border rounded-2xl font-bold" />
+                  <input type="date" value={job.endDate} onChange={e => setJob({...job, endDate: e.target.value})} className="w-full px-5 py-3.5 bg-white border rounded-2xl font-bold" />
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="space-y-8">
-           <div className="bg-slate-900 rounded-[40px] p-8 text-white shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-8 opacity-5"><i className="fa-solid fa-vault text-7xl"></i></div>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest italic mb-2">Project Valuation</p>
-              <h4 className="text-4xl font-black tracking-tighter mb-8">{formatCurrency(totalRecharge, currentUser)}</h4>
-              <div className="space-y-3">
-                 <div className="flex justify-between text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                    <span>Net Total</span>
-                    <span>{formatCurrency(totalRecharge, currentUser)}</span>
-                 </div>
-                 {currentUser?.isVatRegistered && (
-                   <div className="flex justify-between text-[11px] font-bold text-indigo-400 uppercase tracking-widest">
-                      <span>{currentUser.taxName} ({currentUser.taxRate}%)</span>
-                      <span>{formatCurrency(totalRecharge * (currentUser.taxRate / 100), currentUser)}</span>
-                   </div>
-                 )}
-                 <div className="pt-4 border-t border-white/10 flex justify-between items-center">
-                    <span className="text-xs font-black uppercase tracking-[0.2em] text-white">Gross Val</span>
-                    <span className="text-xl font-black text-emerald-400">{formatCurrency(totalRecharge * (currentUser?.isVatRegistered ? (1 + (currentUser.taxRate / 100)) : 1), currentUser)}</span>
-                 </div>
-              </div>
-           </div>
-
-           <div className="bg-white rounded-[40px] p-8 border border-slate-200 shadow-sm">
-              <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-6 flex items-center gap-3 italic">
-                <i className="fa-solid fa-address-card text-indigo-600"></i> Client Dossier
-              </h4>
-              <div className="space-y-6">
-                 <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Corporate Identity</p>
-                    <p className="font-black text-slate-900 text-lg">{client?.name}</p>
-                 </div>
-                 <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Billing Protocol</p>
-                    <p className="text-xs font-bold text-slate-700">{client?.email}</p>
-                 </div>
-                 <Link to="/clients" className="block text-center py-3 bg-slate-50 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors shadow-sm">Update Records</Link>
-              </div>
-           </div>
+        {/* Sidebar */}
+        <div className="space-y-6">
+          <div className="bg-slate-900 rounded-[40px] p-8 text-white shadow-2xl">
+            <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest italic mb-2">Project Valuation</p>
+            <h4 className="text-4xl font-black tracking-tighter mb-8">{formatCurrency(totalRecharge, currentUser)}</h4>
+            <div className="space-y-3">
+              <div className="flex justify-between text-[11px] font-bold text-slate-400 uppercase"><span>Net</span><span>{formatCurrency(totalRecharge, currentUser)}</span></div>
+              <div className="pt-4 border-t border-white/10 flex justify-between items-center"><span className="text-xs font-black uppercase text-white">Gross</span><span className="text-xl font-black text-emerald-400">{formatCurrency(totalRecharge * (currentUser?.isVatRegistered ? (1 + (currentUser.taxRate/100)) : 1), currentUser)}</span></div>
+            </div>
+          </div>
+          <div className="bg-white rounded-[40px] p-8 border border-slate-200 shadow-sm">
+            <h4 className="text-sm font-black mb-6 italic uppercase tracking-tight">Client Dossier</h4>
+            <div className="space-y-4">
+              <p className="font-black text-slate-900">{client?.name}</p>
+              <p className="text-xs font-bold text-slate-500">{client?.email}</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

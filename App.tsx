@@ -25,7 +25,6 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
-  const isInitializing = useRef(false);
   const hasLoadedOnce = useRef(false);
   const syncInProgress = useRef(false);
   
@@ -52,7 +51,7 @@ const App: React.FC = () => {
     try {
       const user = forcedUser || await DB.getCurrentUser();
       if (!user) {
-        setAppState(prev => ({ ...prev, user: null }));
+        setAppState(prev => ({ ...prev, user: null, jobs: [] }));
         setCurrentUser(null);
         setIsLoading(false);
         return;
@@ -101,16 +100,6 @@ const App: React.FC = () => {
   }, [getLatestToken]);
 
   useEffect(() => {
-    if (isInitializing.current) return;
-    isInitializing.current = true;
-
-    const failsafe = setTimeout(() => {
-      if (isLoading) {
-        console.warn("Initialization taking too long. Forcing app start.");
-        setIsLoading(false);
-      }
-    }, 6000);
-
     const init = async () => {
       try {
         await DB.initializeSession();
@@ -122,19 +111,15 @@ const App: React.FC = () => {
           setIsLoading(false);
         }
       } catch (e) {
-        console.error("Initialization Failed:", e);
         setIsLoading(false);
-      } finally {
-        clearTimeout(failsafe);
       }
     };
-
     init();
 
     const client = getSupabase();
     if (client) {
-      const { data: { subscription } } = (client.auth as any).onAuthStateChange(async (event: string, session: any) => {
-        if (event === 'SIGNED_IN' && !hasLoadedOnce.current) {
+      const { data: { subscription } } = (client.auth as any).onAuthStateChange(async (event: string) => {
+        if (event === 'SIGNED_IN') {
           const user = await DB.getCurrentUser();
           if (user) {
             setCurrentUser(user);
@@ -144,32 +129,25 @@ const App: React.FC = () => {
         if (event === 'SIGNED_OUT') {
           setCurrentUser(null);
           hasLoadedOnce.current = false;
-          setAppState({
-            user: null, clients: [], jobs: [], quotes: [], externalEvents: [], jobItems: [], invoices: [], mileage: [],
-          });
+          setAppState({ user: null, clients: [], jobs: [], quotes: [], externalEvents: [], jobItems: [], invoices: [], mileage: [] });
           setIsLoading(false);
         }
       });
-      return () => {
-        subscription.unsubscribe();
-        clearTimeout(failsafe);
-      };
+      return () => subscription.unsubscribe();
     }
-  }, [loadData, isLoading]);
+  }, [loadData]);
 
   if (isLoading) return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-6 p-4">
       <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-      <div className="text-center">
-        <p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Establishing Secure Workspace</p>
-      </div>
+      <p className="text-white text-[10px] font-black uppercase tracking-[0.4em]">Establishing Secure Workspace</p>
     </div>
   );
 
   const AppLayout = ({ children }: { children: React.ReactNode }) => (
-    <div className="flex flex-col md:flex-row h-screen w-full bg-slate-50 overflow-hidden relative">
+    <div className="flex flex-col md:flex-row h-screen w-full bg-slate-50 overflow-hidden">
       <Navigation isSyncing={isSyncing} user={currentUser} />
-      <main className="flex-1 overflow-x-hidden overflow-y-auto custom-scrollbar p-3 sm:p-4 md:p-6 pb-24 md:pb-6">
+      <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6">
         <div className="max-w-7xl mx-auto w-full">
           {children}
         </div>
@@ -195,7 +173,6 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
-        
         {!currentUser ? (
           <>
             <Route path="/" element={<Landing />} />

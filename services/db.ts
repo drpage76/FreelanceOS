@@ -91,16 +91,12 @@ const toDb = (table: string, obj: any, tenantId: string) => {
   for (const key in obj) {
     if (key === '__isSeed' || key === 'tenant_id' || key === 'shifts') continue;
     if (key === 'rechargeAmount' || key === 'actualCost') continue;
-    
-    // UI-only and Session-only flags
     if (key === 'syncToCalendar') continue;
 
-    // DEFENSIVE SCHEMA MAPPING:
-    // Some user databases do not have the extended columns for job_shifts.
-    // We exclude them from cloud sync to prevent 400 errors while keeping them in local storage.
+    // DEFENSIVE SCHEMA MAPPING FOR USER SUPABASE INSTANCES
     if (table === 'job_shifts') {
-      const excludedShiftFields = ['endDate', 'isFullDay', 'startTime', 'endTime'];
-      if (excludedShiftFields.includes(key)) continue;
+      const excludedShiftFields = ['endDate', 'isFullDay', 'startTime', 'endTime', 'is_full_day', 'start_time', 'end_time', 'end_date'];
+      if (excludedShiftFields.includes(key) || excludedShiftFields.includes(FIELD_MAP[key])) continue;
     }
 
     const dbKey = FIELD_MAP[key] || key;
@@ -168,7 +164,6 @@ export const DB = {
     const effectiveId = await DB.getTenantId();
     const tenantId = effectiveId || LOCAL_USER_EMAIL;
 
-    // Local-First: Update local storage immediately to prevent UI lag or ghost records
     if (method === 'upsert' && payload) {
       const raw = Array.isArray(payload) ? payload : [payload];
       raw.forEach(p => {
@@ -184,16 +179,14 @@ export const DB = {
 
     if (method === 'delete') {
       const pk = table === 'tenants' ? 'email' : 'id';
-      localList = localList.filter((item: any) => {
+      (localData as any)[table] = localList.filter((item: any) => {
         if (filter?.id) return item[pk] !== filter.id;
         if (filter?.jobId) return item['jobId'] !== filter.jobId && item['job_id'] !== filter.jobId;
         return true;
       });
-      (localData as any)[table] = localList;
       saveLocalData(localData);
     }
 
-    // Cloud-Mirror: Attempt to sync with Supabase if configured
     if (DB.isCloudConfigured() && effectiveId) {
       const client = getSupabase();
       if (client) {
@@ -201,36 +194,24 @@ export const DB = {
         if (method === 'upsert' && payload) {
           const raw = Array.isArray(payload) ? payload : [payload];
           const mapped = raw.map(p => toDb(table, p, effectiveId));
-          const { error } = await query.upsert(mapped);
-          if (error) {
-            console.error(`Sync Error in ${table}:`, error);
-            throw new Error(`Cloud sync failure: ${error.message}`);
-          }
+          await query.upsert(mapped);
         }
         if (method === 'delete') {
           const pk = table === 'tenants' ? 'email' : 'id';
-          if (filter?.id) {
-            const { error } = await query.delete().eq(pk, filter.id);
-            if (error) throw error;
-          }
-          else if (filter?.jobId) {
-            const { error } = await query.delete().eq('job_id', filter.jobId);
-            if (error) throw error;
-          }
+          if (filter?.id) await query.delete().eq(pk, filter.id);
+          else if (filter?.jobId) await query.delete().eq('job_id', filter.jobId);
         }
         if (method === 'select') {
           let q = query.select('*').eq(table === 'tenants' ? 'email' : 'tenant_id', effectiveId);
           if (filter) Object.entries(filter).forEach(([k, v]) => q = q.eq(FIELD_MAP[k] || k, v));
-          const { data, error } = await q;
-          if (error) throw error;
+          const { data } = await q;
           if (data && data.length > 0) return data.map(fromDb);
         }
       }
     }
 
-    // Return filtered local data as default source of truth for the session
     if (method === 'select') {
-      let base = localList.filter((i: any) => i.tenant_id === tenantId || i.email === tenantId);
+      let base = ((getLocalData() as any)[table] || []).filter((i: any) => i.tenant_id === tenantId || i.email === tenantId);
       if (filter) {
         Object.entries(filter).forEach(([k, v]) => {
           base = base.filter((i: any) => i[k] === v || i[FIELD_MAP[k] || k] === v);
@@ -252,22 +233,10 @@ export const DB = {
     } catch (e) {}
     
     const n: Tenant = { 
-      email, 
-      name: email.split('@')[0], 
-      businessName: 'My Freelance Business', 
-      businessAddress: '', 
-      currency: 'GBP',
-      taxName: 'VAT',
-      taxRate: 20,
-      isVatRegistered: false,
-      fiscalYearStartDay: 6,
-      fiscalYearStartMonth: 4,
-      invoicePrefix: 'INV-',
-      invoiceNextNumber: 1,
-      invoiceNumberingType: 'INCREMENTAL',
-      plan: UserPlan.TRIAL,
-      trialStartDate: new Date().toISOString(),
-      paymentStatus: 'TRIALING'
+      email, name: email.split('@')[0], businessName: 'My Freelance Business', businessAddress: '', 
+      currency: 'GBP', taxName: 'VAT', taxRate: 20, isVatRegistered: false, fiscalYearStartDay: 6,
+      fiscalYearStartMonth: 4, invoicePrefix: 'INV-', invoiceNextNumber: 1, invoiceNumberingType: 'INCREMENTAL',
+      plan: UserPlan.TRIAL, trialStartDate: new Date().toISOString(), paymentStatus: 'TRIALING'
     };
     await DB.updateTenant(n);
     return n;
