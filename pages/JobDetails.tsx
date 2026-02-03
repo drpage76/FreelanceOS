@@ -7,7 +7,7 @@ import { Job, JobItem, JobStatus, Client, Invoice, InvoiceStatus, JobShift, Tena
 import { DB, generateId } from '../services/db';
 import { formatCurrency, formatDate, calculateDueDate, generateInvoiceId } from '../utils';
 import { STATUS_COLORS } from '../constants';
-import { syncJobToGoogle } from '../services/googleCalendar';
+import { syncJobToGoogle, deleteJobFromGoogle } from '../services/googleCalendar';
 
 interface JobDetailsProps {
   onRefresh: () => void;
@@ -99,6 +99,29 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     }
   };
 
+  const handleDeleteJob = async () => {
+    if (!job || !window.confirm('Are you sure you want to delete this project and clear all associated calendar events?')) return;
+    
+    setIsDeleting(true);
+    try {
+      // 1. Clear Google Calendar first
+      if (googleAccessToken) {
+        await deleteJobFromGoogle(job.id, googleAccessToken);
+      }
+      
+      // 2. Delete from DB
+      await DB.deleteJob(job.id);
+      
+      // 3. Refresh and Exit
+      onRefresh();
+      navigate('/jobs');
+    } catch (err) {
+      alert("System failed to complete deletion protocol.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleDownloadPDF = async () => {
     if (!docRef.current || !job || !client) return;
     setIsSaving(true);
@@ -150,31 +173,42 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           </div>
           <div className="max-w-4xl mx-auto w-full bg-white p-8 md:p-16 rounded-[40px] shadow-2xl overflow-x-auto">
             <div ref={docRef} className="w-[700px] mx-auto text-slate-900 bg-white p-4">
-               {/* Minimal Preview Component Inline */}
+               {/* Header Section */}
                <div className="flex justify-between mb-12">
                   <div>
                     {currentUser?.logoUrl ? <img src={currentUser.logoUrl} className="h-20 mb-4 object-contain" /> : <div className="text-2xl font-black mb-4">FreelanceOS</div>}
-                    <h2 className="text-4xl font-black uppercase">{showPreview === 'invoice' ? 'Invoice' : 'Quote'}</h2>
-                    <p className="text-[10px] font-bold text-slate-400 mt-1">Ref: {showPreview === 'invoice' ? invoice?.id : 'EST-'+job.id}</p>
+                    <h2 className="text-4xl font-black uppercase">{showPreview === 'invoice' ? 'Invoice' : 'Quotation'}</h2>
+                    <p className="text-[10px] font-bold text-slate-400 mt-1">Reference: {showPreview === 'invoice' ? invoice?.id : 'QT-'+job.id}</p>
+                    {job.poNumber && (
+                      <p className="text-[10px] font-black text-indigo-600 mt-2 border-t border-indigo-50 pt-1 uppercase">PO Reference: {job.poNumber}</p>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="font-black">{currentUser?.businessName}</p>
                     <p className="text-[10px] text-slate-400 whitespace-pre-line leading-relaxed">{currentUser?.businessAddress}</p>
                   </div>
                </div>
+
+               {/* Recipient and Dates */}
                <div className="grid grid-cols-2 gap-8 mb-12">
                   <div>
-                    <p className="text-[9px] font-black text-slate-300 uppercase mb-2">Billed To</p>
+                    <p className="text-[9px] font-black text-slate-300 uppercase mb-2">Recipient</p>
                     <p className="font-black text-lg">{client.name}</p>
                     <p className="text-[10px] text-slate-500 whitespace-pre-line leading-relaxed">{client.address}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[9px] font-black text-slate-300 uppercase mb-2">Details</p>
-                    <p className="text-[11px] font-bold">Issue Date: {formatDate(showPreview === 'invoice' ? invoice?.date || '' : job.startDate)}</p>
-                    {showPreview === 'invoice' && <p className="text-[11px] font-black text-indigo-600">Due: {formatDate(invoice?.dueDate || '')}</p>}
-                    <p className="text-[11px] font-bold mt-4 italic">{job.description}</p>
+                    <p className="text-[9px] font-black text-slate-300 uppercase mb-2">Timeline & Reference</p>
+                    <p className="text-[11px] font-bold">Document Date: {formatDate(showPreview === 'invoice' ? invoice?.date || '' : job.startDate)}</p>
+                    {showPreview === 'invoice' && <p className="text-[11px] font-black text-indigo-600">Payment Due: {formatDate(invoice?.dueDate || '')}</p>}
+                    <div className="mt-4 pt-4 border-t border-slate-50">
+                       <p className="text-[10px] font-black text-slate-400 uppercase">Production Period</p>
+                       <p className="text-xs font-bold text-slate-900">{formatDate(job.startDate)} — {formatDate(job.endDate)}</p>
+                    </div>
+                    <p className="text-[11px] font-bold mt-4 italic text-slate-700">{job.description}</p>
                   </div>
                </div>
+
+               {/* Line Items */}
                <table className="w-full mb-12">
                   <thead className="border-b-2 border-slate-900">
                     <tr className="text-[10px] font-black uppercase">
@@ -195,11 +229,29 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                     ))}
                   </tbody>
                </table>
+
+               {/* Totals */}
                <div className="flex justify-end border-t-2 border-slate-900 pt-6">
                   <div className="w-64 space-y-2">
-                    <div className="flex justify-between text-xs"><span>Net Total</span><span className="font-bold">{formatCurrency(totalRecharge, currentUser)}</span></div>
-                    {currentUser?.isVatRegistered && <div className="flex justify-between text-xs"><span>{currentUser.taxName}</span><span className="font-bold">{formatCurrency(totalRecharge * (currentUser.taxRate/100), currentUser)}</span></div>}
-                    <div className="flex justify-between text-lg font-black border-t pt-2"><span>Total</span><span className="text-indigo-600">{formatCurrency(totalRecharge * (currentUser?.isVatRegistered ? (1 + (currentUser.taxRate/100)) : 1), currentUser)}</span></div>
+                    <div className="flex justify-between text-xs"><span>Net Amount</span><span className="font-bold">{formatCurrency(totalRecharge, currentUser)}</span></div>
+                    {currentUser?.isVatRegistered && <div className="flex justify-between text-xs"><span>{currentUser.taxName} ({currentUser.taxRate}%)</span><span className="font-bold">{formatCurrency(totalRecharge * (currentUser.taxRate/100), currentUser)}</span></div>}
+                    <div className="flex justify-between text-lg font-black border-t pt-2"><span>Gross Total</span><span className="text-indigo-600">{formatCurrency(totalRecharge * (currentUser?.isVatRegistered ? (1 + (currentUser.taxRate/100)) : 1), currentUser)}</span></div>
+                  </div>
+               </div>
+
+               {/* Footer / Remittance */}
+               <div className="mt-20 pt-10 border-t border-slate-100 grid grid-cols-2 gap-10">
+                  <div>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Remittance Protocols</p>
+                    <div className="bg-slate-50 p-6 rounded-2xl font-mono text-[10px] text-slate-700 border border-slate-100 shadow-inner">
+                      {currentUser?.accountName && <p className="font-black mb-1">{currentUser.accountName}</p>}
+                      {currentUser?.accountNumber && <p>Acc: {currentUser.accountNumber}</p>}
+                      {currentUser?.sortCodeOrIBAN && <p>Sort/IBAN: {currentUser.sortCodeOrIBAN}</p>}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Compliance</p>
+                    <p className="text-[10px] text-slate-500 italic leading-relaxed">System-generated professional documentation for {currentUser?.businessName}. Terms as per master service agreement.</p>
                   </div>
                </div>
             </div>
@@ -223,10 +275,12 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           ) : (
             <button onClick={() => setShowPreview('invoice')} className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg">View Invoice</button>
           )}
-          <button onClick={() => handleUpdateJob()} disabled={isSaving} className="px-4 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase shadow-xl hover:bg-black">
+          <button onClick={() => handleUpdateJob()} disabled={isSaving} className="px-4 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase shadow-xl hover:bg-black transition-all">
             {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : 'Save Changes'}
           </button>
-          <button onClick={() => { if(window.confirm('Delete project?')) DB.deleteJob(job.id).then(() => { onRefresh(); navigate('/jobs'); }) }} className="w-10 h-10 bg-rose-50 text-rose-500 rounded-xl border border-rose-100"><i className="fa-solid fa-trash-can"></i></button>
+          <button onClick={handleDeleteJob} disabled={isDeleting} className="w-10 h-10 bg-rose-50 text-rose-500 rounded-xl border border-rose-100 flex items-center justify-center transition-all hover:bg-rose-500 hover:text-white">
+            {isDeleting ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-trash-can"></i>}
+          </button>
         </div>
       </header>
 
