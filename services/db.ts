@@ -228,8 +228,11 @@ export const DB = {
         if (method === 'select') {
           let q = query.select('*').eq(table === 'tenants' ? 'email' : 'tenant_id', effectiveId);
           if (filter) Object.entries(filter).forEach(([k, v]) => q = q.eq(FIELD_MAP[k] || k, v));
-          const { data } = await q;
-          if (data && data.length > 0) {
+          const { data, error } = await q;
+          
+          // CRITICAL FIX: If the cloud request succeeds, the response is the source of truth.
+          // Do not fall through to local data if we got an actual response (even an empty one).
+          if (!error && data !== null) {
             return data
               .map(fromDb)
               .filter(item => {

@@ -33,18 +33,28 @@ export const fetchGoogleEvents = async (email: string, accessToken?: string): Pr
 };
 
 const deleteExistingEvents = async (jobId: string, accessToken: string) => {
-  const query = encodeURIComponent(jobId);
-  const search = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events?q=${query}`,
-    { headers: { 'Authorization': `Bearer ${accessToken}` } }
-  );
-  const data = await search.json();
-  const matches = (data.items || []).filter((ev: any) => ev.summary?.includes(jobId) || ev.description?.includes(jobId));
-  for (const ev of matches) {
-    await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${ev.id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    });
+  try {
+    const query = encodeURIComponent(jobId);
+    const search = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?q=${query}`,
+      { headers: { 'Authorization': `Bearer ${accessToken}` } }
+    );
+    if (!search.ok) return;
+    
+    const data = await search.json();
+    const matches = (data.items || []).filter((ev: any) => 
+      ev.summary?.includes(jobId) || 
+      ev.description?.includes(jobId)
+    );
+
+    for (const ev of matches) {
+      await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${ev.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+    }
+  } catch (err) {
+    console.error("Google Calendar Cleanup Error:", err);
   }
 };
 
