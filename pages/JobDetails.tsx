@@ -65,6 +65,22 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
   const totalRecharge = useMemo(() => items.reduce((sum, item) => sum + (item.qty * item.unitPrice), 0), [items]);
 
+  const handleAddItem = () => {
+    if (!id) return;
+    setItems([...items, { id: generateId(), jobId: id, description: '', qty: 1, unitPrice: 0, rechargeAmount: 0, actualCost: 0 }]);
+  };
+
+  const handleUpdateItem = (idx: number, field: string, val: any) => {
+    const next = [...items];
+    (next[idx] as any)[field] = val;
+    setItems(next);
+  };
+
+  const handleRemoveItem = (idx: number) => {
+    if (items.length <= 1) return;
+    setItems(items.filter((_, i) => i !== idx));
+  };
+
   const handleUpdateJob = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!job || isSaving) return;
@@ -83,6 +99,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       ...job,
       startDate,
       endDate,
+      totalRecharge, // Ensure the job object has the current total for dashboard stats
       shifts: shifts
     };
 
@@ -113,7 +130,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       await DB.deleteJob(job.id);
       
       // 3. Refresh and Exit
-      onRefresh();
+      await onRefresh();
       navigate('/jobs');
     } catch (err) {
       alert("System failed to complete deletion protocol.");
@@ -173,7 +190,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           </div>
           <div className="max-w-4xl mx-auto w-full bg-white p-8 md:p-16 rounded-[40px] shadow-2xl overflow-x-auto">
             <div ref={docRef} className="w-[700px] mx-auto text-slate-900 bg-white p-4">
-               {/* Header Section */}
                <div className="flex justify-between mb-12">
                   <div>
                     {currentUser?.logoUrl ? <img src={currentUser.logoUrl} className="h-20 mb-4 object-contain" /> : <div className="text-2xl font-black mb-4">FreelanceOS</div>}
@@ -188,8 +204,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                     <p className="text-[10px] text-slate-400 whitespace-pre-line leading-relaxed">{currentUser?.businessAddress}</p>
                   </div>
                </div>
-
-               {/* Recipient and Dates */}
                <div className="grid grid-cols-2 gap-8 mb-12">
                   <div>
                     <p className="text-[9px] font-black text-slate-300 uppercase mb-2">Recipient</p>
@@ -207,8 +221,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                     <p className="text-[11px] font-bold mt-4 italic text-slate-700">{job.description}</p>
                   </div>
                </div>
-
-               {/* Line Items */}
                <table className="w-full mb-12">
                   <thead className="border-b-2 border-slate-900">
                     <tr className="text-[10px] font-black uppercase">
@@ -229,8 +241,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                     ))}
                   </tbody>
                </table>
-
-               {/* Totals */}
                <div className="flex justify-end border-t-2 border-slate-900 pt-6">
                   <div className="w-64 space-y-2">
                     <div className="flex justify-between text-xs"><span>Net Amount</span><span className="font-bold">{formatCurrency(totalRecharge, currentUser)}</span></div>
@@ -238,8 +248,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                     <div className="flex justify-between text-lg font-black border-t pt-2"><span>Gross Total</span><span className="text-indigo-600">{formatCurrency(totalRecharge * (currentUser?.isVatRegistered ? (1 + (currentUser.taxRate/100)) : 1), currentUser)}</span></div>
                   </div>
                </div>
-
-               {/* Footer / Remittance */}
                <div className="mt-20 pt-10 border-t border-slate-100 grid grid-cols-2 gap-10">
                   <div>
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Remittance Protocols</p>
@@ -352,6 +360,30 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
               )}
             </div>
           </div>
+
+          {/* New Entries & Deliverables Section */}
+          <div className="bg-white p-6 md:p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-black uppercase tracking-widest italic">Entries & Deliverables</h4>
+              <button type="button" onClick={handleAddItem} className="text-[10px] font-black text-indigo-600 uppercase hover:underline">+ Add Entry</button>
+            </div>
+            <div className="space-y-3">
+              {items.map((item, idx) => (
+                <div key={item.id} className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-3 rounded-2xl border border-slate-100 group">
+                   <input className="col-span-7 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none" placeholder="Service description..." value={item.description} onChange={e => handleUpdateItem(idx, 'description', e.target.value)} />
+                   <div className="col-span-2 space-y-1">
+                     <span className="text-[7px] font-black text-slate-400 uppercase px-1">Qty</span>
+                     <input type="number" step="any" className="w-full px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-center outline-none" value={item.qty} onChange={e => handleUpdateItem(idx, 'qty', parseFloat(e.target.value) || 0)} />
+                   </div>
+                   <div className="col-span-2 space-y-1">
+                     <span className="text-[7px] font-black text-slate-400 uppercase px-1">Rate</span>
+                     <input type="number" step="any" className="w-full px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-right outline-none" value={item.unitPrice} onChange={e => handleUpdateItem(idx, 'unitPrice', parseFloat(e.target.value) || 0)} />
+                   </div>
+                   <button type="button" onClick={() => handleRemoveItem(idx)} className="col-span-1 text-slate-300 hover:text-rose-500 flex justify-center mt-3"><i className="fa-solid fa-trash-can text-[10px]"></i></button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Sidebar */}
@@ -369,6 +401,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
             <div className="space-y-4">
               <p className="font-black text-slate-900">{client?.name}</p>
               <p className="text-xs font-bold text-slate-500">{client?.email}</p>
+              <p className="text-[10px] text-slate-400 leading-relaxed italic">{client?.address}</p>
             </div>
           </div>
         </div>
