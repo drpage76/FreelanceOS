@@ -234,41 +234,39 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
             </div>
             
             <div className="col-span-2 p-8 bg-slate-50/80 border border-slate-200 rounded-[32px] space-y-6">
-               <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                     <i className="fa-brands fa-google text-indigo-600"></i>
-                     <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest italic">Production Schedule</h4>
-                  </div>
-                  <button 
-                    type="button" 
-                    onClick={() => setJobDetails({ ...jobDetails, syncToCalendar: !jobDetails.syncToCalendar })}
-                    className={`px-4 py-2.5 rounded-xl text-[9px] font-black uppercase transition-all border shadow-lg ${!jobDetails.syncToCalendar ? 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700' : 'bg-white text-indigo-600 border-indigo-100 hover:bg-slate-50'}`}
-                  >
-                    {!jobDetails.syncToCalendar ? "DONT SHOW IN CALENDAR" : "SYNC ACTIVE"}
-                  </button>
+               <div className="flex items-center gap-3 mb-2">
+                  <i className="fa-brands fa-google text-indigo-600"></i>
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest italic">Production Schedule & Sync</h4>
                </div>
                
-              <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight italic">Timeline Mode</p>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-4 border-t border-slate-200">
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight italic">Protocol Mode</p>
                 <div className="flex bg-white p-1 rounded-xl border border-slate-100 shadow-sm">
                   <button 
                     type="button" 
-                    onClick={() => setJobDetails({ ...jobDetails, schedulingType: SchedulingType.CONTINUOUS })}
-                    className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${jobDetails.schedulingType === SchedulingType.CONTINUOUS ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400'}`}
+                    onClick={() => setJobDetails({ ...jobDetails, schedulingType: SchedulingType.CONTINUOUS, syncToCalendar: true })}
+                    className={`px-5 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${jobDetails.syncToCalendar && jobDetails.schedulingType === SchedulingType.CONTINUOUS ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400'}`}
                   >
                     Continuous
                   </button>
                   <button 
                     type="button" 
-                    onClick={() => setJobDetails({ ...jobDetails, schedulingType: SchedulingType.SHIFT_BASED })}
-                    className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${jobDetails.schedulingType === SchedulingType.SHIFT_BASED ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400'}`}
+                    onClick={() => setJobDetails({ ...jobDetails, schedulingType: SchedulingType.SHIFT_BASED, syncToCalendar: true })}
+                    className={`px-5 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${jobDetails.syncToCalendar && jobDetails.schedulingType === SchedulingType.SHIFT_BASED ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400'}`}
                   >
                     Shift-based
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setJobDetails({ ...jobDetails, syncToCalendar: false })}
+                    className={`px-5 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${!jobDetails.syncToCalendar ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400'}`}
+                  >
+                    None
                   </button>
                 </div>
               </div>
 
-              {jobDetails.schedulingType === SchedulingType.SHIFT_BASED ? (
+              {jobDetails.syncToCalendar && jobDetails.schedulingType === SchedulingType.SHIFT_BASED ? (
                 <div className="space-y-4">
                   {shifts.map((s, idx) => (
                     <div key={idx} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3 animate-in slide-in-from-left-1">
@@ -297,7 +295,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
                   ))}
                   <button type="button" onClick={handleAddShift} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-white hover:text-indigo-600 transition-all">+ Add Work Session</button>
                 </div>
-              ) : (
+              ) : jobDetails.syncToCalendar ? (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <span className="text-[8px] font-black text-slate-400 uppercase px-1">Start Date</span>
@@ -307,6 +305,10 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
                     <span className="text-[8px] font-black text-slate-400 uppercase px-1">End Date</span>
                     <input type="date" className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold shadow-sm" value={jobDetails.endDate} onChange={e => setJobDetails({...jobDetails, endDate: e.target.value})} />
                   </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-center">
+                  <p className="text-[10px] font-black text-rose-400 uppercase italic">Job will not be synced to Google Calendar</p>
                 </div>
               )}
             </div>

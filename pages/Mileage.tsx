@@ -30,7 +30,6 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
     description: ''
   });
 
-  // Effect to automatically calculate mileage when postcodes reach valid length
   useEffect(() => {
     const start = newEntry.startPostcode.trim();
     const end = newEntry.endPostcode.trim();
@@ -71,11 +70,6 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
     e.preventDefault();
     if (isSaving || !newEntry.startPostcode || !newEntry.endPostcode) return;
     
-    if (newEntry.distanceMiles <= 0 && !isCalculating) {
-      alert("Please enter a valid distance or wait for Map Protocol.");
-      return;
-    }
-
     setIsSaving(true);
     try {
       const record: MileageRecord = {
@@ -129,72 +123,70 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
         <p className="text-slate-500 font-bold uppercase text-[9px] tracking-widest italic">Google Maps Protocol Active</p>
       </header>
 
-      {/* Entry Form - Now First */}
       <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden">
         <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Start Date</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Date</label>
               <input type="date" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.date} onChange={e => setNewEntry({...newEntry, date: e.target.value})} />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">End Date (Optional Range)</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">End Date (Range)</label>
               <input type="date" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.endDate} onChange={e => setNewEntry({...newEntry, endDate: e.target.value})} />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Description / Job Ref</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Description</label>
               <input placeholder="Client meeting / Project ID" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={newEntry.description} onChange={e => setNewEntry({...newEntry, description: e.target.value})} />
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Unit Miles</label>
-              <div className={`relative px-5 py-4 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[56px] transition-all ${isCalculating ? 'border-indigo-400 animate-pulse' : 'border-indigo-100 text-indigo-700'}`}>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+            <div className="md:col-span-3 space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Start Postcode</label>
+              <input placeholder="SW1..." className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase" value={newEntry.startPostcode} onChange={e => setNewEntry({...newEntry, startPostcode: e.target.value.toUpperCase()})} />
+            </div>
+            
+            <div className="md:col-span-3 space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">End Postcode</label>
+              <input placeholder="E1..." className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase" value={newEntry.endPostcode} onChange={e => setNewEntry({...newEntry, endPostcode: e.target.value.toUpperCase()})} />
+            </div>
+
+            <div className="md:col-span-2 space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Miles</label>
+              <div className={`relative px-4 py-4 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[56px] transition-all ${isCalculating ? 'border-indigo-400 animate-pulse' : 'border-indigo-100 text-indigo-700'}`}>
                 <input 
                   type="number" 
                   step="0.01" 
                   className="w-full bg-transparent outline-none font-black text-indigo-700 placeholder:text-indigo-300" 
                   value={newEntry.distanceMiles || ''} 
-                  placeholder={isCalculating ? "GEOLOCATING..." : "0.00"}
+                  placeholder={isCalculating ? "GEO..." : "0.00"}
                   onChange={e => setNewEntry({...newEntry, distanceMiles: parseFloat(e.target.value) || 0})} 
                 />
-                <button type="button" onClick={handleCalculateMileage} className="text-[10px] text-indigo-400 hover:text-indigo-600 ml-2" title="Manual Recalculate">
-                  <i className="fa-solid fa-arrows-rotate"></i>
+                <button type="button" onClick={handleCalculateMileage} className="text-indigo-400 hover:text-indigo-600 ml-1">
+                  <i className="fa-solid fa-arrows-rotate text-[10px]"></i>
                 </button>
               </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-6 items-end">
-            <div className="lg:col-span-2 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Departure Postcode</label>
-              <input placeholder="SW1..." className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase" value={newEntry.startPostcode} onChange={e => setNewEntry({...newEntry, startPostcode: e.target.value.toUpperCase()})} />
-            </div>
-            
-            <div className="lg:col-span-2 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Destination Postcode</label>
-              <input placeholder="E1..." className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase" value={newEntry.endPostcode} onChange={e => setNewEntry({...newEntry, endPostcode: e.target.value.toUpperCase()})} />
-            </div>
-
-            <div className="space-y-2">
+            <div className="md:col-span-1 space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Trips</label>
-              <input type="number" min="1" className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl font-black outline-none h-[56px]" value={newEntry.numTrips} onChange={e => setNewEntry({...newEntry, numTrips: parseInt(e.target.value) || 1})} />
+              <input type="number" min="1" className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl font-black outline-none h-[56px] text-center" value={newEntry.numTrips} onChange={e => setNewEntry({...newEntry, numTrips: parseInt(e.target.value) || 1})} />
             </div>
 
-            <div className="space-y-2">
-               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Return Trip?</label>
-               <button type="button" onClick={() => setNewEntry({...newEntry, isReturn: !newEntry.isReturn})} className={`w-full px-4 py-4 rounded-2xl font-black text-[10px] uppercase border transition-all h-[56px] ${newEntry.isReturn ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-200'}`}>
-                 {newEntry.isReturn ? 'Return' : 'Single'}
+            <div className="md:col-span-1.5 space-y-2">
+               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Return?</label>
+               <button type="button" onClick={() => setNewEntry({...newEntry, isReturn: !newEntry.isReturn})} className={`w-full px-2 py-4 rounded-2xl font-black text-[10px] uppercase border transition-all h-[56px] ${newEntry.isReturn ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-400 border-slate-200'}`}>
+                 {newEntry.isReturn ? 'Yes' : 'No'}
                </button>
             </div>
 
-            <button type="submit" disabled={isSaving || (newEntry.distanceMiles === 0 && !isCalculating)} className="h-[56px] bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50">
-               {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-plus-circle text-indigo-400"></i>}
-               Add to Ledger
+            <button type="submit" disabled={isSaving || (newEntry.distanceMiles === 0 && !isCalculating)} className="md:col-span-1.5 h-[56px] bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50">
+               {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : 'Add'}
             </button>
           </div>
         </form>
       </div>
 
-      {/* Summary Stats - Now After Form */}
       <div className="flex flex-col md:flex-row justify-end gap-4">
         <div className="bg-white border border-slate-200 p-6 rounded-[32px] shadow-sm flex items-center gap-8 w-full md:w-auto">
            <div className="text-center">
@@ -214,13 +206,13 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50/50 border-b border-slate-100">
               <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <th className="p-6">Date Protocol</th>
-                <th className="p-6">Description / Notes</th>
-                <th className="p-6">Route Vector</th>
-                <th className="p-6">Leg Type</th>
+                <th className="p-6">Date</th>
+                <th className="p-6">Description</th>
+                <th className="p-6">Route</th>
+                <th className="p-6">Leg</th>
                 <th className="p-6 text-right">Total mi</th>
                 <th className="p-6 text-right">Valuation</th>
-                <th className="p-6 text-center">Delete</th>
+                <th className="p-6 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
