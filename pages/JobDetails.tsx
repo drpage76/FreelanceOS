@@ -88,7 +88,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     
     let startDate = job.startDate;
     let endDate = job.endDate;
-    if (job.syncToCalendar && job.schedulingType === SchedulingType.SHIFT_BASED && shifts.length > 0) {
+    if (job.schedulingType === SchedulingType.SHIFT_BASED && shifts.length > 0) {
       const startDates = shifts.map(s => s.startDate).filter(Boolean).sort();
       const endDates = shifts.map(s => s.endDate).filter(Boolean).sort();
       if (startDates.length > 0) startDate = startDates[0]!;
@@ -338,7 +338,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 </div>
               </div>
               
-              {job.syncToCalendar && job.schedulingType === SchedulingType.SHIFT_BASED ? (
+              {job.schedulingType === SchedulingType.SHIFT_BASED ? (
                 <div className="space-y-4">
                   {shifts.map((s, idx) => (
                     <div key={s.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col md:flex-row gap-4 items-center">
@@ -349,14 +349,16 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                   ))}
                   <button onClick={() => setShifts([...shifts, { id: generateId(), jobId: job.id, title: 'New Session', startDate: job.startDate, endDate: job.startDate, startTime: '09:00', endTime: '17:30', isFullDay: true, tenant_id: job.tenant_id }])} className="w-full py-4 border-2 border-dashed border-indigo-100 rounded-3xl text-[10px] font-black text-indigo-400 uppercase">+ Add Session</button>
                 </div>
-              ) : job.syncToCalendar ? (
+              ) : (
                 <div className="grid grid-cols-2 gap-6">
                   <input type="date" value={job.startDate} onChange={e => setJob({...job, startDate: e.target.value})} className="w-full px-5 py-3.5 bg-white border rounded-2xl font-bold" />
                   <input type="date" value={job.endDate} onChange={e => setJob({...job, endDate: e.target.value})} className="w-full px-5 py-3.5 bg-white border rounded-2xl font-bold" />
                 </div>
-              ) : (
-                <div className="p-6 bg-rose-50 border border-rose-100 rounded-[32px] text-center">
-                  <p className="text-[10px] font-black text-rose-400 uppercase italic">Synchronization disabled for this project protocol.</p>
+              )}
+
+              {!job.syncToCalendar && (
+                <div className="mt-6 p-4 bg-rose-50/50 border border-rose-100 rounded-2xl text-center">
+                  <p className="text-[9px] font-black text-rose-400 uppercase italic">Calendar synchronization is currently disabled for this record.</p>
                 </div>
               )}
             </div>

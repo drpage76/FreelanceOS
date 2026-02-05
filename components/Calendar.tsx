@@ -34,6 +34,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
       const client = clients.find(c => c.id === job.clientId);
       const clientName = client?.name || 'Unknown';
       const locationLabel = job.location ? ` @ ${job.location}` : '';
+      const statusPrefix = `[${job.status.toUpperCase()}] #${job.id}`;
       
       if (job.schedulingType === SchedulingType.SHIFT_BASED) {
         if (job.shifts && job.shifts.length > 0) {
@@ -44,7 +45,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
             entries.push({
               id: shift.id,
               jobId: job.id,
-              title: `${clientName}: ${shift.title || 'Shift'}${locationLabel}`,
+              title: `${statusPrefix} | ${clientName}: ${shift.title || 'Shift'}${locationLabel}`,
               startDate: shift.startDate,
               endDate: shift.endDate || shift.startDate,
               type: 'shift',
@@ -60,7 +61,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
         entries.push({
           id: job.id,
           jobId: job.id,
-          title: `${clientName}: ${job.description}${locationLabel}`,
+          title: `${statusPrefix} | ${clientName}: ${job.description}${locationLabel}`,
           startDate: job.startDate,
           endDate: job.endDate || job.startDate,
           type: 'job',
@@ -70,8 +71,6 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     });
 
     (externalEvents || []).forEach(e => {
-      // De-duplication: If the external event is a sync of an internal job, skip it.
-      // Our sync adds "(Ref: ID)" to the title.
       const refMatch = e.title.match(/\(Ref: ([^)]+)\)/);
       if (refMatch && internalJobIds.has(refMatch[1])) {
         return; 
@@ -79,10 +78,17 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
 
       const sDate = e.startDate ? parseISO(e.startDate) : null;
       if (sDate && isValid(sDate)) {
-        // Google Calendar exclusive end dates often add +1 day for all-day events.
-        // If it's a multi-day event and from google, normalize the display if it looks like it's inclusive.
-        // We'll trust the provided end date but subtract 1 if it's strictly a 00:00:00 boundary from Google.
-        entries.push({ ...e, type: 'external' });
+        // Handle Google Calendar exclusive end dates for all-day events
+        let endDate = e.endDate;
+        if (e.source === 'google' && e.startDate !== e.endDate) {
+          const endISO = parseISO(e.endDate);
+          if (isValid(endISO)) {
+            // Subtract 1 day because Google all-day events have an exclusive end date
+            endDate = format(subDays(endISO, 1), 'yyyy-MM-dd');
+          }
+        }
+
+        entries.push({ ...e, endDate, type: 'external' });
       }
     });
 

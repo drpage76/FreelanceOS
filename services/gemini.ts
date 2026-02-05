@@ -18,10 +18,9 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
   if (!ai) return { miles: null, sources: [], error: "AI Key Missing" };
 
   const model = "gemini-2.5-flash"; 
-  const prompt = `Calculate the shortest driving distance in MILES between UK postcodes "${start}" and "${end}". 
-  Provide the distance as a plain number. 
-  Example: 15.4
-  If you must provide text, ensure the number is clearly visible.`;
+  const prompt = `Find the direct driving distance in MILES between UK postcodes "${start}" and "${end}". 
+  Response must contain the shortest distance as a numerical value only. 
+  If you include text, ensure the numerical miles are clear (e.g., "12.5 miles").`;
 
   try {
     const response = await ai.models.generateContent({
@@ -38,12 +37,11 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
     });
 
     const text = response.text?.trim() || "";
-    // More aggressive extraction: find any number followed by "miles", "mi", or just the number itself
-    // We look for the first occurrence of a number in the grounded response.
+    // Robust extraction: matches decimals or integers, even if surrounded by text.
     const match = text.match(/(\d+(\.\d+)?)/);
     const miles = match ? parseFloat(match[0]) : null;
 
-    console.debug("Grounding Protocol Response:", text, "Extracted:", miles);
+    console.debug("Grounding Engine Trace:", text, "Extracted:", miles);
 
     return {
       miles: (miles && !isNaN(miles)) ? miles : null,
