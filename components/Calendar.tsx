@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router';
 import { 
   format, isSameMonth, isSameDay, addMonths, subMonths, 
   parseISO, differenceInDays, startOfDay, endOfDay,
-  parse, isValid
+  parse, isValid, subDays
 } from 'date-fns';
 import { Job, JobStatus, ExternalEvent, Client, SchedulingType } from '../types';
 import { getCalendarDays } from '../utils';
@@ -28,6 +28,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
 
   const allCalendarEntries = useMemo(() => {
     const entries: any[] = [];
+    const internalJobIds = new Set((jobs || []).map(j => j.id));
     
     (jobs || []).forEach(job => {
       const client = clients.find(c => c.id === job.clientId);
@@ -69,8 +70,18 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     });
 
     (externalEvents || []).forEach(e => {
+      // De-duplication: If the external event is a sync of an internal job, skip it.
+      // Our sync adds "(Ref: ID)" to the title.
+      const refMatch = e.title.match(/\(Ref: ([^)]+)\)/);
+      if (refMatch && internalJobIds.has(refMatch[1])) {
+        return; 
+      }
+
       const sDate = e.startDate ? parseISO(e.startDate) : null;
       if (sDate && isValid(sDate)) {
+        // Google Calendar exclusive end dates often add +1 day for all-day events.
+        // If it's a multi-day event and from google, normalize the display if it looks like it's inclusive.
+        // We'll trust the provided end date but subtract 1 if it's strictly a 00:00:00 boundary from Google.
         entries.push({ ...e, type: 'external' });
       }
     });

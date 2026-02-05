@@ -124,24 +124,12 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
 
   return (
     <div className="space-y-6 px-4">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-black text-slate-900 leading-tight italic">Travel & Mileage</h2>
-          <p className="text-slate-500 font-bold uppercase text-[9px] tracking-widest italic">Google Maps Protocol Active</p>
-        </div>
-        <div className="bg-white border border-slate-200 p-6 rounded-[32px] shadow-sm flex items-center gap-8">
-           <div className="text-center">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fiscal Total</p>
-              <p className="text-2xl font-black text-slate-900">{totals.miles.toFixed(1)} <span className="text-[10px] text-slate-400">mi</span></p>
-           </div>
-           <div className="w-px h-10 bg-slate-100"></div>
-           <div className="text-center">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Reclaim Val</p>
-              <p className="text-2xl font-black text-indigo-600">{formatCurrency(totals.value, state.user)}</p>
-           </div>
-        </div>
+      <header>
+        <h2 className="text-3xl font-black text-slate-900 leading-tight italic">Travel & Mileage</h2>
+        <p className="text-slate-500 font-bold uppercase text-[9px] tracking-widest italic">Google Maps Protocol Active</p>
       </header>
 
+      {/* Entry Form - Now First */}
       <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden">
         <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -162,13 +150,13 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
               <div className={`relative px-5 py-4 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[56px] transition-all ${isCalculating ? 'border-indigo-400 animate-pulse' : 'border-indigo-100 text-indigo-700'}`}>
                 <input 
                   type="number" 
-                  step="0.1" 
-                  className="w-full bg-transparent outline-none font-black text-indigo-700 placeholder:text-indigo-200" 
+                  step="0.01" 
+                  className="w-full bg-transparent outline-none font-black text-indigo-700 placeholder:text-indigo-300" 
                   value={newEntry.distanceMiles || ''} 
-                  placeholder={isCalculating ? "LOOKING UP..." : "0.0"}
+                  placeholder={isCalculating ? "GEOLOCATING..." : "0.00"}
                   onChange={e => setNewEntry({...newEntry, distanceMiles: parseFloat(e.target.value) || 0})} 
                 />
-                <button type="button" onClick={handleCalculateMileage} className="text-[10px] text-indigo-400 hover:text-indigo-600 ml-2" title="Retry Map Calculation">
+                <button type="button" onClick={handleCalculateMileage} className="text-[10px] text-indigo-400 hover:text-indigo-600 ml-2" title="Manual Recalculate">
                   <i className="fa-solid fa-arrows-rotate"></i>
                 </button>
               </div>
@@ -198,12 +186,27 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                </button>
             </div>
 
-            <button type="submit" disabled={isSaving || newEntry.distanceMiles === 0 || isCalculating} className="h-[56px] bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50">
+            <button type="submit" disabled={isSaving || (newEntry.distanceMiles === 0 && !isCalculating)} className="h-[56px] bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50">
                {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-plus-circle text-indigo-400"></i>}
                Add to Ledger
             </button>
           </div>
         </form>
+      </div>
+
+      {/* Summary Stats - Now After Form */}
+      <div className="flex flex-col md:flex-row justify-end gap-4">
+        <div className="bg-white border border-slate-200 p-6 rounded-[32px] shadow-sm flex items-center gap-8 w-full md:w-auto">
+           <div className="text-center">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fiscal Total</p>
+              <p className="text-2xl font-black text-slate-900">{totals.miles.toFixed(1)} <span className="text-[10px] text-slate-400">mi</span></p>
+           </div>
+           <div className="w-px h-10 bg-slate-100"></div>
+           <div className="text-center">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Reclaim Val</p>
+              <p className="text-2xl font-black text-indigo-600">{formatCurrency(totals.value, state.user)}</p>
+           </div>
+        </div>
       </div>
 
       <div className="bg-white rounded-[40px] border border-slate-200 overflow-hidden shadow-sm">

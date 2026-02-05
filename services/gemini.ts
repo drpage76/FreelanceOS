@@ -18,9 +18,9 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
   if (!ai) return { miles: null, sources: [], error: "AI Key Missing" };
 
   const model = "gemini-2.5-flash"; 
-  const prompt = `Task: Use Google Maps tool to determine the driving distance in MILES between UK postcodes "${start}" and "${end}". 
-  CRITICAL: Your entire response must consist of exactly one decimal number representing the miles. Do NOT use markdown, do NOT include the word "miles", do NOT explain. 
-  Example Valid Response: 14.8`;
+  const prompt = `Use Google Maps to find the direct driving distance in MILES between UK postcodes "${start}" and "${end}". 
+  Return ONLY the numerical distance (e.g., 12.5). Do not include any text, units, or formatting. 
+  If you find multiple routes, provide the shortest driving distance.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -30,7 +30,7 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
         tools: [{ googleMaps: {} }],
         toolConfig: {
           retrievalConfig: {
-            latLng: { latitude: 51.5074, longitude: -0.1278 }
+            latLng: { latitude: 51.5074, longitude: -0.1278 } // UK Center bias
           }
         }
       },
@@ -40,6 +40,8 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
     // Robust parsing: extract the first sequence of digits/decimals
     const match = text.match(/[0-9.]+/);
     const miles = match ? parseFloat(match[0]) : null;
+
+    console.debug("AI Mileage Result:", text, miles);
 
     return {
       miles: (miles && !isNaN(miles)) ? miles : null,
