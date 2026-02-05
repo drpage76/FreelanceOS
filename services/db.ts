@@ -92,7 +92,6 @@ const toDb = (table: string, obj: any, tenantId: string) => {
   for (const key in obj) {
     if (key === '__isSeed' || key === 'tenant_id' || key === 'shifts') continue;
     if (key === 'rechargeAmount' || key === 'actualCost') continue;
-    if (key === 'syncToCalendar') continue;
 
     if (table === 'job_shifts') {
       const excludedShiftFields = ['endDate', 'isFullDay', 'startTime', 'endTime', 'is_full_day', 'start_time', 'end_time', 'end_date'];
@@ -230,8 +229,6 @@ export const DB = {
           if (filter) Object.entries(filter).forEach(([k, v]) => q = q.eq(FIELD_MAP[k] || k, v));
           const { data, error } = await q;
           
-          // CRITICAL FIX: If the cloud request succeeds, the response is the source of truth.
-          // Do not fall through to local data if we got an actual response (even an empty one).
           if (!error && data !== null) {
             return data
               .map(fromDb)

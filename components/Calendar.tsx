@@ -31,6 +31,10 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     const internalJobIds = new Set((jobs || []).map(j => j.id));
     
     (jobs || []).forEach(job => {
+      // Respect the syncToCalendar flag for internal display too? 
+      // User says "dont show job in calendar" refers to the calendar entry.
+      if (job.syncToCalendar === false) return;
+
       const client = clients.find(c => c.id === job.clientId);
       const clientName = client?.name || 'Unknown';
       const locationLabel = job.location ? ` @ ${job.location}` : '';
@@ -71,6 +75,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     });
 
     (externalEvents || []).forEach(e => {
+      // De-duplication: If title has a reference to an internal job, skip it to avoid doubles
       const refMatch = e.title.match(/\(Ref: ([^)]+)\)/);
       if (refMatch && internalJobIds.has(refMatch[1])) {
         return; 
@@ -78,16 +83,14 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
 
       const sDate = e.startDate ? parseISO(e.startDate) : null;
       if (sDate && isValid(sDate)) {
-        // Handle Google Calendar exclusive end dates for all-day events
         let endDate = e.endDate;
+        // Normalize Google all-day exclusive end dates
         if (e.source === 'google' && e.startDate !== e.endDate) {
           const endISO = parseISO(e.endDate);
           if (isValid(endISO)) {
-            // Subtract 1 day because Google all-day events have an exclusive end date
             endDate = format(subDays(endISO, 1), 'yyyy-MM-dd');
           }
         }
-
         entries.push({ ...e, endDate, type: 'external' });
       }
     });
@@ -95,9 +98,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     return entries.sort((a, b) => {
       const dateA = parseISO(a.startDate);
       const dateB = parseISO(b.startDate);
-      const timeA = isValid(dateA) ? dateA.getTime() : 0;
-      const timeB = isValid(dateB) ? dateB.getTime() : 0;
-      return timeA - timeB;
+      return (isValid(dateA) ? dateA.getTime() : 0) - (isValid(dateB) ? dateB.getTime() : 0);
     });
   }, [jobs, externalEvents, clients]);
 
@@ -105,9 +106,10 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     if (type === 'external') return color || '#6366f1';
     switch(status) {
       case JobStatus.CONFIRMED: return '#10b981';
+      case JobStatus.AWAITING_PAYMENT: return '#06b6d4';
+      case JobStatus.COMPLETED: return '#10b981';
       case JobStatus.PENCILLED: return '#f59e0b';
       case JobStatus.POTENTIAL: return '#fbbf24';
-      case JobStatus.COMPLETED: return '#0ea5e9';
       default: return '#94a3b8';
     }
   };
@@ -170,7 +172,6 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
             const eISO = parseISO(entry.endDate);
             const s = startOfDay(isValid(sISO) ? sISO : weekStart);
             const e = endOfDay(isValid(eISO) ? eISO : weekEnd);
-            
             const viewStart = Math.max(s.getTime(), weekStart.getTime());
             const viewEnd = Math.min(e.getTime(), weekEnd.getTime());
 
@@ -181,10 +182,8 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
                 const leeISO = parseISO(le.endDate);
                 const les = startOfDay(isValid(lesISO) ? lesISO : weekStart);
                 const lee = endOfDay(isValid(leeISO) ? leeISO : weekEnd);
-                
                 const leViewStart = Math.max(les.getTime(), weekStart.getTime());
                 const leViewEnd = Math.min(lee.getTime(), weekEnd.getTime());
-
                 return Math.max(viewStart, leViewStart) <= Math.min(viewEnd, leViewEnd);
               });
               if (!hasCollision) break;
@@ -226,7 +225,6 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
                       const eISO = parseISO(entry.endDate);
                       const s = startOfDay(isValid(sISO) ? sISO : day);
                       const end = endOfDay(isValid(eISO) ? eISO : day);
-                      
                       const offset = Math.max(0, differenceInDays(s, weekStart));
                       const eventEndInWeek = end > weekEnd ? weekEnd : end;
                       const eventStartInWeek = s < weekStart ? weekStart : s;
