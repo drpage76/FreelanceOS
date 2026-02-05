@@ -89,7 +89,6 @@ const toDb = (table: string, obj: any, tenantId: string) => {
   const newObj: any = {};
   if (table !== 'tenants') newObj['tenant_id'] = tenantId;
   
-  // We explicitly ONLY send fields that are mapped to ensure Supabase schema alignment
   for (const key in obj) {
     if (key === '__isSeed' || key === 'tenant_id' || key === 'shifts') continue;
     if (key === 'rechargeAmount' || key === 'actualCost') continue;

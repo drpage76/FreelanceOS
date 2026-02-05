@@ -19,7 +19,7 @@ import { DB, getSupabase } from './services/db';
 import { fetchGoogleEvents, syncJobToGoogle } from './services/googleCalendar';
 import { checkSubscriptionStatus } from './utils';
 
-// Standalone Layout component to prevent unmounting issues
+// STANDALONE component - MUST be outside App to maintain state across renders
 interface LayoutProps {
   children: React.ReactNode;
   isSyncing: boolean;
@@ -149,6 +149,11 @@ const App: React.FC = () => {
     initializationStarted.current = true;
 
     const init = async () => {
+      // Safety timeout to prevent infinite spinner
+      const timeout = setTimeout(() => {
+        if (isLoading) setIsLoading(false);
+      }, 5000);
+
       try {
         await DB.initializeSession();
         const user = await DB.getCurrentUser();
@@ -161,6 +166,8 @@ const App: React.FC = () => {
       } catch (e) {
         console.error("Initialization error:", e);
         setIsLoading(false);
+      } finally {
+        clearTimeout(timeout);
       }
     };
     init();
