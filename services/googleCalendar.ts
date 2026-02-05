@@ -27,7 +27,7 @@ export const fetchGoogleEvents = async (email: string, accessToken?: string): Pr
       endDate: format(parseISO(item.end?.dateTime || item.end?.date), 'yyyy-MM-dd'),
       source: 'google',
       link: item.htmlLink,
-      color: item.colorId ? '#6366f1' : '#6366f1' // Simplify color mapping for brevity
+      color: item.colorId ? '#6366f1' : '#6366f1'
     }));
   } catch { return []; }
 };
@@ -42,6 +42,7 @@ const deleteExistingEvents = async (jobId: string, accessToken: string) => {
     if (!search.ok) return;
     
     const data = await search.json();
+    // Aggressive matching for job ID in summary or description
     const matches = (data.items || []).filter((ev: any) => 
       ev.summary?.includes(jobId) || 
       ev.description?.includes(jobId)
@@ -61,10 +62,10 @@ const deleteExistingEvents = async (jobId: string, accessToken: string) => {
 export const syncJobToGoogle = async (job: Job, accessToken?: string, clientName?: string): Promise<boolean> => {
   if (!accessToken) return false;
   try {
-    // Always clean first to prevent duplicates or clean up if sync is disabled
+    // Always clean first to ensure no orphan events
     await deleteExistingEvents(job.id, accessToken);
     
-    // Respect the manual sync flag
+    // Stop if job is cancelled or sync is disabled
     if (job.status === JobStatus.CANCELLED || job.syncToCalendar === false) return true;
 
     const eventsToCreate = [];
@@ -73,18 +74,18 @@ export const syncJobToGoogle = async (job: Job, accessToken?: string, clientName
     if (job.schedulingType === SchedulingType.SHIFT_BASED && job.shifts && job.shifts.length > 0) {
       for (const shift of job.shifts) {
         const event: any = {
-          summary: `[${job.status.toUpperCase()}] ${clientName ? clientName + ': ' : ''}${shift.title} (Ref: ${job.id})`,
+          summary: `[${job.status.toUpperCase()}] ${clientName ? clientName + ': ' : ''}${shift.title || 'Shift'} (Ref: ${job.id})`,
           location: job.location,
-          description: `Ref: ${job.id}\nShift: ${shift.title}\nClient: ${clientName || 'Unknown'}`,
+          description: `Ref: ${job.id}\nShift: ${shift.title || 'Untitled'}\nClient: ${clientName || 'Unknown'}`,
           colorId
         };
 
         if (shift.isFullDay) {
           event.start = { date: shift.startDate };
-          event.end = { date: format(addDays(parseISO(shift.endDate), 1), 'yyyy-MM-dd') };
+          event.end = { date: format(addDays(parseISO(shift.endDate || shift.startDate), 1), 'yyyy-MM-dd') };
         } else {
-          event.start = { dateTime: `${shift.startDate}T${shift.startTime}:00Z` };
-          event.end = { dateTime: `${shift.endDate}T${shift.endTime}:00Z` };
+          event.start = { dateTime: `${shift.startDate}T${shift.startTime || '09:00'}:00Z` };
+          event.end = { dateTime: `${shift.endDate || shift.startDate}T${shift.endTime || '17:30'}:00Z` };
         }
         eventsToCreate.push(event);
       }
@@ -94,21 +95,25 @@ export const syncJobToGoogle = async (job: Job, accessToken?: string, clientName
         location: job.location,
         description: `Ref: ${job.id}\nClient: ${clientName || 'Unknown'}`,
         start: { date: job.startDate },
-        end: { date: format(addDays(parseISO(job.endDate), 1), 'yyyy-MM-dd') },
+        end: { date: format(addDays(parseISO(job.endDate || job.startDate), 1), 'yyyy-MM-dd') },
         colorId,
         transparency: job.status === JobStatus.CONFIRMED ? 'opaque' : 'transparent'
       });
     }
 
     for (const body of eventsToCreate) {
-      await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+      const resp = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
+      if (!resp.ok) console.error("Google Calendar Push Error:", await resp.json());
     }
     return true;
-  } catch { return false; }
+  } catch (err) { 
+    console.error("Google Sync Exception:", err);
+    return false; 
+  }
 };
 
 export const deleteJobFromGoogle = async (jobId: string, accessToken?: string): Promise<boolean> => {

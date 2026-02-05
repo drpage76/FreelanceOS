@@ -139,29 +139,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
   return (
     <div className="space-y-6 max-w-full overflow-x-hidden pb-20 px-1 md:px-4">
-      {/* Document Previews & Modals (Omitted for space, unchanged logic) */}
-      {showPreview && client && (
-        <div className="fixed inset-0 z-[300] flex flex-col bg-slate-900/95 backdrop-blur-xl p-4 md:p-8 overflow-y-auto">
-          {/* ... Modal content matches existing implementation ... */}
-          <div className="max-w-4xl mx-auto w-full flex justify-end mb-6">
-             <button onClick={() => setShowPreview(null)} className="w-10 h-10 bg-white/10 text-white rounded-xl flex items-center justify-center hover:bg-white/20"><i className="fa-solid fa-xmark"></i></button>
-          </div>
-          <div className="max-w-4xl mx-auto w-full bg-white p-8 md:p-16 rounded-[40px] shadow-2xl overflow-x-auto">
-            <div ref={docRef} className="w-[700px] mx-auto text-slate-900 bg-white p-4">
-               {/* Document Template Implementation */}
-               <div className="flex justify-between mb-12">
-                  <div>
-                    {currentUser?.logoUrl ? <img src={currentUser.logoUrl} className="h-20 mb-4 object-contain" /> : <div className="text-2xl font-black mb-4">FreelanceOS</div>}
-                    <h2 className="text-4xl font-black uppercase">{showPreview === 'invoice' ? 'Invoice' : 'Quotation'}</h2>
-                    <p className="text-[10px] font-bold text-slate-400 mt-1">Reference: {showPreview === 'invoice' ? invoice?.id : 'QT-'+job.id}</p>
-                  </div>
-               </div>
-               {/* ... Other Template details ... */}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -217,9 +194,27 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                 <h4 className="text-xs font-black uppercase tracking-widest italic">Production Schedule & Sync</h4>
                 <div className="flex bg-slate-100 p-1 rounded-xl">
-                  <button onClick={() => setJob(prev => prev ? ({...prev, schedulingType: SchedulingType.CONTINUOUS, syncToCalendar: true}) : null)} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${job.syncToCalendar && job.schedulingType === SchedulingType.CONTINUOUS ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Continuous</button>
-                  <button onClick={() => setJob(prev => prev ? ({...prev, schedulingType: SchedulingType.SHIFT_BASED, syncToCalendar: true}) : null)} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${job.syncToCalendar && job.schedulingType === SchedulingType.SHIFT_BASED ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>Shift-based</button>
-                  <button onClick={() => setJob(prev => prev ? ({...prev, syncToCalendar: false}) : null)} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${!job.syncToCalendar ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400'}`}>None</button>
+                  <button 
+                    type="button"
+                    onClick={() => setJob(prev => prev ? ({...prev, schedulingType: SchedulingType.CONTINUOUS, syncToCalendar: true}) : null)} 
+                    className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${job.syncToCalendar && job.schedulingType === SchedulingType.CONTINUOUS ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}
+                  >
+                    Continuous
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setJob(prev => prev ? ({...prev, schedulingType: SchedulingType.SHIFT_BASED, syncToCalendar: true}) : null)} 
+                    className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${job.syncToCalendar && job.schedulingType === SchedulingType.SHIFT_BASED ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}
+                  >
+                    Shift-based
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setJob(prev => prev ? ({...prev, syncToCalendar: false}) : null)} 
+                    className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${job.syncToCalendar === false ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400'}`}
+                  >
+                    None
+                  </button>
                 </div>
               </div>
               
@@ -227,7 +222,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 <div className="space-y-4">
                   {shifts.map((s, idx) => (
                     <div key={s.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col md:flex-row gap-4 items-center">
-                      <input className="bg-white px-4 py-2 rounded-xl text-xs font-black w-full md:flex-1" value={s.title} onChange={e => { const n = [...shifts]; n[idx].title = e.target.value; setShifts(n); }} />
+                      <input className="bg-white px-4 py-2 rounded-xl text-xs font-black w-full md:flex-1" placeholder="Shift Title" value={s.title} onChange={e => { const n = [...shifts]; n[idx].title = e.target.value; setShifts(n); }} />
                       <input type="date" value={s.startDate} className="bg-white px-4 py-2 rounded-xl text-xs font-bold" onChange={e => { const n = [...shifts]; n[idx].startDate = e.target.value; setShifts(n); }} />
                       <button onClick={() => setShifts(prev => prev.filter((_, i) => i !== idx))} className="text-slate-300 hover:text-rose-500"><i className="fa-solid fa-trash-can text-xs"></i></button>
                     </div>
@@ -247,9 +242,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 </div>
               )}
 
-              {!job.syncToCalendar && (
+              {job.syncToCalendar === false && (
                 <div className="mt-6 p-4 bg-rose-50/50 border border-rose-100 rounded-2xl text-center">
-                  <p className="text-[9px] font-black text-rose-400 uppercase italic">Synchronization disabled. Job details persist in database only.</p>
+                  <p className="text-[9px] font-black text-rose-400 uppercase italic">Synchronization disabled. Job will be removed from all external and internal calendars on save.</p>
                 </div>
               )}
             </div>

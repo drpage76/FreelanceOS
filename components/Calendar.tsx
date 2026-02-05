@@ -31,8 +31,8 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     const internalJobIds = new Set((jobs || []).map(j => j.id));
     
     (jobs || []).forEach(job => {
-      // Respect the syncToCalendar flag for internal display too? 
-      // User says "dont show job in calendar" refers to the calendar entry.
+      // Respect the syncToCalendar flag for internal display too
+      // If syncToCalendar is strictly false, do not show in internal calendar
       if (job.syncToCalendar === false) return;
 
       const client = clients.find(c => c.id === job.clientId);
@@ -75,7 +75,8 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     });
 
     (externalEvents || []).forEach(e => {
-      // De-duplication: If title has a reference to an internal job, skip it to avoid doubles
+      // De-duplication: If title or description has a reference to an internal job, skip it to avoid doubles
+      // We check for (Ref: ID) pattern
       const refMatch = e.title.match(/\(Ref: ([^)]+)\)/);
       if (refMatch && internalJobIds.has(refMatch[1])) {
         return; 

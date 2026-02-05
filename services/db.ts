@@ -82,7 +82,11 @@ const FIELD_MAP: Record<string, string> = {
   isFullDay: 'is_full_day',
   expiryDate: 'expiry_date',
   totalAmount: 'total_amount',
-  syncToCalendar: 'sync_to_calendar'
+  syncToCalendar: 'sync_to_calendar',
+  title: 'title',
+  description: 'description',
+  location: 'location',
+  status: 'status'
 };
 
 const toDb = (table: string, obj: any, tenantId: string) => {
@@ -93,12 +97,8 @@ const toDb = (table: string, obj: any, tenantId: string) => {
     if (key === '__isSeed' || key === 'tenant_id' || key === 'shifts') continue;
     if (key === 'rechargeAmount' || key === 'actualCost') continue;
 
-    const dbKey = FIELD_MAP[key];
-    if (dbKey) {
-      newObj[dbKey] = obj[key];
-    } else if (key === 'id') {
-      newObj['id'] = obj['id'];
-    }
+    const dbKey = FIELD_MAP[key] || key;
+    newObj[dbKey] = obj[key];
   }
   return newObj;
 };
