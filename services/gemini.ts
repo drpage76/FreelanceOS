@@ -18,10 +18,9 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
   if (!ai) return { miles: null, sources: [], error: "AI Key Missing" };
 
   const model = "gemini-2.5-flash"; 
-  const prompt = `Use Google Maps to provide the shortest driving distance in MILES between UK postcodes "${start}" and "${end}". 
-  Your output must contain the distance as a plain decimal number. 
-  Example: 14.2
-  If you include context, ensure the number is clearly identifiable.`;
+  const prompt = `Calculate the direct shortest driving distance in MILES between UK postcodes "${start}" and "${end}". 
+  Your response MUST contain the numeric distance (e.g. 15.5). 
+  Only provide the number. Do not say "The distance is...".`;
 
   try {
     const response = await ai.models.generateContent({
@@ -31,21 +30,21 @@ export const calculateDrivingDistance = async (start: string, end: string) => {
         tools: [{ googleMaps: {} }],
         toolConfig: {
           retrievalConfig: {
-            latLng: { latitude: 51.5074, longitude: -0.1278 } // Center bias for UK
+            latLng: { latitude: 51.5074, longitude: -0.1278 } // Center for UK
           }
         }
       },
     });
 
     const text = response.text?.trim() || "";
-    // Improved regex to find numbers that look like mileage (allowing decimals)
+    // Robust extraction: matches the first occurrence of a digit-based number
     const match = text.match(/(\d+(\.\d+)?)/);
     const miles = match ? parseFloat(match[0]) : null;
 
-    console.debug("Distance Logic Trace:", { raw: text, parsed: miles });
+    console.debug("Grounding Protocol Result:", text, "Extracted Miles:", miles);
 
     return {
-      miles: (miles && !isNaN(miles)) ? miles : null,
+      miles: (miles !== null && !isNaN(miles) && miles > 0) ? miles : null,
       sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
     };
   } catch (error) {

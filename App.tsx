@@ -14,10 +14,50 @@ import { Landing } from './pages/Landing';
 import { Privacy } from './pages/Privacy';
 import { Terms } from './pages/Terms';
 import { CreateJobModal } from './components/CreateJobModal';
-import { AppState, Tenant, JobStatus, InvoiceStatus, UserPlan } from './types';
+import { AppState, Tenant, JobStatus, InvoiceStatus, UserPlan, Job, JobItem } from './types';
 import { DB, getSupabase } from './services/db';
 import { fetchGoogleEvents, syncJobToGoogle } from './services/googleCalendar';
 import { checkSubscriptionStatus } from './utils';
+
+// Standalone Layout component to prevent unmounting issues
+interface LayoutProps {
+  children: React.ReactNode;
+  isSyncing: boolean;
+  currentUser: Tenant | null;
+  isReadOnly: boolean;
+  isNewJobModalOpen: boolean;
+  setIsNewJobModalOpen: (open: boolean) => void;
+  clients: any[];
+  onSaveJob: (job: Job, items: JobItem[], clientName: string) => Promise<void>;
+}
+
+const Layout: React.FC<LayoutProps> = ({ 
+  children, isSyncing, currentUser, isReadOnly, 
+  isNewJobModalOpen, setIsNewJobModalOpen, clients, onSaveJob 
+}) => {
+  return (
+    <div className="flex flex-col md:flex-row h-screen w-full bg-slate-50 overflow-hidden relative">
+      <Navigation isSyncing={isSyncing} user={currentUser} />
+      {isReadOnly && (
+        <div className="fixed top-0 left-0 right-0 bg-rose-600 text-white py-2 text-center z-[200] text-[10px] font-black uppercase tracking-[0.2em] shadow-lg animate-in slide-in-from-top duration-500">
+           Trial Period Expired. Access is currently Read-Only. <Link to="/settings" className="underline ml-2 hover:text-rose-100 transition-colors">Reactivate Elite Plan</Link>
+        </div>
+      )}
+      <main className={`flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar ${isReadOnly ? 'pt-12' : ''}`}>
+        <div className="max-w-7xl mx-auto w-full">
+          {children}
+        </div>
+      </main>
+      <CreateJobModal 
+        isOpen={isNewJobModalOpen} 
+        onClose={() => setIsNewJobModalOpen(false)} 
+        clients={clients} 
+        tenant_id={currentUser?.email || ''}
+        onSave={onSaveJob}
+      />
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<Tenant | null>(null);
@@ -108,14 +148,6 @@ const App: React.FC = () => {
     if (initializationStarted.current) return;
     initializationStarted.current = true;
 
-    // Failsafe timer to prevent stuck loading screen
-    const failsafe = setTimeout(() => {
-      if (isLoading) {
-        console.warn("Failsafe triggered: Initialization timeout. Starting app.");
-        setIsLoading(false);
-      }
-    }, 5000);
-
     const init = async () => {
       try {
         await DB.initializeSession();
@@ -129,8 +161,6 @@ const App: React.FC = () => {
       } catch (e) {
         console.error("Initialization error:", e);
         setIsLoading(false);
-      } finally {
-        clearTimeout(failsafe);
       }
     };
     init();
@@ -152,59 +182,28 @@ const App: React.FC = () => {
           setIsLoading(false);
         }
       });
-      return () => {
-        subscription.unsubscribe();
-        clearTimeout(failsafe);
-      };
+      return () => subscription.unsubscribe();
     }
-  }, [loadData, isLoading]);
+  }, [loadData]);
+
+  const handleSaveNewJob = async (job: Job, items: JobItem[], clientName: string) => {
+    if (isReadOnly) {
+      alert("Workspace is currently read-only. Please reactivate your subscription.");
+      return;
+    }
+    await DB.saveJob(job);
+    await DB.saveJobItems(job.id, items);
+    const token = await getLatestToken();
+    if (token) await syncJobToGoogle(job, token, clientName);
+    await loadData();
+  };
 
   if (isLoading) return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-6 p-4">
       <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
       <div className="text-center">
         <p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Establishing Secure Workspace</p>
-        <button 
-          onClick={() => setIsLoading(false)} 
-          className="mt-8 text-slate-500 text-[9px] font-black uppercase tracking-widest hover:text-white transition-colors"
-        >
-          Skip Synchronization
-        </button>
       </div>
-    </div>
-  );
-
-  const AppLayout = ({ children }: { children: React.ReactNode }) => (
-    <div className="flex flex-col md:flex-row h-screen w-full bg-slate-50 overflow-hidden relative">
-      <Navigation isSyncing={isSyncing} user={currentUser} />
-      {/* Fix: Added Link to the imports from react-router to enable navigation from the read-only banner */}
-      {isReadOnly && (
-        <div className="fixed top-0 left-0 right-0 bg-rose-600 text-white py-2 text-center z-[200] text-[10px] font-black uppercase tracking-[0.2em] shadow-lg animate-in slide-in-from-top duration-500">
-           Trial Period Expired. Access is currently Read-Only. <Link to="/settings" className="underline ml-2 hover:text-rose-100 transition-colors">Reactivate Elite Plan</Link>
-        </div>
-      )}
-      <main className={`flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar ${isReadOnly ? 'pt-12' : ''}`}>
-        <div className="max-w-7xl mx-auto w-full">
-          {children}
-        </div>
-      </main>
-      <CreateJobModal 
-        isOpen={isNewJobModalOpen} 
-        onClose={() => setIsNewJobModalOpen(false)} 
-        clients={appState.clients} 
-        tenant_id={currentUser?.email || ''}
-        onSave={async (job, items, clientName) => {
-          if (isReadOnly) {
-            alert("Workspace is currently read-only. Please reactivate your subscription.");
-            return;
-          }
-          await DB.saveJob(job);
-          await DB.saveJobItems(job.id, items);
-          const token = await getLatestToken();
-          if (token) await syncJobToGoogle(job, token, clientName);
-          await loadData();
-        }} 
-      />
     </div>
   );
 
@@ -219,16 +218,28 @@ const App: React.FC = () => {
             <Route path="*" element={<Navigate to="/" />} />
           </>
         ) : (
-          <>
-            <Route path="/" element={<AppLayout><Dashboard state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onSyncCalendar={() => loadData(currentUser)} isSyncing={isSyncing} /></AppLayout>} />
-            <Route path="/jobs" element={<AppLayout><Jobs state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onRefresh={loadData} /></AppLayout>} />
-            <Route path="/jobs/:id" element={<AppLayout><JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} /></AppLayout>} />
-            <Route path="/clients" element={<AppLayout><Clients state={appState} onRefresh={loadData} /></AppLayout>} />
-            <Route path="/invoices" element={<AppLayout><Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} /></AppLayout>} />
-            <Route path="/mileage" element={<AppLayout><Mileage state={appState} onRefresh={loadData} /></AppLayout>} />
-            <Route path="/settings" element={<AppLayout><Settings user={currentUser} onLogout={() => DB.signOut().then(() => window.location.reload())} onRefresh={loadData} /></AppLayout>} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </>
+          <Route element={
+            <Layout 
+              isSyncing={isSyncing} 
+              currentUser={currentUser} 
+              isReadOnly={isReadOnly} 
+              isNewJobModalOpen={isNewJobModalOpen}
+              setIsNewJobModalOpen={setIsNewJobModalOpen}
+              clients={appState.clients}
+              onSaveJob={handleSaveNewJob}
+            >
+              <Routes>
+                <Route path="/" element={<Dashboard state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onSyncCalendar={() => loadData(currentUser)} isSyncing={isSyncing} />} />
+                <Route path="/jobs" element={<Jobs state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onRefresh={loadData} />} />
+                <Route path="/jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
+                <Route path="/clients" element={<Clients state={appState} onRefresh={loadData} />} />
+                <Route path="/invoices" element={<Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
+                <Route path="/mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
+                <Route path="/settings" element={<Settings user={currentUser} onLogout={() => DB.signOut().then(() => window.location.reload())} onRefresh={loadData} />} />
+                <Route path="*" element={<Navigate to="/" />} />
+              </Routes>
+            </Layout>
+          } path="*" />
         )}
       </Routes>
     </HashRouter>

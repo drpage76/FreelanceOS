@@ -89,17 +89,17 @@ const toDb = (table: string, obj: any, tenantId: string) => {
   const newObj: any = {};
   if (table !== 'tenants') newObj['tenant_id'] = tenantId;
   
+  // We explicitly ONLY send fields that are mapped to ensure Supabase schema alignment
   for (const key in obj) {
     if (key === '__isSeed' || key === 'tenant_id' || key === 'shifts') continue;
     if (key === 'rechargeAmount' || key === 'actualCost') continue;
 
-    if (table === 'job_shifts') {
-      const excludedShiftFields = ['endDate', 'isFullDay', 'startTime', 'endTime', 'is_full_day', 'start_time', 'end_time', 'end_date'];
-      if (excludedShiftFields.includes(key) || excludedShiftFields.includes(FIELD_MAP[key])) continue;
+    const dbKey = FIELD_MAP[key];
+    if (dbKey) {
+      newObj[dbKey] = obj[key];
+    } else if (key === 'id') {
+      newObj['id'] = obj['id'];
     }
-
-    const dbKey = FIELD_MAP[key] || key;
-    newObj[dbKey] = obj[key];
   }
   return newObj;
 };
@@ -217,7 +217,8 @@ export const DB = {
         if (method === 'upsert' && payload) {
           const raw = Array.isArray(payload) ? payload : [payload];
           const mapped = raw.map(p => toDb(table, p, effectiveId));
-          await query.upsert(mapped);
+          const { error } = await query.upsert(mapped);
+          if (error) console.error(`Supabase Upsert Error (${table}):`, error);
         }
         if (method === 'delete') {
           const pk = table === 'tenants' ? 'email' : 'id';
