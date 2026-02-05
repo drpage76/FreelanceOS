@@ -100,6 +100,10 @@ const toDb = (table: string, obj: any, tenantId: string) => {
     const dbKey = FIELD_MAP[key] || key;
     newObj[dbKey] = obj[key];
   }
+  // Ensure ID is always preserved for upsert primary key matching
+  if (obj.id && !newObj.id) {
+    newObj.id = obj.id;
+  }
   return newObj;
 };
 

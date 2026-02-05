@@ -98,23 +98,24 @@ const App: React.FC = () => {
       if (!user) {
         setAppState(prev => ({ ...prev, user: null, jobs: [] }));
         setCurrentUser(null);
-        setIsLoading(false);
         return;
       }
 
       const token = await getLatestToken();
       if (token) setGoogleAccessToken(token);
 
-      const [clients, jobs, invoices, mileage, quotes] = await Promise.all([
-        DB.getClients().catch(() => []),
-        DB.getJobs().catch(() => []),
-        DB.getInvoices().catch(() => []),
-        DB.getMileage().catch(() => []),
-        DB.getQuotes().catch(() => [])
+      const [clients, jobs, invoices, mileage, quotes] = await Promise.allSettled([
+        DB.getClients(),
+        DB.getJobs(),
+        DB.getInvoices(),
+        DB.getMileage(),
+        DB.getQuotes()
       ]);
 
-      const reconciledJobs = (jobs || []).map(job => {
-        const inv = (invoices || []).find(i => i.jobId === job.id);
+      const getVal = (res: any) => res.status === 'fulfilled' ? res.value : [];
+      
+      const reconciledJobs = (getVal(jobs) || []).map((job: Job) => {
+        const inv = (getVal(invoices) || []).find((i: any) => i.jobId === job.id);
         if (inv?.status === InvoiceStatus.PAID && job.status !== JobStatus.COMPLETED) {
           return { ...job, status: JobStatus.COMPLETED };
         }
@@ -126,11 +127,11 @@ const App: React.FC = () => {
       setCurrentUser(user);
       setAppState({
         user,
-        clients: clients || [],
+        clients: getVal(clients) || [],
         jobs: reconciledJobs,
-        quotes: quotes || [],
-        invoices: invoices || [],
-        mileage: mileage || [],
+        quotes: getVal(quotes) || [],
+        invoices: getVal(invoices) || [],
+        mileage: getVal(mileage) || [],
         externalEvents: googleEvents || [],
         jobItems: []
       });
@@ -149,11 +150,6 @@ const App: React.FC = () => {
     initializationStarted.current = true;
 
     const init = async () => {
-      // Safety timeout to prevent infinite spinner
-      const timeout = setTimeout(() => {
-        if (isLoading) setIsLoading(false);
-      }, 5000);
-
       try {
         await DB.initializeSession();
         const user = await DB.getCurrentUser();
@@ -166,8 +162,6 @@ const App: React.FC = () => {
       } catch (e) {
         console.error("Initialization error:", e);
         setIsLoading(false);
-      } finally {
-        clearTimeout(timeout);
       }
     };
     init();

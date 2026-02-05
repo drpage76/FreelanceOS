@@ -32,7 +32,6 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     
     (jobs || []).forEach(job => {
       // Respect the syncToCalendar flag for internal display too
-      // If syncToCalendar is strictly false, do not show in internal calendar
       if (job.syncToCalendar === false) return;
 
       const client = clients.find(c => c.id === job.clientId);
@@ -75,17 +74,15 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     });
 
     (externalEvents || []).forEach(e => {
-      // De-duplication: If title or description has a reference to an internal job, skip it to avoid doubles
-      // We check for (Ref: ID) pattern
-      const refMatch = e.title.match(/\(Ref: ([^)]+)\)/);
-      if (refMatch && internalJobIds.has(refMatch[1])) {
+      // Improved De-duplication: Check for ID starting with # in title
+      const idInTitleMatch = e.title.match(/#(\d+)/);
+      if (idInTitleMatch && internalJobIds.has(idInTitleMatch[1])) {
         return; 
       }
 
       const sDate = e.startDate ? parseISO(e.startDate) : null;
       if (sDate && isValid(sDate)) {
         let endDate = e.endDate;
-        // Normalize Google all-day exclusive end dates
         if (e.source === 'google' && e.startDate !== e.endDate) {
           const endISO = parseISO(e.endDate);
           if (isValid(endISO)) {
