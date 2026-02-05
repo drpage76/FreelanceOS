@@ -1,8 +1,8 @@
+
 import React, { useState, useMemo } from 'react';
-// Use direct named imports from react-router to resolve missing export errors in unified environments
 import { Link, useNavigate } from 'react-router';
 import { AppState, JobStatus, InvoiceStatus, Invoice, Job, Client } from '../types';
-import { formatCurrency, formatDate, calculateDueDate, generateInvoiceId } from '../utils';
+import { formatCurrency, formatDate, calculateDueDate } from '../utils';
 import { STATUS_COLORS } from '../constants';
 import { DB } from '../services/db';
 
@@ -76,7 +76,7 @@ export const Jobs: React.FC<JobsProps> = ({ state, onRefresh, onNewJobClick }) =
     try {
       const terms = parseInt(invoicePrompt.client.paymentTermsDays as any) || 30;
       const newInvoice: Invoice = {
-        id: generateInvoiceId(state.user),
+        id: invoicePrompt.job.id, // Unified ID protocol
         jobId: invoicePrompt.job.id,
         date: promptDate,
         dueDate: calculateDueDate(promptDate, terms),

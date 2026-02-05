@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useMemo } from 'react';
 import { Link } from 'react-router';
 import { jsPDF } from 'jspdf';
@@ -111,10 +112,10 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh, googleAcce
       
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       
+      // Filename format: Invoice [ID] [Client Name].pdf
       const finalFileName = `Invoice ${previewData.inv.id} ${previewData.client.name}.pdf`;
       pdf.save(finalFileName);
 
-      // Cloud Sync to Google Drive
       if (googleAccessToken && state.user?.businessName) {
         const pdfBlob = pdf.output('blob');
         const folderName = `${state.user.businessName} Invoices`;

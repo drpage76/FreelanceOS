@@ -5,7 +5,7 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Job, JobItem, JobStatus, Client, Invoice, InvoiceStatus, JobShift, Tenant, SchedulingType } from '../types';
 import { DB, generateId } from '../services/db';
-import { formatCurrency, formatDate, calculateDueDate, generateInvoiceId } from '../utils';
+import { formatCurrency, formatDate, calculateDueDate } from '../utils';
 import { STATUS_COLORS } from '../constants';
 import { syncJobToGoogle, deleteJobFromGoogle } from '../services/googleCalendar';
 
@@ -99,7 +99,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       ...job,
       startDate,
       endDate,
-      totalRecharge, // Ensure the job object has the current total for dashboard stats
+      totalRecharge,
       shifts: shifts
     };
 
@@ -121,15 +121,8 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     
     setIsDeleting(true);
     try {
-      // 1. Clear Google Calendar first
-      if (googleAccessToken) {
-        await deleteJobFromGoogle(job.id, googleAccessToken);
-      }
-      
-      // 2. Delete from DB
+      if (googleAccessToken) await deleteJobFromGoogle(job.id, googleAccessToken);
       await DB.deleteJob(job.id);
-      
-      // 3. Refresh and Exit
       await onRefresh();
       navigate('/jobs');
     } catch (err) {
@@ -148,7 +141,10 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'PNG', 0, 0, 210, (canvas.height * 210) / canvas.width);
-      pdf.save(`${showPreview === 'invoice' ? 'Invoice' : 'Quotation'}_${id}.pdf`);
+      
+      const isInvoice = showPreview === 'invoice';
+      const fileName = `${isInvoice ? 'Invoice' : 'Quotation'} ${isInvoice ? (invoice?.id || job.id) : job.id} ${client.name}.pdf`;
+      pdf.save(fileName);
     } catch (err) { alert("Export failed."); } finally { setIsSaving(false); }
   };
 
@@ -158,7 +154,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     try {
       const terms = parseInt(client.paymentTermsDays as any) || 30;
       const newInvoice: Invoice = {
-        id: generateInvoiceId(currentUser),
+        id: job.id, // Job ID is used as the Invoice Number
         jobId: job.id,
         date: selectedInvoiceDate,
         dueDate: calculateDueDate(selectedInvoiceDate, terms),
@@ -347,7 +343,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                     <div key={s.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col md:flex-row gap-4 items-center">
                       <input className="bg-white px-4 py-2 rounded-xl text-xs font-black w-full md:flex-1" value={s.title} onChange={e => { const n = [...shifts]; n[idx].title = e.target.value; setShifts(n); }} />
                       <input type="date" value={s.startDate} className="bg-white px-4 py-2 rounded-xl text-xs font-bold" onChange={e => { const n = [...shifts]; n[idx].startDate = e.target.value; setShifts(n); }} />
-                      <button onClick={() => setShifts(shifts.filter((_, i) => i !== idx))} className="text-slate-300 hover:text-rose-500"><i className="fa-solid fa-trash-can"></i></button>
+                      <button onClick={() => setShifts(shifts.filter((_, i) => i !== idx))} className="text-slate-300 hover:text-rose-500"><i className="fa-solid fa-trash-can text-xs"></i></button>
                     </div>
                   ))}
                   <button onClick={() => setShifts([...shifts, { id: generateId(), jobId: job.id, title: 'New Session', startDate: job.startDate, endDate: job.startDate, startTime: '09:00', endTime: '17:30', isFullDay: true, tenant_id: job.tenant_id }])} className="w-full py-4 border-2 border-dashed border-indigo-100 rounded-3xl text-[10px] font-black text-indigo-400 uppercase">+ Add Session</button>
@@ -369,17 +365,22 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
             </div>
             <div className="space-y-3">
               {items.map((item, idx) => (
-                <div key={item.id} className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-3 rounded-2xl border border-slate-100 group">
-                   <input className="col-span-7 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none" placeholder="Service description..." value={item.description} onChange={e => handleUpdateItem(idx, 'description', e.target.value)} />
+                <div key={item.id} className="grid grid-cols-12 gap-3 items-end bg-slate-50 p-4 rounded-2xl border border-slate-100 group">
+                   <div className="col-span-6 space-y-1">
+                     <span className="text-[7px] font-black text-slate-400 uppercase px-1">Description</span>
+                     <input className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none" placeholder="Service description..." value={item.description} onChange={e => handleUpdateItem(idx, 'description', e.target.value)} />
+                   </div>
                    <div className="col-span-2 space-y-1">
                      <span className="text-[7px] font-black text-slate-400 uppercase px-1">Qty</span>
                      <input type="number" step="any" className="w-full px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-center outline-none" value={item.qty} onChange={e => handleUpdateItem(idx, 'qty', parseFloat(e.target.value) || 0)} />
                    </div>
-                   <div className="col-span-2 space-y-1">
+                   <div className="col-span-3 space-y-1">
                      <span className="text-[7px] font-black text-slate-400 uppercase px-1">Rate</span>
                      <input type="number" step="any" className="w-full px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-right outline-none" value={item.unitPrice} onChange={e => handleUpdateItem(idx, 'unitPrice', parseFloat(e.target.value) || 0)} />
                    </div>
-                   <button type="button" onClick={() => handleRemoveItem(idx)} className="col-span-1 text-slate-300 hover:text-rose-500 flex justify-center mt-3"><i className="fa-solid fa-trash-can text-[10px]"></i></button>
+                   <div className="col-span-1 flex justify-center pb-2">
+                     <button type="button" onClick={() => handleRemoveItem(idx)} className="text-slate-300 hover:text-rose-500 transition-colors"><i className="fa-solid fa-trash-can text-[10px]"></i></button>
+                   </div>
                 </div>
               ))}
             </div>

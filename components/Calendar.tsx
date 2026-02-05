@@ -1,8 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-// Use direct named imports from react-router to resolve missing useNavigate export in unified environments
 import { useNavigate } from 'react-router';
-
 import { 
   format, isSameMonth, isSameDay, addMonths, subMonths, 
   parseISO, differenceInDays, startOfDay, endOfDay,
@@ -109,13 +107,13 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
 
   return (
     <div className="bg-white rounded-[40px] overflow-hidden flex flex-col h-auto">
-      <div className="px-8 py-6 flex items-center justify-between bg-white border-b border-slate-100">
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-4">
-             <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+      <div className="px-4 sm:px-8 py-6 flex flex-wrap items-center justify-between bg-white border-b border-slate-100 gap-4">
+        <div className="flex flex-wrap items-center gap-4 sm:gap-8">
+          <div className="flex items-center gap-3">
+             <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight whitespace-nowrap">
                {format(currentDate, 'MMMM yyyy')}
              </h3>
-             <div className="relative overflow-hidden w-10 h-10 flex items-center justify-center bg-slate-50 rounded-xl border border-slate-200 group cursor-pointer transition-all hover:border-indigo-400">
+             <div className="relative overflow-hidden w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-slate-50 rounded-xl border border-slate-200 group cursor-pointer transition-all hover:border-indigo-400">
                 <i className="fa-solid fa-calendar-day text-[14px] text-slate-400 group-hover:text-indigo-600"></i>
                 <input 
                   type="month" 
@@ -125,10 +123,10 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
                 />
              </div>
           </div>
-          <div className="flex bg-slate-100 p-1 rounded-[16px] border border-slate-200">
-            <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="w-9 h-9 flex items-center justify-center hover:bg-white rounded-lg text-slate-400 transition-all"><i className="fa-solid fa-chevron-left text-xs"></i></button>
-            <button onClick={() => setCurrentDate(new Date())} className="px-6 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest mx-2 shadow-sm">Today</button>
-            <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="w-9 h-9 flex items-center justify-center hover:bg-white rounded-lg text-slate-400 transition-all"><i className="fa-solid fa-chevron-right text-xs"></i></button>
+          <div className="flex bg-slate-100 p-1 rounded-[16px] border border-slate-200 shadow-inner">
+            <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:bg-white rounded-lg text-slate-400 transition-all"><i className="fa-solid fa-chevron-left text-xs"></i></button>
+            <button onClick={() => setCurrentDate(new Date())} className="px-4 sm:px-6 py-1 bg-indigo-600 text-white rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-widest mx-1 sm:mx-2 shadow-sm">Today</button>
+            <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:bg-white rounded-lg text-slate-400 transition-all"><i className="fa-solid fa-chevron-right text-xs"></i></button>
           </div>
         </div>
       </div>
