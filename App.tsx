@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { HashRouter, Routes, Route, Navigate, Link, Outlet } from 'react-router';
+import { HashRouter, Routes, Route, Navigate, Link, Outlet, useLocation } from 'react-router-dom';
 
 import { Navigation } from './components/Navigation';
 import { Dashboard } from './pages/Dashboard';
@@ -20,7 +20,46 @@ import { DB, getSupabase } from './services/db';
 import { fetchGoogleEvents, syncJobToGoogle } from './services/googleCalendar';
 import { checkSubscriptionStatus } from './utils';
 
-// Shared Layout component using Outlet for nested routes
+/**
+ * Error Boundary Component to prevent Blank Screens
+ */
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: any}> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("FreelanceOS Error Boundary caught crash:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-8 text-center">
+          <div className="w-20 h-20 bg-rose-500/10 text-rose-500 rounded-3xl flex items-center justify-center mb-6 border border-rose-500/20">
+            <i className="fa-solid fa-triangle-exclamation text-3xl"></i>
+          </div>
+          <h1 className="text-white text-2xl font-black mb-2 tracking-tight">Workspace Crash Detected</h1>
+          <p className="text-slate-400 max-w-md mb-8 text-sm font-medium">A technical protocol failure occurred. Your data is safe in the cloud, but the interface needs a hard reset.</p>
+          <button 
+            onClick={() => window.location.href = window.location.origin + window.location.pathname}
+            className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 transition-all"
+          >
+            Re-Initialize Workspace
+          </button>
+          <pre className="mt-12 text-[9px] text-slate-700 font-mono uppercase bg-black/20 p-4 rounded-xl max-w-2xl overflow-x-auto">
+            {this.state.error?.toString()}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// Layout Wrapper
 const MainLayout: React.FC<{
   isSyncing: boolean;
   currentUser: Tenant | null;
@@ -33,11 +72,17 @@ const MainLayout: React.FC<{
   isSyncing, currentUser, isReadOnly, 
   isNewJobModalOpen, setIsNewJobModalOpen, clients, onSaveJob 
 }) => {
+  const location = useLocation();
+
+  if (!currentUser) {
+    return <Navigate to="/" state={{ from: location }} replace />;
+  }
+
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-slate-50 overflow-hidden relative">
       <Navigation isSyncing={isSyncing} user={currentUser} />
       {isReadOnly && (
-        <div className="fixed top-0 left-0 right-0 bg-rose-600 text-white py-2 text-center z-[200] text-[10px] font-black uppercase tracking-[0.2em] shadow-lg animate-in slide-in-from-top duration-500">
+        <div className="fixed top-0 left-0 right-0 bg-rose-600 text-white py-2 text-center z-[200] text-[10px] font-black uppercase tracking-[0.2em] shadow-lg">
            Trial Period Expired. Access is currently Read-Only. <Link to="/settings" className="underline ml-2 hover:text-rose-100 transition-colors">Reactivate Elite Plan</Link>
         </div>
       )}
@@ -148,10 +193,9 @@ const App: React.FC = () => {
     if (initializationStarted.current) return;
     initializationStarted.current = true;
 
-    // Safety timeout to kill the spinner if load hangs
     const safetyTimeout = setTimeout(() => {
       setIsLoading(false);
-    }, 6000);
+    }, 8000);
 
     const init = async () => {
       try {
@@ -189,8 +233,12 @@ const App: React.FC = () => {
           setIsLoading(false);
         }
       });
-      return () => subscription.unsubscribe();
+      return () => {
+        clearTimeout(safetyTimeout);
+        subscription.unsubscribe();
+      };
     }
+    return () => clearTimeout(safetyTimeout);
   }, [loadData]);
 
   const handleSaveNewJob = async (job: Job, items: JobItem[], clientName: string) => {
@@ -223,18 +271,15 @@ const App: React.FC = () => {
   );
 
   return (
-    <HashRouter>
-      <Routes>
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/terms" element={<Terms />} />
-        
-        {!currentUser ? (
-          <>
-            <Route path="/" element={<Landing />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </>
-        ) : (
-          <Route element={
+    <ErrorBoundary>
+      <HashRouter>
+        <Routes>
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          
+          <Route path="/" element={!currentUser ? <Landing /> : <Navigate to="/dashboard" replace />} />
+          
+          <Route path="/" element={
             <MainLayout 
               isSyncing={isSyncing} 
               currentUser={currentUser} 
@@ -245,7 +290,7 @@ const App: React.FC = () => {
               onSaveJob={handleSaveNewJob}
             />
           }>
-            <Route index element={<Dashboard state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onSyncCalendar={() => loadData(currentUser)} isSyncing={isSyncing} />} />
+            <Route path="dashboard" element={<Dashboard state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onSyncCalendar={() => loadData(currentUser)} isSyncing={isSyncing} />} />
             <Route path="jobs" element={<Jobs state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onRefresh={loadData} />} />
             <Route path="jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
             <Route path="clients" element={<Clients state={appState} onRefresh={loadData} />} />
@@ -253,11 +298,12 @@ const App: React.FC = () => {
             <Route path="invoices" element={<Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
             <Route path="mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
             <Route path="settings" element={<Settings user={currentUser} onLogout={() => DB.signOut().then(() => window.location.reload())} onRefresh={loadData} />} />
-            <Route path="*" element={<Navigate to="/" />} />
           </Route>
-        )}
-      </Routes>
-    </HashRouter>
+
+          <Route path="*" element={<Navigate to={currentUser ? "/dashboard" : "/"} replace />} />
+        </Routes>
+      </HashRouter>
+    </ErrorBoundary>
   );
 };
 

@@ -5,7 +5,7 @@ import { Client, Job, JobItem, Invoice, Tenant, UserPlan, MileageRecord, JobShif
 const SUPABASE_URL = 'https://hucvermrtjxsjcsjirwj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1Y3Zlcm1ydGp4c2pjc2ppcndqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNDQ1NDAsImV4cCI6MjA4MzgyMDU0MH0.hpdDWrdQubhBW2ga3Vho8J_fOtVw7Xr6GZexF8ksSmA';
 const CLOUD_CONFIG_KEY = 'freelance_os_cloud_config';
-const LOCAL_STORAGE_KEY = 'freelance_os_local_data_v2'; 
+const LOCAL_STORAGE_KEY = 'freelance_os_local_data_v3'; // Incremented version to clear potential local corruption
 const DELETED_ITEMS_KEY = 'freelance_os_deleted_ids';
 const LOCAL_USER_EMAIL = 'local@freelanceos.internal';
 
@@ -228,32 +228,35 @@ export const DB = {
           else if (filter?.jobId) await query.delete().eq('job_id', filter.jobId);
         }
         if (method === 'select') {
-          let q = query.select('*').eq(table === 'tenants' ? 'email' : 'tenant_id', effectiveId);
-          if (filter) Object.entries(filter).forEach(([k, v]) => q = q.eq(FIELD_MAP[k] || k, v));
-          const { data, error } = await q;
-          
-          if (!error && data !== null) {
-            const remoteData = data.map(fromDb);
-            const merged = [...remoteData];
-            localList.forEach((localItem: any) => {
-              const pk = table === 'tenants' ? 'email' : 'id';
-              // CRITICAL: localItem is already in JS format, don't use fromDb here
-              if (!merged.find(remoteItem => remoteItem[pk] === localItem[pk]) && !deletedIds.has(localItem[pk])) {
-                merged.push(localItem);
-              }
-            });
+          try {
+            let q = query.select('*').eq(table === 'tenants' ? 'email' : 'tenant_id', effectiveId);
+            if (filter) Object.entries(filter).forEach(([k, v]) => q = q.eq(FIELD_MAP[k] || k, v));
+            const { data, error } = await q;
+            
+            if (!error && data !== null) {
+              const remoteData = data.map(fromDb);
+              const merged = [...remoteData];
+              localList.forEach((localItem: any) => {
+                const pk = table === 'tenants' ? 'email' : 'id';
+                if (!merged.find(remoteItem => remoteItem[pk] === localItem[pk]) && !deletedIds.has(localItem[pk])) {
+                  merged.push(localItem);
+                }
+              });
 
-            return merged.filter(item => {
-              const pk = table === 'tenants' ? 'email' : 'id';
-              return !deletedIds.has(item[pk]);
-            });
+              return merged.filter(item => {
+                const pk = table === 'tenants' ? 'email' : 'id';
+                return !deletedIds.has(item[pk]);
+              });
+            }
+          } catch (e) {
+            console.error(`Protocol Error in Select (${table}):`, e);
           }
         }
       }
     }
 
     if (method === 'select') {
-      let base = ((getLocalData() as any)[table] || []).filter((i: any) => i.tenant_id === tenantId || i.email === tenantId);
+      let base = (localList || []).filter((i: any) => i.tenant_id === tenantId || i.email === tenantId);
       if (filter) {
         Object.entries(filter).forEach(([k, v]) => {
           base = base.filter((i: any) => i[k] === v || i[FIELD_MAP[k] || k] === v);
@@ -264,7 +267,7 @@ export const DB = {
         return !deletedIds.has(item[pk]);
       });
     }
-    return payload;
+    return payload || [];
   },
 
   getCurrentUser: async (): Promise<Tenant | null> => {
@@ -288,7 +291,7 @@ export const DB = {
   },
 
   updateTenant: async (t: Tenant) => DB.call('tenants', 'upsert', t),
-  getClients: async () => DB.call('clients', 'select'),
+  getClients: async () => DB.call('clients', 'select').then(res => res || []),
   saveClient: async (c: Client) => DB.call('clients', 'upsert', c),
   getJobs: async () => {
     const jobs = await DB.call('jobs', 'select');
@@ -302,10 +305,10 @@ export const DB = {
     await DB.saveShifts(j.id, j.shifts || []);
     await DB.call('jobs', 'upsert', j);
   },
-  getQuotes: async () => DB.call('quotes', 'select'),
+  getQuotes: async () => DB.call('quotes', 'select').then(res => res || []),
   saveQuote: async (q: Quote) => DB.call('quotes', 'upsert', q),
   deleteQuote: async (id: string) => DB.call('quotes', 'delete', null, { id }),
-  getInvoices: async () => DB.call('invoices', 'select'),
+  getInvoices: async () => DB.call('invoices', 'select').then(res => res || []),
   saveInvoice: async (i: Invoice) => {
     await DB.call('invoices', 'upsert', i);
     const user = await DB.getCurrentUser();
@@ -313,11 +316,11 @@ export const DB = {
       await DB.updateTenant({ ...user, invoiceNextNumber: (user.invoiceNextNumber || 0) + 1 });
     }
   },
-  getMileage: async () => DB.call('mileage', 'select'),
+  getMileage: async () => DB.call('mileage', 'select').then(res => res || []),
   saveMileage: async (m: MileageRecord) => DB.call('mileage', 'upsert', m),
-  getJobItems: async (jobId: string) => DB.call('job_items', 'select', null, { jobId }),
+  getJobItems: async (jobId: string) => DB.call('job_items', 'select', null, { jobId }).then(res => res || []),
   saveJobItems: async (jobId: string, items: JobItem[]) => DB.call('job_items', 'upsert', items),
-  getShifts: async (jobId: string) => DB.call('job_shifts', 'select', null, { jobId }),
+  getShifts: async (jobId: string) => DB.call('job_shifts', 'select', null, { jobId }).then(res => res || []),
   saveShifts: async (jobId: string, shifts: JobShift[]) => {
     await DB.call('job_shifts', 'delete', null, { jobId });
     if (shifts && shifts.length > 0) {
@@ -336,5 +339,10 @@ export const DB = {
   deleteJobItem: async (id: string) => DB.call('job_items', 'delete', null, { id }),
   deleteInvoice: async (id: string) => DB.call('invoices', 'delete', null, { id }),
   deleteMileage: async (id: string) => DB.call('mileage', 'delete', null, { id }),
-  signOut: async () => { await (getSupabase()?.auth as any).signOut(); cachedTenantId = null; supabaseInstance = null; }
+  signOut: async () => { 
+    const client = getSupabase();
+    if (client) await (client.auth as any).signOut(); 
+    cachedTenantId = null; 
+    supabaseInstance = null; 
+  }
 };
