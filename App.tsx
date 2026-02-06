@@ -125,7 +125,9 @@ const App: React.FC = () => {
     if (!client) return undefined;
     try {
       const { data: { session } } = await (client.auth as any).getSession();
-      return session?.provider_token || session?.access_token;
+      // provider_token is the Google OAuth token. access_token is the Supabase JWT.
+      // We need the provider_token for Google Calendar/Drive APIs.
+      return session?.provider_token || undefined;
     } catch (e) {
       return undefined;
     }
@@ -142,11 +144,12 @@ const App: React.FC = () => {
         setAppState(prev => ({ ...prev, user: null }));
         setCurrentUser(null);
         setIsLoading(false);
+        syncInProgress.current = false;
         return;
       }
 
       const token = await getLatestToken();
-      if (token) setGoogleAccessToken(token);
+      setGoogleAccessToken(token);
 
       const [clients, jobs, invoices, mileage, quotes] = await Promise.allSettled([
         DB.getClients(),
@@ -256,7 +259,11 @@ const App: React.FC = () => {
     }));
 
     const token = await getLatestToken();
-    if (token) await syncJobToGoogle(job, token, clientName);
+    if (token) {
+      await syncJobToGoogle(job, token, clientName);
+    } else {
+      console.warn("No Google token found. Syncing internal record only.");
+    }
     
     await loadData();
   };

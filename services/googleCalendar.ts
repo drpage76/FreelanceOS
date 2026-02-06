@@ -18,34 +18,42 @@ export const fetchGoogleEvents = async (email: string, accessToken?: string): Pr
       `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&timeMin=${timeMin.toISOString()}`,
       { headers: { 'Authorization': `Bearer ${accessToken}` } }
     );
-    if (!response.ok) return [];
+    if (!response.ok) {
+      if (response.status === 401) console.warn("Google Calendar access token expired or invalid.");
+      return [];
+    }
     const data = await response.json();
     return (data.items || []).map((item: any) => ({
       id: item.id,
-      title: item.summary || 'Untitled',
+      title: item.summary || 'Untitled Event',
       startDate: format(parseISO(item.start?.dateTime || item.start?.date), 'yyyy-MM-dd'),
       endDate: format(parseISO(item.end?.dateTime || item.end?.date), 'yyyy-MM-dd'),
       source: 'google',
       link: item.htmlLink,
       color: item.colorId ? '#6366f1' : '#6366f1'
     }));
-  } catch { return []; }
+  } catch (err) { 
+    console.error("Fetch Google Events error:", err);
+    return []; 
+  }
 };
 
 const deleteExistingEvents = async (jobId: string, accessToken: string) => {
   try {
-    const query = encodeURIComponent(jobId);
+    // We search for the exact reference string to be precise
+    const query = encodeURIComponent(`(Ref: ${jobId})`);
     const search = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events?q=${query}`,
       { headers: { 'Authorization': `Bearer ${accessToken}` } }
     );
+    
     if (!search.ok) return;
     
     const data = await search.json();
-    // Aggressive matching for job ID in summary or description
+    // Double check the items to ensure we only delete events related to this job ID
     const matches = (data.items || []).filter((ev: any) => 
-      ev.summary?.includes(jobId) || 
-      ev.description?.includes(jobId)
+      (ev.summary && ev.summary.includes(jobId)) || 
+      (ev.description && ev.description.includes(jobId))
     );
 
     for (const ev of matches) {
@@ -60,28 +68,35 @@ const deleteExistingEvents = async (jobId: string, accessToken: string) => {
 };
 
 export const syncJobToGoogle = async (job: Job, accessToken?: string, clientName?: string): Promise<boolean> => {
-  if (!accessToken) return false;
+  if (!accessToken) {
+    console.warn("Sync attempted without Google access token.");
+    return false;
+  }
+  
   try {
-    // Always clean first to ensure no orphan events
+    // 1. Clean up existing events for this job ID
     await deleteExistingEvents(job.id, accessToken);
     
-    // Stop if job is cancelled or sync is disabled
+    // 2. If job is cancelled or sync is disabled, we stop after cleaning
     if (job.status === JobStatus.CANCELLED || job.syncToCalendar === false) return true;
 
     const eventsToCreate = [];
     const colorId = STATUS_TO_GOOGLE_COLOR[job.status] || '1';
+    const clientPrefix = clientName ? `${clientName}: ` : '';
 
     if (job.schedulingType === SchedulingType.SHIFT_BASED && job.shifts && job.shifts.length > 0) {
       for (const shift of job.shifts) {
+        const summary = `[${job.status.toUpperCase()}] ${clientPrefix}${shift.title || 'Shift'} (Ref: ${job.id})`;
         const event: any = {
-          summary: `[${job.status.toUpperCase()}] ${clientName ? clientName + ': ' : ''}${shift.title || 'Shift'} (Ref: ${job.id})`,
+          summary,
           location: job.location,
-          description: `Ref: ${job.id}\nShift: ${shift.title || 'Untitled'}\nClient: ${clientName || 'Unknown'}`,
+          description: `Internal Project Reference: ${job.id}\nShift: ${shift.title || 'Untitled'}\nClient: ${clientName || 'Unknown'}`,
           colorId
         };
 
         if (shift.isFullDay) {
           event.start = { date: shift.startDate };
+          // Google Calendar end dates for all-day events are exclusive, so add 1 day
           event.end = { date: format(addDays(parseISO(shift.endDate || shift.startDate), 1), 'yyyy-MM-dd') };
         } else {
           event.start = { dateTime: `${shift.startDate}T${shift.startTime || '09:00'}:00Z` };
@@ -90,11 +105,13 @@ export const syncJobToGoogle = async (job: Job, accessToken?: string, clientName
         eventsToCreate.push(event);
       }
     } else {
+      const summary = `[${job.status.toUpperCase()}] ${clientPrefix}${job.description} (Ref: ${job.id})`;
       eventsToCreate.push({
-        summary: `[${job.status.toUpperCase()}] ${clientName ? clientName + ': ' : ''}${job.description} (Ref: ${job.id})`,
+        summary,
         location: job.location,
-        description: `Ref: ${job.id}\nClient: ${clientName || 'Unknown'}`,
+        description: `Internal Project Reference: ${job.id}\nClient: ${clientName || 'Unknown'}`,
         start: { date: job.startDate },
+        // Google Calendar end dates for all-day events are exclusive
         end: { date: format(addDays(parseISO(job.endDate || job.startDate), 1), 'yyyy-MM-dd') },
         colorId,
         transparency: job.status === JobStatus.CONFIRMED ? 'opaque' : 'transparent'
@@ -107,7 +124,10 @@ export const syncJobToGoogle = async (job: Job, accessToken?: string, clientName
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      if (!resp.ok) console.error("Google Calendar Push Error:", await resp.json());
+      if (!resp.ok) {
+        const errData = await resp.json();
+        console.error("Google Calendar API POST Error:", errData);
+      }
     }
     return true;
   } catch (err) { 
@@ -121,5 +141,8 @@ export const deleteJobFromGoogle = async (jobId: string, accessToken?: string): 
   try {
     await deleteExistingEvents(jobId, accessToken);
     return true;
-  } catch { return false; }
+  } catch (err) { 
+    console.error("Google Delete error:", err);
+    return false; 
+  }
 };

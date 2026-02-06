@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate } from 'react-router-dom';
 import { 
   format, isSameMonth, isSameDay, addMonths, subMonths, 
   parseISO, differenceInDays, startOfDay, endOfDay,
@@ -28,7 +28,8 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
 
   const allCalendarEntries = useMemo(() => {
     const entries: any[] = [];
-    const internalJobIds = new Set((jobs || []).map(j => j.id));
+    // Standardize IDs to strings for robust matching
+    const internalJobIds = new Set((jobs || []).map(j => String(j.id)));
     
     (jobs || []).forEach(job => {
       if (job.syncToCalendar === false) return;
@@ -73,16 +74,24 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     });
 
     (externalEvents || []).forEach(e => {
-      // Improved De-duplication with null-safety for title
+      // Improved De-duplication: 
+      // Look for (Ref: ID) or #ID patterns using a robust alphanumeric+hyphen match
       const title = e.title || '';
-      const idMatch = title.match(/#(\d+)/) || title.match(/\(Ref: (\d+)\)/);
-      if (idMatch && internalJobIds.has(idMatch[1])) {
-        return; 
+      const refMatch = title.match(/\(Ref:\s*([a-zA-Z0-9-]+)\)/i) || title.match(/#([a-zA-Z0-9-]+)/);
+      
+      if (refMatch) {
+        const matchedId = refMatch[1];
+        if (internalJobIds.has(matchedId)) {
+          // This is a "Ghost" entry (a Google Event that represents an internal job we're already displaying)
+          return; 
+        }
       }
 
       const sDate = e.startDate ? parseISO(e.startDate) : null;
       if (sDate && isValid(sDate)) {
         let endDate = e.endDate;
+        // Google API returns the end date of an all-day event as the following day (exclusive)
+        // We subtract 1 day to correctly show it in our UI.
         if (e.source === 'google' && e.startDate !== e.endDate) {
           const endISO = parseISO(e.endDate);
           if (isValid(endISO)) {
