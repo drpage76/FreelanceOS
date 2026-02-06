@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { HashRouter, Routes, Route, Navigate, Link } from 'react-router';
+import { HashRouter, Routes, Route, Navigate, Link, Outlet } from 'react-router';
 
 import { Navigation } from './components/Navigation';
 import { Dashboard } from './pages/Dashboard';
@@ -20,9 +20,8 @@ import { DB, getSupabase } from './services/db';
 import { fetchGoogleEvents, syncJobToGoogle } from './services/googleCalendar';
 import { checkSubscriptionStatus } from './utils';
 
-// STANDALONE component - MUST be outside App to maintain state across renders
-interface LayoutProps {
-  children: React.ReactNode;
+// Shared Layout component using Outlet for nested routes
+const MainLayout: React.FC<{
   isSyncing: boolean;
   currentUser: Tenant | null;
   isReadOnly: boolean;
@@ -30,10 +29,8 @@ interface LayoutProps {
   setIsNewJobModalOpen: (open: boolean) => void;
   clients: any[];
   onSaveJob: (job: Job, items: JobItem[], clientName: string) => Promise<void>;
-}
-
-const Layout: React.FC<LayoutProps> = ({ 
-  children, isSyncing, currentUser, isReadOnly, 
+}> = ({ 
+  isSyncing, currentUser, isReadOnly, 
   isNewJobModalOpen, setIsNewJobModalOpen, clients, onSaveJob 
 }) => {
   return (
@@ -46,7 +43,7 @@ const Layout: React.FC<LayoutProps> = ({
       )}
       <main className={`flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar ${isReadOnly ? 'pt-12' : ''}`}>
         <div className="max-w-7xl mx-auto w-full">
-          {children}
+          <Outlet />
         </div>
       </main>
       <CreateJobModal 
@@ -97,7 +94,7 @@ const App: React.FC = () => {
     try {
       const user = forcedUser || await DB.getCurrentUser();
       if (!user) {
-        setAppState(prev => ({ ...prev, user: null, jobs: [] }));
+        setAppState(prev => ({ ...prev, user: null }));
         setCurrentUser(null);
         setIsLoading(false);
         return;
@@ -153,8 +150,8 @@ const App: React.FC = () => {
 
     // Safety timeout to kill the spinner if load hangs
     const safetyTimeout = setTimeout(() => {
-      if (isLoading) setIsLoading(false);
-    }, 8000);
+      setIsLoading(false);
+    }, 6000);
 
     const init = async () => {
       try {
@@ -169,6 +166,8 @@ const App: React.FC = () => {
       } catch (e) {
         console.error("Initialization error:", e);
         setIsLoading(false);
+      } finally {
+        clearTimeout(safetyTimeout);
       }
     };
     init();
@@ -190,12 +189,8 @@ const App: React.FC = () => {
           setIsLoading(false);
         }
       });
-      return () => {
-        clearTimeout(safetyTimeout);
-        subscription.unsubscribe();
-      };
+      return () => subscription.unsubscribe();
     }
-    return () => clearTimeout(safetyTimeout);
   }, [loadData]);
 
   const handleSaveNewJob = async (job: Job, items: JobItem[], clientName: string) => {
@@ -232,6 +227,7 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        
         {!currentUser ? (
           <>
             <Route path="/" element={<Landing />} />
@@ -239,7 +235,7 @@ const App: React.FC = () => {
           </>
         ) : (
           <Route element={
-            <Layout 
+            <MainLayout 
               isSyncing={isSyncing} 
               currentUser={currentUser} 
               isReadOnly={isReadOnly} 
@@ -247,20 +243,18 @@ const App: React.FC = () => {
               setIsNewJobModalOpen={setIsNewJobModalOpen}
               clients={appState.clients}
               onSaveJob={handleSaveNewJob}
-            >
-              <Routes>
-                <Route path="/" element={<Dashboard state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onSyncCalendar={() => loadData(currentUser)} isSyncing={isSyncing} />} />
-                <Route path="/jobs" element={<Jobs state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onRefresh={loadData} />} />
-                <Route path="/jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
-                <Route path="/clients" element={<Clients state={appState} onRefresh={loadData} />} />
-                <Route path="/quotes" element={<Quotes state={appState} onRefresh={loadData} />} />
-                <Route path="/invoices" element={<Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
-                <Route path="/mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
-                <Route path="/settings" element={<Settings user={currentUser} onLogout={() => DB.signOut().then(() => window.location.reload())} onRefresh={loadData} />} />
-                <Route path="*" element={<Navigate to="/" />} />
-              </Routes>
-            </Layout>
-          } path="*" />
+            />
+          }>
+            <Route index element={<Dashboard state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onSyncCalendar={() => loadData(currentUser)} isSyncing={isSyncing} />} />
+            <Route path="jobs" element={<Jobs state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onRefresh={loadData} />} />
+            <Route path="jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
+            <Route path="clients" element={<Clients state={appState} onRefresh={loadData} />} />
+            <Route path="quotes" element={<Quotes state={appState} onRefresh={loadData} />} />
+            <Route path="invoices" element={<Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
+            <Route path="mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
+            <Route path="settings" element={<Settings user={currentUser} onLogout={() => DB.signOut().then(() => window.location.reload())} onRefresh={loadData} />} />
+            <Route path="*" element={<Navigate to="/" />} />
+          </Route>
         )}
       </Routes>
     </HashRouter>

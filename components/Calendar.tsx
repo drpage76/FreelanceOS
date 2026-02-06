@@ -31,7 +31,6 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     const internalJobIds = new Set((jobs || []).map(j => j.id));
     
     (jobs || []).forEach(job => {
-      // Respect the syncToCalendar flag for internal display too
       if (job.syncToCalendar === false) return;
 
       const client = clients.find(c => c.id === job.clientId);
@@ -74,8 +73,9 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     });
 
     (externalEvents || []).forEach(e => {
-      // Improved De-duplication: Check for Ref: ID or #ID
-      const idMatch = e.title.match(/#(\d+)/) || e.title.match(/\(Ref: (\d+)\)/);
+      // Improved De-duplication with null-safety for title
+      const title = e.title || '';
+      const idMatch = title.match(/#(\d+)/) || title.match(/\(Ref: (\d+)\)/);
       if (idMatch && internalJobIds.has(idMatch[1])) {
         return; 
       }

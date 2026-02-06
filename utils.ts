@@ -48,9 +48,9 @@ export const checkSubscriptionStatus = (user: Tenant | null) => {
     if (isValid(parsed)) startDate = parsed;
   }
 
-  // Updated to 30-day free trial as per specification
   const expiryDate = addDays(startDate, 30);
-  const daysLeft = Math.max(0, differenceInDays(expiryDate, new Date()));
+  const diff = differenceInDays(expiryDate, new Date());
+  const daysLeft = isNaN(diff) ? 0 : Math.max(0, diff);
   
   return {
     isTrialExpired: daysLeft <= 0,
@@ -99,7 +99,8 @@ export const calculateRevenueStats = (jobs: any[], userSettings: Tenant | null, 
     fiscalYearStart = new Date(now.getFullYear() - 1, startMonth, startDay);
   }
   
-  const daysElapsed = Math.max(1, differenceInDays(now, fiscalYearStart));
+  const diff = differenceInDays(now, fiscalYearStart);
+  const daysElapsed = Math.max(1, isNaN(diff) ? 1 : diff);
   
   const ytdRevenue = (jobs || [])
     .filter(j => j.status !== 'Cancelled' && parseISO(j.startDate) >= fiscalYearStart && parseISO(j.startDate) <= now)
@@ -126,5 +127,6 @@ export const getCalendarDays = (date: Date) => {
 export const isEventInDay = (eventStart: string, eventEnd: string, day: Date) => {
   const start = parseISO(eventStart);
   const end = parseISO(eventEnd);
+  if (!isValid(start) || !isValid(end)) return false;
   return isWithinInterval(day, { start, end }) || isSameDay(day, start) || isSameDay(day, end);
 };
