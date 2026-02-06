@@ -74,9 +74,9 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     });
 
     (externalEvents || []).forEach(e => {
-      // Improved De-duplication: Check for ID starting with # in title
-      const idInTitleMatch = e.title.match(/#(\d+)/);
-      if (idInTitleMatch && internalJobIds.has(idInTitleMatch[1])) {
+      // Improved De-duplication: Check for Ref: ID or #ID
+      const idMatch = e.title.match(/#(\d+)/) || e.title.match(/\(Ref: (\d+)\)/);
+      if (idMatch && internalJobIds.has(idMatch[1])) {
         return; 
       }
 

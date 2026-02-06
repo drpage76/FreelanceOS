@@ -99,6 +99,7 @@ const App: React.FC = () => {
       if (!user) {
         setAppState(prev => ({ ...prev, user: null, jobs: [] }));
         setCurrentUser(null);
+        setIsLoading(false);
         return;
       }
 
@@ -150,6 +151,11 @@ const App: React.FC = () => {
     if (initializationStarted.current) return;
     initializationStarted.current = true;
 
+    // Safety timeout to kill the spinner if load hangs
+    const safetyTimeout = setTimeout(() => {
+      if (isLoading) setIsLoading(false);
+    }, 8000);
+
     const init = async () => {
       try {
         await DB.initializeSession();
@@ -184,8 +190,12 @@ const App: React.FC = () => {
           setIsLoading(false);
         }
       });
-      return () => subscription.unsubscribe();
+      return () => {
+        clearTimeout(safetyTimeout);
+        subscription.unsubscribe();
+      };
     }
+    return () => clearTimeout(safetyTimeout);
   }, [loadData]);
 
   const handleSaveNewJob = async (job: Job, items: JobItem[], clientName: string) => {
@@ -193,11 +203,10 @@ const App: React.FC = () => {
       alert("Workspace is currently read-only. Please reactivate your subscription.");
       return;
     }
-    // Optimistic UI update could go here, but DB.saveJob handles local first
+    
     await DB.saveJob(job);
     await DB.saveJobItems(job.id, items);
     
-    // Explicitly update internal state before cloud sync to ensure immediate visibility
     setAppState(prev => ({
       ...prev,
       jobs: [job, ...prev.jobs]
@@ -206,7 +215,6 @@ const App: React.FC = () => {
     const token = await getLatestToken();
     if (token) await syncJobToGoogle(job, token, clientName);
     
-    // Full refresh to ensure everything is in sync
     await loadData();
   };
 

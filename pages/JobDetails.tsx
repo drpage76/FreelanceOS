@@ -123,6 +123,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     if (!docRef.current || !job || !client) return;
     setIsSaving(true);
     
+    // Tiny delay to ensure styles are applied
     await new Promise(r => setTimeout(r, 100));
 
     try {
@@ -134,8 +135,8 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
       
-      const title = showPreview === 'invoice' ? `Invoice ${job.id}` : `Quotation ${job.id}`;
-      const fileName = `${title} ${client.name}.pdf`;
+      const titleLabel = showPreview === 'invoice' ? 'Invoice' : 'Quotation';
+      const fileName = `${titleLabel} ${job.id} ${client.name}.pdf`;
       pdf.save(fileName);
 
       if (googleAccessToken && currentUser?.businessName) {
@@ -180,13 +181,13 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                   {showPreview === 'invoice' ? 'Invoice Preview' : 'Quotation Preview'}
                 </span>
                 <div className="flex gap-2">
-                   <button onClick={handleDownloadPDF} className="px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-xs uppercase shadow-lg flex items-center gap-2">
-                     <i className="fa-solid fa-file-arrow-down"></i> PDF
+                   <button onClick={handleDownloadPDF} disabled={isSaving} className="px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-xs uppercase shadow-lg flex items-center gap-2">
+                     {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-file-arrow-down"></i>} PDF
                    </button>
                    <button onClick={() => setShowPreview(null)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-rose-500 border border-slate-200"><i className="fa-solid fa-xmark"></i></button>
                 </div>
              </div>
-             <div className="p-10 bg-slate-50 overflow-x-auto">
+             <div className="p-10 bg-slate-50 overflow-x-auto custom-scrollbar">
                <div ref={docRef} className="bg-white p-12 pb-32 border border-slate-100 min-h-[1120px] w-[800px] mx-auto shadow-sm text-slate-900">
                  <div className="flex justify-between items-start mb-20">
                     <div>
@@ -195,12 +196,13 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                       ) : (
                         <div className="flex items-center gap-2 mb-6 text-3xl font-black italic">Freelance<span className="text-indigo-600">OS</span></div>
                       )}
-                      <h1 className="text-5xl font-black uppercase tracking-tight">{showPreview}</h1>
+                      <h1 className="text-5xl font-black uppercase tracking-tight">{showPreview === 'quote' ? 'Quotation' : 'Invoice'}</h1>
                       <p className="text-slate-400 font-bold uppercase text-xs mt-2 tracking-widest">Ref: {job.id}</p>
                     </div>
                     <div className="text-right">
                        <p className="font-black text-xl">{currentUser?.businessName}</p>
                        <p className="text-sm text-slate-500 whitespace-pre-line leading-relaxed mt-2">{currentUser?.businessAddress}</p>
+                       {currentUser?.vatNumber && <p className="text-[10px] font-black uppercase text-slate-400 mt-2">{currentUser?.taxName || 'VAT'}: {currentUser.vatNumber}</p>}
                     </div>
                  </div>
 
@@ -216,6 +218,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                           <p className="text-sm font-bold text-slate-700">Issued: {formatDate(new Date().toISOString())}</p>
                           <p className="text-sm font-black text-slate-900 leading-tight">Project: {job.description}</p>
                           <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Period: {formatDate(job.startDate)} — {formatDate(job.endDate)}</p>
+                          {job.poNumber && <p className="text-[11px] font-black text-indigo-600 uppercase tracking-widest mt-2">PO Ref: {job.poNumber}</p>}
                        </div>
                     </div>
                  </div>
@@ -247,13 +250,27 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subtotal</span>
                           <span className="text-xl font-bold text-slate-700">{formatCurrency(totalRecharge, currentUser)}</span>
                        </div>
+                       {currentUser?.isVatRegistered && (
+                         <div className="flex justify-between items-center pt-2 border-t border-slate-50">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{currentUser?.taxName || 'VAT'} ({currentUser?.taxRate || 20}%)</span>
+                            <span className="text-xl font-bold text-slate-700">{formatCurrency(totalRecharge * ((currentUser?.taxRate || 20) / 100), currentUser)}</span>
+                         </div>
+                       )}
                        <div className="flex justify-between items-center pt-4 border-t-2 border-slate-900">
-                          <span className="text-xs font-black uppercase tracking-widest">Total Payable</span>
+                          <span className="text-xs font-black uppercase tracking-widest">Total Valuation</span>
                           <span className="text-3xl font-black text-indigo-600">
                             {formatCurrency(totalRecharge * (currentUser?.isVatRegistered ? (1 + (currentUser.taxRate/100)) : 1), currentUser)}
                           </span>
                        </div>
                     </div>
+                 </div>
+
+                 <div className="mt-20 pt-10 border-t border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Terms & Conditions</p>
+                    <p className="text-[11px] text-slate-500 leading-relaxed font-medium italic">
+                      This {showPreview === 'quote' ? 'quotation' : 'invoice'} is subject to standard service terms. {showPreview === 'quote' && 'Valid for 30 days.'} 
+                      Payment is required within {client?.paymentTermsDays || 30} days of issue.
+                    </p>
                  </div>
                </div>
              </div>

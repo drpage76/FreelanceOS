@@ -100,7 +100,6 @@ const toDb = (table: string, obj: any, tenantId: string) => {
     const dbKey = FIELD_MAP[key] || key;
     newObj[dbKey] = obj[key];
   }
-  // Ensure ID is always preserved for upsert primary key matching
   if (obj.id && !newObj.id) {
     newObj.id = obj.id;
   }
@@ -235,12 +234,12 @@ export const DB = {
           
           if (!error && data !== null) {
             const remoteData = data.map(fromDb);
-            // Merge logic: Use remote data but allow local additions that haven't synced yet
             const merged = [...remoteData];
             localList.forEach((localItem: any) => {
               const pk = table === 'tenants' ? 'email' : 'id';
+              // CRITICAL: localItem is already in JS format, don't use fromDb here
               if (!merged.find(remoteItem => remoteItem[pk] === localItem[pk]) && !deletedIds.has(localItem[pk])) {
-                merged.push(fromDb(localItem));
+                merged.push(localItem);
               }
             });
 
