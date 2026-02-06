@@ -234,12 +234,20 @@ export const DB = {
           const { data, error } = await q;
           
           if (!error && data !== null) {
-            return data
-              .map(fromDb)
-              .filter(item => {
-                const pk = table === 'tenants' ? 'email' : 'id';
-                return !deletedIds.has(item[pk]);
-              });
+            const remoteData = data.map(fromDb);
+            // Merge logic: Use remote data but allow local additions that haven't synced yet
+            const merged = [...remoteData];
+            localList.forEach((localItem: any) => {
+              const pk = table === 'tenants' ? 'email' : 'id';
+              if (!merged.find(remoteItem => remoteItem[pk] === localItem[pk]) && !deletedIds.has(localItem[pk])) {
+                merged.push(fromDb(localItem));
+              }
+            });
+
+            return merged.filter(item => {
+              const pk = table === 'tenants' ? 'email' : 'id';
+              return !deletedIds.has(item[pk]);
+            });
           }
         }
       }

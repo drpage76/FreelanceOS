@@ -1,5 +1,5 @@
+
 import React, { useEffect, useState } from 'react';
-// Use direct named imports from react-router to resolve missing export errors in unified environments
 import { Link, useLocation } from 'react-router';
 
 import { Tenant, UserPlan } from '../types';
@@ -67,6 +67,7 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
         <NavItem to="/" icon="fa-chart-pie" label="Dashboard" active={location.pathname === '/'} />
         <NavItem to="/jobs" icon="fa-briefcase" label="Jobs" active={location.pathname.startsWith('/jobs')} />
         <NavItem to="/clients" icon="fa-users" label="Clients" active={location.pathname.startsWith('/clients')} />
+        <NavItem to="/quotes" icon="fa-file-signature" label="Estimates" active={location.pathname.startsWith('/quotes')} />
         <NavItem to="/invoices" icon="fa-file-invoice-dollar" label="Financials" active={location.pathname.startsWith('/invoices')} />
         <NavItem to="/mileage" icon="fa-car-side" label="Mileage" active={location.pathname === '/mileage'} />
         <NavItem to="/settings" icon="fa-gear" label="Settings" active={location.pathname === '/settings'} />

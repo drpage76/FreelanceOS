@@ -8,6 +8,7 @@ import { DB, generateId } from '../services/db';
 import { formatCurrency, formatDate, calculateDueDate } from '../utils';
 import { STATUS_COLORS } from '../constants';
 import { syncJobToGoogle, deleteJobFromGoogle } from '../services/googleCalendar';
+import { uploadToGoogleDrive } from '../services/googleDrive';
 
 interface JobDetailsProps {
   onRefresh: () => void;
@@ -118,6 +119,37 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (!docRef.current || !job || !client) return;
+    setIsSaving(true);
+    
+    await new Promise(r => setTimeout(r, 100));
+
+    try {
+      const element = docRef.current;
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const imgWidth = 210;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      
+      const title = showPreview === 'invoice' ? `Invoice ${job.id}` : `Quotation ${job.id}`;
+      const fileName = `${title} ${client.name}.pdf`;
+      pdf.save(fileName);
+
+      if (googleAccessToken && currentUser?.businessName) {
+        const pdfBlob = pdf.output('blob');
+        const folderName = `${currentUser.businessName} Documents`;
+        await uploadToGoogleDrive(googleAccessToken, folderName, fileName, pdfBlob);
+      }
+    } catch (err) { 
+      alert("PDF Export failed."); 
+    } finally { 
+      setIsSaving(false); 
+    }
+  };
+
   const handleDeleteJob = async () => {
     if (!job || !window.confirm('Are you sure you want to delete this project and clear all associated calendar events?')) return;
     
@@ -139,6 +171,96 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
   return (
     <div className="space-y-6 max-w-full overflow-x-hidden pb-20 px-1 md:px-4">
+      {/* Preview Modal */}
+      {showPreview && client && (
+        <div className="fixed inset-0 z-[200] flex items-start justify-center bg-slate-900/80 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-4xl rounded-[40px] shadow-2xl overflow-hidden my-8 border border-slate-200">
+             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 sticky top-0 z-[210] backdrop-blur-md">
+                <span className="px-4 py-2 rounded-xl text-[10px] font-black uppercase border bg-indigo-50 text-indigo-600 border-indigo-100">
+                  {showPreview === 'invoice' ? 'Invoice Preview' : 'Quotation Preview'}
+                </span>
+                <div className="flex gap-2">
+                   <button onClick={handleDownloadPDF} className="px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-xs uppercase shadow-lg flex items-center gap-2">
+                     <i className="fa-solid fa-file-arrow-down"></i> PDF
+                   </button>
+                   <button onClick={() => setShowPreview(null)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-rose-500 border border-slate-200"><i className="fa-solid fa-xmark"></i></button>
+                </div>
+             </div>
+             <div className="p-10 bg-slate-50 overflow-x-auto">
+               <div ref={docRef} className="bg-white p-12 pb-32 border border-slate-100 min-h-[1120px] w-[800px] mx-auto shadow-sm text-slate-900">
+                 <div className="flex justify-between items-start mb-20">
+                    <div>
+                      {currentUser?.logoUrl ? (
+                        <img src={currentUser.logoUrl} alt="Logo" className="h-24 mb-6 object-contain" />
+                      ) : (
+                        <div className="flex items-center gap-2 mb-6 text-3xl font-black italic">Freelance<span className="text-indigo-600">OS</span></div>
+                      )}
+                      <h1 className="text-5xl font-black uppercase tracking-tight">{showPreview}</h1>
+                      <p className="text-slate-400 font-bold uppercase text-xs mt-2 tracking-widest">Ref: {job.id}</p>
+                    </div>
+                    <div className="text-right">
+                       <p className="font-black text-xl">{currentUser?.businessName}</p>
+                       <p className="text-sm text-slate-500 whitespace-pre-line leading-relaxed mt-2">{currentUser?.businessAddress}</p>
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-10 mb-20">
+                    <div>
+                       <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-2">Recipient</p>
+                       <p className="font-black text-xl">{client.name}</p>
+                       <p className="text-sm text-slate-500 whitespace-pre-line leading-relaxed mt-2">{client.address}</p>
+                    </div>
+                    <div className="text-right">
+                       <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-2">Document Details</p>
+                       <div className="space-y-1">
+                          <p className="text-sm font-bold text-slate-700">Issued: {formatDate(new Date().toISOString())}</p>
+                          <p className="text-sm font-black text-slate-900 leading-tight">Project: {job.description}</p>
+                          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Period: {formatDate(job.startDate)} — {formatDate(job.endDate)}</p>
+                       </div>
+                    </div>
+                 </div>
+
+                 <table className="w-full mb-12">
+                    <thead>
+                       <tr className="border-b-2 border-slate-900">
+                          <th className="py-4 text-left text-[10px] font-black uppercase tracking-widest">Description</th>
+                          <th className="py-4 text-center text-[10px] font-black uppercase tracking-widest">Qty</th>
+                          <th className="py-4 text-right text-[10px] font-black uppercase tracking-widest">Rate</th>
+                          <th className="py-4 text-right text-[10px] font-black uppercase tracking-widest">Amount</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                       {items.map(it => (
+                         <tr key={it.id}>
+                            <td className="py-5 font-bold text-slate-700 text-sm">{it.description}</td>
+                            <td className="py-5 text-center text-slate-600 font-black text-xs">{it.qty}</td>
+                            <td className="py-5 text-right text-slate-600 font-black text-xs">{formatCurrency(it.unitPrice, currentUser)}</td>
+                            <td className="py-5 text-right font-black text-slate-900 text-sm">{formatCurrency(it.qty * it.unitPrice, currentUser)}</td>
+                         </tr>
+                       ))}
+                    </tbody>
+                 </table>
+
+                 <div className="flex justify-end pt-10 border-t-2 border-slate-900">
+                    <div className="w-64 space-y-4">
+                       <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subtotal</span>
+                          <span className="text-xl font-bold text-slate-700">{formatCurrency(totalRecharge, currentUser)}</span>
+                       </div>
+                       <div className="flex justify-between items-center pt-4 border-t-2 border-slate-900">
+                          <span className="text-xs font-black uppercase tracking-widest">Total Payable</span>
+                          <span className="text-3xl font-black text-indigo-600">
+                            {formatCurrency(totalRecharge * (currentUser?.isVatRegistered ? (1 + (currentUser.taxRate/100)) : 1), currentUser)}
+                          </span>
+                       </div>
+                    </div>
+                 </div>
+               </div>
+             </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">

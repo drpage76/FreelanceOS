@@ -9,6 +9,7 @@ import { JobDetails } from './pages/JobDetails';
 import { Clients } from './pages/Clients';
 import { Invoices } from './pages/Invoices';
 import { Mileage } from './pages/Mileage';
+import { Quotes } from './pages/Quotes';
 import { Settings } from './pages/Settings';
 import { Landing } from './pages/Landing'; 
 import { Privacy } from './pages/Privacy';
@@ -192,10 +193,20 @@ const App: React.FC = () => {
       alert("Workspace is currently read-only. Please reactivate your subscription.");
       return;
     }
+    // Optimistic UI update could go here, but DB.saveJob handles local first
     await DB.saveJob(job);
     await DB.saveJobItems(job.id, items);
+    
+    // Explicitly update internal state before cloud sync to ensure immediate visibility
+    setAppState(prev => ({
+      ...prev,
+      jobs: [job, ...prev.jobs]
+    }));
+
     const token = await getLatestToken();
     if (token) await syncJobToGoogle(job, token, clientName);
+    
+    // Full refresh to ensure everything is in sync
     await loadData();
   };
 
@@ -234,6 +245,7 @@ const App: React.FC = () => {
                 <Route path="/jobs" element={<Jobs state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onRefresh={loadData} />} />
                 <Route path="/jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
                 <Route path="/clients" element={<Clients state={appState} onRefresh={loadData} />} />
+                <Route path="/quotes" element={<Quotes state={appState} onRefresh={loadData} />} />
                 <Route path="/invoices" element={<Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
                 <Route path="/mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
                 <Route path="/settings" element={<Settings user={currentUser} onLogout={() => DB.signOut().then(() => window.location.reload())} onRefresh={loadData} />} />
