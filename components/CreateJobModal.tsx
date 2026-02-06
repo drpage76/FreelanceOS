@@ -37,7 +37,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
 
   useEffect(() => {
     if (isOpen) {
-      setJobDetails(DEFAULT_JOB_DETAILS);
+      setJobDetails({ ...DEFAULT_JOB_DETAILS, startDate: new Date().toISOString().split('T')[0], endDate: new Date().toISOString().split('T')[0] });
       setShifts([]);
       setItems([{ description: 'Professional Services', qty: 1, unitPrice: 0 }]);
       setSelectedClientId('');
@@ -47,7 +47,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
   }, [isOpen]);
 
   const totalRecharge = useMemo(() => {
-    return items.reduce((sum, item) => sum + (item.qty * (parseFloat(item.unitPrice) || 0)), 0);
+    return items.reduce((sum, item) => sum + ( (parseFloat(item.qty) || 0) * (parseFloat(item.unitPrice) || 0) ), 0);
   }, [items]);
 
   const handleAddShift = () => {
@@ -117,7 +117,8 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
         if (endDates.length > 0) endDate = endDates[endDates.length - 1]!;
       }
 
-      const jobId = generateJobId(startDate, Math.floor(Math.random() * 90) + 10);
+      // Updated Unique ID Protocol
+      const jobId = generateJobId(startDate);
       
       const newJob: Job = {
         ...jobDetails,
@@ -142,7 +143,9 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
       };
 
       const jobItems: JobItem[] = items.map(i => ({ 
-        ...i, 
+        description: i.description,
+        qty: parseFloat(i.qty) || 0,
+        unitPrice: parseFloat(i.unitPrice) || 0,
         id: generateId(), 
         jobId, 
         rechargeAmount: (parseFloat(i.qty) || 0) * (parseFloat(i.unitPrice) || 0), 
@@ -153,7 +156,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
       onClose();
     } catch (err: any) { 
       console.error("Save Error:", err);
-      alert(`Save Interrupted: ${err.message || 'Check your internet connection.'}`); 
+      alert(`Save Interrupted: ${err.message || 'Check connection.'}`); 
     } finally { 
       setIsSaving(false); 
     }
@@ -190,19 +193,15 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
                    <label className="text-[9px] font-black text-indigo-400 uppercase mb-1 block px-1">New Client Name</label>
                    <input required placeholder="Legal Entity Name" className="w-full px-5 py-3 bg-white border border-indigo-200 rounded-xl font-bold outline-none" value={newClient.name} onChange={e => setNewClient({...newClient, name: e.target.value})} />
                 </div>
+                <div className="col-span-2">
+                   <label className="text-[9px] font-black text-indigo-400 uppercase mb-1 block px-1">Billing Address</label>
+                   <textarea rows={2} placeholder="Full address for invoice" className="w-full px-5 py-3 bg-white border border-indigo-200 rounded-xl font-medium outline-none text-sm" value={newClient.address} onChange={e => setNewClient({...newClient, address: e.target.value})} />
+                </div>
                 <div>
                    <label className="text-[9px] font-black text-indigo-400 uppercase mb-1 block px-1">Billing Email</label>
                    <input type="email" placeholder="billing@company.com" className="w-full px-5 py-3 bg-white border border-indigo-200 rounded-xl font-medium outline-none" value={newClient.email} onChange={e => setNewClient({...newClient, email: e.target.value})} />
                 </div>
                 <div>
-                   <label className="text-[9px] font-black text-indigo-400 uppercase mb-1 block px-1">Phone Number</label>
-                   <input placeholder="+44..." className="w-full px-5 py-3 bg-white border border-indigo-200 rounded-xl font-medium outline-none" value={newClient.phone} onChange={e => setNewClient({...newClient, phone: e.target.value})} />
-                </div>
-                <div className="col-span-2">
-                   <label className="text-[9px] font-black text-indigo-400 uppercase mb-1 block px-1">Billing Address</label>
-                   <textarea rows={2} placeholder="Full address for invoice" className="w-full px-5 py-3 bg-white border border-indigo-200 rounded-xl font-medium outline-none text-sm" value={newClient.address} onChange={e => setNewClient({...newClient, address: e.target.value})} />
-                </div>
-                <div className="col-span-2">
                    <label className="text-[9px] font-black text-indigo-400 uppercase mb-1 block px-1">Payment Terms (Days)</label>
                    <input type="number" className="w-full px-5 py-3 bg-white border border-indigo-200 rounded-xl font-bold outline-none" value={newClient.terms} onChange={e => setNewClient({...newClient, terms: parseInt(e.target.value) || 30})} />
                 </div>

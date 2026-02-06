@@ -82,8 +82,8 @@ export const Quotes: React.FC<QuotesProps> = ({ state, onRefresh }) => {
     if (!window.confirm("Convert this accepted quote into an active project?")) return;
     setIsProcessing(quote.id);
     try {
-      const jobId = generateJobId(quote.date, Math.floor(Math.random() * 90) + 10);
-      // Fix: Add missing 'syncToCalendar' property to the Job object
+      // Fix: Call generateJobId with 1 argument as per its definition in utils.ts
+      const jobId = generateJobId(quote.date);
       const newJob: Job = {
         id: jobId,
         clientId: quote.clientId,

@@ -13,13 +13,13 @@ export const fetchGoogleEvents = async (email: string, accessToken?: string): Pr
   if (!accessToken) return [];
   try {
     const timeMin = new Date();
-    timeMin.setMonth(timeMin.getMonth() - 1);
+    timeMin.setMonth(timeMin.getMonth() - 2); // Fetch slightly more history
     const response = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&timeMin=${timeMin.toISOString()}`,
       { headers: { 'Authorization': `Bearer ${accessToken}` } }
     );
     if (!response.ok) {
-      if (response.status === 401) console.warn("Google Calendar access token expired or invalid.");
+      if (response.status === 401) console.warn("Google Calendar access token expired.");
       return [];
     }
     const data = await response.json();
@@ -40,8 +40,8 @@ export const fetchGoogleEvents = async (email: string, accessToken?: string): Pr
 
 const deleteExistingEvents = async (jobId: string, accessToken: string) => {
   try {
-    // We search for the exact reference string to be precise
-    const query = encodeURIComponent(`(Ref: ${jobId})`);
+    // Aggressive search for the Job ID in any field
+    const query = encodeURIComponent(jobId);
     const search = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events?q=${query}`,
       { headers: { 'Authorization': `Bearer ${accessToken}` } }
@@ -50,7 +50,6 @@ const deleteExistingEvents = async (jobId: string, accessToken: string) => {
     if (!search.ok) return;
     
     const data = await search.json();
-    // Double check the items to ensure we only delete events related to this job ID
     const matches = (data.items || []).filter((ev: any) => 
       (ev.summary && ev.summary.includes(jobId)) || 
       (ev.description && ev.description.includes(jobId))
@@ -63,21 +62,21 @@ const deleteExistingEvents = async (jobId: string, accessToken: string) => {
       });
     }
   } catch (err) {
-    console.error("Google Calendar Cleanup Error:", err);
+    console.error("Google Cleanup Protocol Error:", err);
   }
 };
 
+// Fix: Export deleteJobFromGoogle function for clean project removal from Google Calendar
+export const deleteJobFromGoogle = async (jobId: string, accessToken: string) => {
+  await deleteExistingEvents(jobId, accessToken);
+};
+
 export const syncJobToGoogle = async (job: Job, accessToken?: string, clientName?: string): Promise<boolean> => {
-  if (!accessToken) {
-    console.warn("Sync attempted without Google access token.");
-    return false;
-  }
+  if (!accessToken) return false;
   
   try {
-    // 1. Clean up existing events for this job ID
     await deleteExistingEvents(job.id, accessToken);
     
-    // 2. If job is cancelled or sync is disabled, we stop after cleaning
     if (job.status === JobStatus.CANCELLED || job.syncToCalendar === false) return true;
 
     const eventsToCreate = [];
@@ -96,7 +95,6 @@ export const syncJobToGoogle = async (job: Job, accessToken?: string, clientName
 
         if (shift.isFullDay) {
           event.start = { date: shift.startDate };
-          // Google Calendar end dates for all-day events are exclusive, so add 1 day
           event.end = { date: format(addDays(parseISO(shift.endDate || shift.startDate), 1), 'yyyy-MM-dd') };
         } else {
           event.start = { dateTime: `${shift.startDate}T${shift.startTime || '09:00'}:00Z` };
@@ -111,7 +109,6 @@ export const syncJobToGoogle = async (job: Job, accessToken?: string, clientName
         location: job.location,
         description: `Internal Project Reference: ${job.id}\nClient: ${clientName || 'Unknown'}`,
         start: { date: job.startDate },
-        // Google Calendar end dates for all-day events are exclusive
         end: { date: format(addDays(parseISO(job.endDate || job.startDate), 1), 'yyyy-MM-dd') },
         colorId,
         transparency: job.status === JobStatus.CONFIRMED ? 'opaque' : 'transparent'
@@ -124,25 +121,11 @@ export const syncJobToGoogle = async (job: Job, accessToken?: string, clientName
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      if (!resp.ok) {
-        const errData = await resp.json();
-        console.error("Google Calendar API POST Error:", errData);
-      }
+      if (!resp.ok) console.error("Sync POST Failure:", await resp.json());
     }
     return true;
   } catch (err) { 
     console.error("Google Sync Exception:", err);
-    return false; 
-  }
-};
-
-export const deleteJobFromGoogle = async (jobId: string, accessToken?: string): Promise<boolean> => {
-  if (!accessToken) return false;
-  try {
-    await deleteExistingEvents(jobId, accessToken);
-    return true;
-  } catch (err) { 
-    console.error("Google Delete error:", err);
     return false; 
   }
 };

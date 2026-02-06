@@ -125,8 +125,6 @@ const App: React.FC = () => {
     if (!client) return undefined;
     try {
       const { data: { session } } = await (client.auth as any).getSession();
-      // provider_token is the Google OAuth token. access_token is the Supabase JWT.
-      // We need the provider_token for Google Calendar/Drive APIs.
       return session?.provider_token || undefined;
     } catch (e) {
       return undefined;
@@ -193,6 +191,13 @@ const App: React.FC = () => {
   }, [getLatestToken]);
 
   useEffect(() => {
+    // URL Cleanup Routine - removes OAuth error/state garbage from address bar
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error') || params.get('state')) {
+      const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+
     if (initializationStarted.current) return;
     initializationStarted.current = true;
 
@@ -250,19 +255,20 @@ const App: React.FC = () => {
       return;
     }
     
+    // Core Cloud Save
     await DB.saveJob(job);
     await DB.saveJobItems(job.id, items);
     
+    // UI Local Optimistic Update
     setAppState(prev => ({
       ...prev,
       jobs: [job, ...prev.jobs]
     }));
 
+    // Protocol Sync
     const token = await getLatestToken();
     if (token) {
       await syncJobToGoogle(job, token, clientName);
-    } else {
-      console.warn("No Google token found. Syncing internal record only.");
     }
     
     await loadData();

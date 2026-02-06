@@ -60,12 +60,17 @@ export const checkSubscriptionStatus = (user: Tenant | null) => {
   };
 };
 
-export const generateJobId = (startDate: string, sequence: number): string => {
+/**
+ * Enhanced Job ID Generation
+ * Format: YYMM-XXXX (e.g. 2602-8492)
+ * High entropy to prevent database collisions in multi-user environments
+ */
+export const generateJobId = (startDate: string): string => {
   const date = parseISO(startDate);
   const yy = format(date, 'yy');
   const mm = format(date, 'MM');
-  const seq = sequence.toString().padStart(2, '0');
-  return `${yy}${mm}${seq}`;
+  const entropy = Math.floor(1000 + Math.random() * 9000); 
+  return `${yy}${mm}-${entropy}`;
 };
 
 export const generateInvoiceId = (userSettings: Tenant | null): string => {
