@@ -28,8 +28,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
 
   const allCalendarEntries = useMemo(() => {
     const entries: any[] = [];
-    // Standardize IDs to strings for robust matching
-    const internalJobIds = new Set((jobs || []).map(j => String(j.id)));
+    const allInternalJobIds = new Set((jobs || []).map(j => String(j.id)));
     
     (jobs || []).forEach(job => {
       if (job.syncToCalendar === false) return;
@@ -53,7 +52,9 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
               endDate: shift.endDate || shift.startDate,
               type: 'shift',
               status: job.status,
-              timeLabel: shift.isFullDay ? 'Full Day' : `${shift.startTime || '09:00'} - ${shift.endTime || '17:30'}`
+              timeLabel: shift.isFullDay ? 'Full Day' : `${shift.startTime || '09:00'} - ${shift.endTime || '17:30'}`,
+              clientName,
+              fullDescription: job.description
             });
           });
         }
@@ -68,21 +69,20 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
           startDate: job.startDate,
           endDate: job.endDate || job.startDate,
           type: 'job',
-          status: job.status
+          status: job.status,
+          clientName,
+          fullDescription: job.description
         });
       }
     });
 
     (externalEvents || []).forEach(e => {
-      // Improved De-duplication: 
-      // Look for (Ref: ID) or #ID patterns using a robust alphanumeric+hyphen match
       const title = e.title || '';
       const refMatch = title.match(/\(Ref:\s*([a-zA-Z0-9-]+)\)/i) || title.match(/#([a-zA-Z0-9-]+)/);
       
       if (refMatch) {
         const matchedId = refMatch[1];
-        if (internalJobIds.has(matchedId)) {
-          // This is a "Ghost" entry (a Google Event that represents an internal job we're already displaying)
+        if (allInternalJobIds.has(matchedId)) {
           return; 
         }
       }
@@ -90,8 +90,6 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
       const sDate = e.startDate ? parseISO(e.startDate) : null;
       if (sDate && isValid(sDate)) {
         let endDate = e.endDate;
-        // Google API returns the end date of an all-day event as the following day (exclusive)
-        // We subtract 1 day to correctly show it in our UI.
         if (e.source === 'google' && e.startDate !== e.endDate) {
           const endISO = parseISO(e.endDate);
           if (isValid(endISO)) {
@@ -240,11 +238,17 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
                       const bgColor = getStatusColor(entry.status, entry.type, entry.color);
                       const textColor = (bgColor === '#fbbf24' || bgColor === '#f59e0b') ? 'text-slate-900' : 'text-white';
 
+                      // Tooltip text formatting
+                      const tooltipText = entry.type === 'external' 
+                        ? `Google Event: ${entry.title}\nPeriod: ${formatDate(entry.startDate)} - ${formatDate(entry.endDate)}`
+                        : `Project: ${entry.fullDescription || entry.title}\nClient: ${entry.clientName}\nStatus: ${entry.status}\nTime: ${entry.timeLabel || 'Continuous'}`;
+
                       return (
                         <div 
                           key={`${entry.id}-${wIdx}`}
                           onClick={() => handleEntryClick(entry)}
                           style={{ gridColumn: `${offset + 1} / span ${duration}`, backgroundColor: bgColor }}
+                          title={tooltipText} 
                           className={`h-5 rounded-lg shadow-sm flex items-center px-3 z-10 transition-all hover:brightness-105 hover:scale-[1.01] cursor-pointer ${textColor}`}
                         >
                           <div className="flex items-center gap-2 overflow-hidden w-full">
@@ -265,4 +269,12 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
       </div>
     </div>
   );
+};
+
+const formatDate = (dateStr: string) => {
+  try {
+    return format(parseISO(dateStr), 'dd MMM yy');
+  } catch {
+    return dateStr;
+  }
 };

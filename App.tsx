@@ -17,7 +17,7 @@ import { Terms } from './pages/Terms';
 import { CreateJobModal } from './components/CreateJobModal';
 import { AppState, Tenant, JobStatus, InvoiceStatus, UserPlan, Job, JobItem } from './types';
 import { DB, getSupabase } from './services/db';
-import { fetchGoogleEvents, syncJobToGoogle } from './services/googleCalendar';
+import { fetchGoogleEvents, syncJobToGoogle, deleteJobFromGoogle } from './services/googleCalendar';
 import { checkSubscriptionStatus } from './utils';
 
 /**
@@ -190,8 +190,42 @@ const App: React.FC = () => {
     }
   }, [getLatestToken]);
 
+  /**
+   * Powerful Sync Protocol:
+   * Forces a re-sync of all internal state to the Google Calendar cloud.
+   */
+  const handleSyncAll = useCallback(async () => {
+    if (syncInProgress.current || !currentUser) return;
+    setIsSyncing(true);
+    
+    try {
+      const token = await getLatestToken();
+      if (!token) {
+        alert("Google Authentication required. Please sign in again.");
+        setIsSyncing(false);
+        return;
+      }
+
+      // Sync active jobs and clean up ghosts
+      for (const job of appState.jobs) {
+        const client = appState.clients.find(c => c.id === job.clientId);
+        if (job.syncToCalendar === false || job.status === JobStatus.CANCELLED) {
+          await deleteJobFromGoogle(job.id, token);
+        } else {
+          await syncJobToGoogle(job, token, client?.name);
+        }
+      }
+
+      // Reload to reflect changes
+      await loadData(currentUser);
+    } catch (err) {
+      console.error("Mass Sync Protocol Failure:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [appState.jobs, appState.clients, currentUser, getLatestToken, loadData]);
+
   useEffect(() => {
-    // URL Cleanup Routine - removes OAuth error/state garbage from address bar
     const params = new URLSearchParams(window.location.search);
     if (params.get('error') || params.get('state')) {
       const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
@@ -255,17 +289,14 @@ const App: React.FC = () => {
       return;
     }
     
-    // Core Cloud Save
     await DB.saveJob(job);
     await DB.saveJobItems(job.id, items);
     
-    // UI Local Optimistic Update
     setAppState(prev => ({
       ...prev,
       jobs: [job, ...prev.jobs]
     }));
 
-    // Protocol Sync
     const token = await getLatestToken();
     if (token) {
       await syncJobToGoogle(job, token, clientName);
@@ -303,7 +334,7 @@ const App: React.FC = () => {
               onSaveJob={handleSaveNewJob}
             />
           }>
-            <Route path="dashboard" element={<Dashboard state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onSyncCalendar={() => loadData(currentUser)} isSyncing={isSyncing} />} />
+            <Route path="dashboard" element={<Dashboard state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onSyncCalendar={handleSyncAll} isSyncing={isSyncing} />} />
             <Route path="jobs" element={<Jobs state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onRefresh={loadData} />} />
             <Route path="jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
             <Route path="clients" element={<Clients state={appState} onRefresh={loadData} />} />
