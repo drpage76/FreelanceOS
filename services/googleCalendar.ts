@@ -13,7 +13,7 @@ export const fetchGoogleEvents = async (email: string, accessToken?: string): Pr
   if (!accessToken) return [];
   try {
     const timeMin = new Date();
-    timeMin.setMonth(timeMin.getMonth() - 2); // Fetch slightly more history
+    timeMin.setMonth(timeMin.getMonth() - 2); 
     const response = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&timeMin=${timeMin.toISOString()}`,
       { headers: { 'Authorization': `Bearer ${accessToken}` } }
@@ -40,7 +40,7 @@ export const fetchGoogleEvents = async (email: string, accessToken?: string): Pr
 
 const deleteExistingEvents = async (jobId: string, accessToken: string) => {
   try {
-    // Aggressive search for the Job ID in any field
+    // Broad search for the Job ID to catch all related entries
     const query = encodeURIComponent(jobId);
     const search = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events?q=${query}`,
@@ -66,7 +66,6 @@ const deleteExistingEvents = async (jobId: string, accessToken: string) => {
   }
 };
 
-// Fix: Export deleteJobFromGoogle function for clean project removal from Google Calendar
 export const deleteJobFromGoogle = async (jobId: string, accessToken: string) => {
   await deleteExistingEvents(jobId, accessToken);
 };
@@ -75,8 +74,10 @@ export const syncJobToGoogle = async (job: Job, accessToken?: string, clientName
   if (!accessToken) return false;
   
   try {
+    // 1. Always perform a thorough cleanup first
     await deleteExistingEvents(job.id, accessToken);
     
+    // 2. If sync is disabled or cancelled, we are done (cleanup complete)
     if (job.status === JobStatus.CANCELLED || job.syncToCalendar === false) return true;
 
     const eventsToCreate = [];
