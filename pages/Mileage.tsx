@@ -169,10 +169,10 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
         <p className="text-slate-500 font-bold uppercase text-[9px] tracking-widest italic">Google Maps Protocol Active</p>
       </header>
 
-      <div className="bg-white p-6 md:p-8 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden">
-        <form onSubmit={handleSubmit} className="space-y-8 relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="space-y-2">
+      <div className="bg-white p-6 md:p-10 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden">
+        <form onSubmit={handleSubmit} className="space-y-10 relative z-10">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <div className="space-y-2 md:col-span-3">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Link to Project</label>
               <select className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.jobId} onChange={e => setNewEntry({...newEntry, jobId: e.target.value})}>
                 <option value="">(None - General Travel)</option>
@@ -181,40 +181,40 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                 ))}
               </select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Start Date</label>
               <input type="date" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.date} onChange={e => setNewEntry({...newEntry, date: e.target.value})} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">End Date (Optional)</label>
               <input type="date" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.endDate} onChange={e => setNewEntry({...newEntry, endDate: e.target.value})} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-5">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Internal Memo</label>
-              <input placeholder="Description..." className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={newEntry.description} onChange={e => setNewEntry({...newEntry, description: e.target.value})} />
+              <input placeholder="Project reference or meeting notes..." className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={newEntry.description} onChange={e => setNewEntry({...newEntry, description: e.target.value})} />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 items-end">
-            <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+            <div className="space-y-2 md:col-span-3">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Start Point</label>
-              <input placeholder="Postcode/City" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase" value={newEntry.startPostcode} onChange={e => setNewEntry({...newEntry, startPostcode: e.target.value.toUpperCase()})} />
+              <input placeholder="Postcode / City" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase" value={newEntry.startPostcode} onChange={e => setNewEntry({...newEntry, startPostcode: e.target.value.toUpperCase()})} />
             </div>
             
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-3">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">End Point</label>
-              <input placeholder="Postcode/City" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase" value={newEntry.endPostcode} onChange={e => setNewEntry({...newEntry, endPostcode: e.target.value.toUpperCase()})} />
+              <input placeholder="Postcode / City" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase" value={newEntry.endPostcode} onChange={e => setNewEntry({...newEntry, endPostcode: e.target.value.toUpperCase()})} />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Single Leg Distance</label>
-              <div className={`relative px-4 py-4 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[56px] transition-all ${isCalculating ? 'border-indigo-400 animate-pulse' : calcError ? 'border-rose-300 bg-rose-50' : 'border-indigo-100 text-indigo-700'}`}>
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Single Leg</label>
+              <div className={`relative px-4 py-4 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[60px] transition-all ${isCalculating ? 'border-indigo-400 animate-pulse' : calcError ? 'border-rose-300 bg-rose-50' : 'border-indigo-100 text-indigo-700'}`}>
                 <input 
                   type="number" 
                   step="0.01" 
                   className={`w-full bg-transparent outline-none font-black ${calcError ? 'text-rose-600' : 'text-indigo-700'} placeholder:text-indigo-300`} 
                   value={newEntry.distanceMiles || ''} 
-                  placeholder={isCalculating ? "Calculating..." : "0.00"}
+                  placeholder={isCalculating ? "Syncing..." : "0.00"}
                   onChange={e => {
                     setCalcError(false);
                     setNewEntry({...newEntry, distanceMiles: parseFloat(e.target.value) || 0});
@@ -226,26 +226,26 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                   disabled={isCalculating}
                   className={`${isCalculating ? 'opacity-30' : 'hover:text-indigo-600'} text-indigo-400 ml-1 shrink-0 transition-colors`}
                 >
-                  <i className={`fa-solid ${isCalculating ? 'fa-spinner animate-spin' : 'fa-arrows-rotate'} text-[12px]`}></i>
+                  <i className={`fa-solid ${isCalculating ? 'fa-spinner animate-spin' : 'fa-arrows-rotate'} text-[14px]`}></i>
                 </button>
               </div>
-              {calcError && <p className="text-[8px] text-rose-500 font-black uppercase tracking-tighter px-1">Lookup failed. Check postcodes.</p>}
+              {calcError && <p className="text-[8px] text-rose-500 font-black uppercase tracking-tighter px-1 absolute mt-1">Lookup failed. Check postcodes.</p>}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 md:col-span-2">
                <div className="space-y-2">
                  <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Trips</label>
-                 <input type="number" min="1" className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl font-black outline-none h-[56px] text-center" value={newEntry.numTrips} onChange={e => setNewEntry({...newEntry, numTrips: parseInt(e.target.value) || 1})} />
+                 <input type="number" min="1" className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl font-black outline-none h-[60px] text-center" value={newEntry.numTrips} onChange={e => setNewEntry({...newEntry, numTrips: parseInt(e.target.value) || 1})} />
                </div>
                <div className="space-y-2">
                  <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Return?</label>
-                 <button type="button" onClick={() => setNewEntry({...newEntry, isReturn: !newEntry.isReturn})} className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase border transition-all h-[56px] ${newEntry.isReturn ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-200'}`}>
+                 <button type="button" onClick={() => setNewEntry({...newEntry, isReturn: !newEntry.isReturn})} className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase border transition-all h-[60px] ${newEntry.isReturn ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-200'}`}>
                    {newEntry.isReturn ? 'YES' : 'NO'}
                  </button>
                </div>
             </div>
 
-            <button type="submit" disabled={isSaving || (newEntry.distanceMiles === 0 && !isCalculating)} className="h-[56px] bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50">
+            <button type="submit" disabled={isSaving || (newEntry.distanceMiles === 0 && !isCalculating)} className="h-[60px] md:col-span-2 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50">
                {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-plus mr-1"></i>}
                {isSaving ? 'Syncing' : 'Add to Ledger'}
             </button>
@@ -254,15 +254,15 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
       </div>
 
       <div className="flex flex-col md:flex-row justify-end gap-4">
-        <div className="bg-white border border-slate-200 p-6 rounded-[32px] shadow-sm flex items-center gap-8 w-full md:w-auto">
+        <div className="bg-white border border-slate-200 p-8 rounded-[40px] shadow-sm flex items-center gap-10 w-full md:w-auto">
            <div className="text-center">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fiscal Total</p>
-              <p className="text-2xl font-black text-slate-900">{totals.miles.toFixed(1)} <span className="text-[10px] text-slate-400">mi</span></p>
+              <p className="text-4xl font-black text-slate-900">{totals.miles.toFixed(1)} <span className="text-[12px] text-slate-400">mi</span></p>
            </div>
-           <div className="w-px h-10 bg-slate-100"></div>
+           <div className="w-px h-12 bg-slate-100"></div>
            <div className="text-center">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Reclaim Val</p>
-              <p className="text-2xl font-black text-indigo-600">{formatCurrency(totals.value, state.user)}</p>
+              <p className="text-4xl font-black text-indigo-600">{formatCurrency(totals.value, state.user)}</p>
            </div>
         </div>
       </div>
@@ -272,13 +272,13 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50/50 border-b border-slate-100">
               <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <th className="p-6">Date</th>
-                <th className="p-6">Project Ref</th>
-                <th className="p-6">Description</th>
-                <th className="p-6">Route</th>
-                <th className="p-6 text-right">Total mi</th>
-                <th className="p-6 text-right">Valuation</th>
-                <th className="p-6 text-center">Actions</th>
+                <th className="p-8">Date</th>
+                <th className="p-8">Project Ref</th>
+                <th className="p-8">Description</th>
+                <th className="p-8">Route</th>
+                <th className="p-8 text-right">Total mi</th>
+                <th className="p-8 text-right">Valuation</th>
+                <th className="p-8 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
@@ -290,11 +290,11 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                   const dateLabel = record.endDate ? `${formatDate(record.date)} - ${formatDate(record.endDate)}` : formatDate(record.date);
                   return (
                     <tr key={record.id} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="p-6 text-[11px] font-black text-slate-900 whitespace-nowrap">{dateLabel}</td>
-                      <td className="p-6 text-[10px] font-black text-indigo-500">{record.jobId || <span className="text-slate-200 italic">None</span>}</td>
-                      <td className="p-6 text-[11px] font-bold text-slate-600 italic truncate max-w-[150px]">{record.description || 'Travel expenses'}</td>
-                      <td className="p-6 text-[10px] font-black text-slate-700">
-                        <span className="flex items-center gap-2">
+                      <td className="p-8 text-[11px] font-black text-slate-900 whitespace-nowrap">{dateLabel}</td>
+                      <td className="p-8 text-[10px] font-black text-indigo-500">{record.jobId || <span className="text-slate-200 italic">None</span>}</td>
+                      <td className="p-8 text-[11px] font-bold text-slate-600 italic truncate max-w-[150px]">{record.description || 'Travel expenses'}</td>
+                      <td className="p-8 text-[10px] font-black text-slate-700">
+                        <span className="flex items-center gap-3">
                           {record.startPostcode} 
                           <i className="fa-solid fa-arrow-right-long text-indigo-400"></i> 
                           {record.endPostcode}
@@ -303,21 +303,21 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                           </span>
                         </span>
                       </td>
-                      <td className="p-6 text-right font-black text-slate-900">{totalTripMiles.toFixed(1)}</td>
-                      <td className="p-6 text-right font-black text-indigo-600">{formatCurrency(totalTripMiles * MILEAGE_RATE, state.user)}</td>
-                      <td className="p-6 text-center">
+                      <td className="p-8 text-right font-black text-slate-900">{totalTripMiles.toFixed(1)}</td>
+                      <td className="p-8 text-right font-black text-indigo-600">{formatCurrency(totalTripMiles * MILEAGE_RATE, state.user)}</td>
+                      <td className="p-8 text-center">
                          <div className="flex items-center justify-center gap-2">
                            {record.jobId && (
                              <button 
                                onClick={() => handleBillToProject(record)} 
                                disabled={isBilling === record.id}
                                title="Add as line item to project invoice"
-                               className="bg-emerald-50 text-emerald-600 w-10 h-10 flex items-center justify-center rounded-xl border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all shadow-sm disabled:opacity-50"
+                               className="bg-emerald-50 text-emerald-600 w-11 h-11 flex items-center justify-center rounded-xl border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all shadow-sm disabled:opacity-50"
                              >
-                               {isBilling === record.id ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-file-invoice-dollar"></i>}
+                               {isBilling === record.id ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-file-invoice-dollar text-sm"></i>}
                              </button>
                            )}
-                           <button onClick={() => handleDelete(record.id)} className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all"><i className="fa-solid fa-trash-can text-xs"></i></button>
+                           <button onClick={() => handleDelete(record.id)} className="w-11 h-11 flex items-center justify-center rounded-xl text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all"><i className="fa-solid fa-trash-can text-sm"></i></button>
                          </div>
                       </td>
                     </tr>

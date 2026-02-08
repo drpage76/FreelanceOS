@@ -12,7 +12,7 @@ const getAIClient = () => {
 
 /**
  * Calculates driving distance using Google Maps grounding.
- * Strictly optimized to return a clean numeric value for the UI.
+ * Optimized to strictly separate result from input postcode digits.
  */
 export const calculateDrivingDistance = async (start: string, end: string, country: string = "United Kingdom") => {
   const ai = getAIClient();
@@ -20,22 +20,25 @@ export const calculateDrivingDistance = async (start: string, end: string, count
 
   const model = "gemini-2.5-flash"; 
   
-  // High-intensity prompt designed to force a numeric response from the grounding tool
-  const prompt = `CRITICAL: Use Google Maps to find the shortest driving distance between these two locations.
+  // Refined prompt to avoid "number leakage" from postcodes into the final result
+  const prompt = `Find the shortest driving distance between these two locations.
   
   LOCATIONS:
-  - From: "${start}"
-  - To: "${end}"
-  - Territory: "${country}"
+  - FROM: "${start}"
+  - TO: "${end}"
+  - REGION: "${country}"
 
-  REQUIRED OUTPUT:
-  Respond ONLY with the numeric distance in MILES. 
-  Example: "14.2"
+  TASK:
+  Use Google Maps grounding. Calculate the distance in MILES.
+  
+  RESPONSE FORMAT:
+  Your response MUST contain the distance clearly labeled like this: "RESULT: [number]"
+  Example: "RESULT: 14.5"
   
   RULES:
-  - If Google Maps returns KM, convert to miles (multiply by 0.621371).
-  - Do NOT include text, units, or explanations.
-  - Just the number.`;
+  - Convert KM to Miles (x 0.621371) if necessary.
+  - Do not let the numbers in the postcodes affect your output.
+  - Provide ONLY the RESULT line.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -45,7 +48,6 @@ export const calculateDrivingDistance = async (start: string, end: string, count
         tools: [{ googleMaps: {} }],
         toolConfig: {
           retrievalConfig: {
-            // Provide a hint for the region to improve map grounding accuracy
             latLng: { latitude: 51.5074, longitude: -0.1278 } 
           }
         }
@@ -53,14 +55,31 @@ export const calculateDrivingDistance = async (start: string, end: string, count
     });
 
     const text = response.text?.trim() || "";
-    // Aggressive regex to strip anything that isn't a number or decimal point
-    const cleanedText = text.replace(/[^0-9.]/g, '');
-    const miles = parseFloat(cleanedText);
+    
+    // Look specifically for the "RESULT: [number]" pattern to avoid picking up numbers from postcodes
+    const resultMatch = text.match(/RESULT:\s*(\d+(\.\d+)?)/i);
+    let miles = null;
+    
+    if (resultMatch) {
+      miles = parseFloat(resultMatch[1]);
+    } else {
+      // Fallback: search for a number that follows a word like "distance", "is", or "miles"
+      const fallbackMatch = text.match(/(?:distance|is|total)\s*(\d+(\.\d+)?)/i) || text.match(/(\d+(\.\d+)?)\s*(?:miles|mi)/i);
+      if (fallbackMatch) {
+        miles = parseFloat(fallbackMatch[1]);
+      } else {
+        // Last resort: find the very last numeric sequence in the text (assuming postcodes are at start)
+        const allNums = text.match(/(\d+(\.\d+)?)/g);
+        if (allNums && allNums.length > 0) {
+          miles = parseFloat(allNums[allNums.length - 1]);
+        }
+      }
+    }
 
     console.debug("Grounding Protocol:", { input: { start, end }, output: text, parsed: miles });
 
     return {
-      miles: (!isNaN(miles) && miles > 0) ? miles : null,
+      miles: (miles !== null && !isNaN(miles) && miles > 0) ? miles : null,
       sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
     };
   } catch (error) {
