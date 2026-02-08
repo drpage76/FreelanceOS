@@ -17,7 +17,7 @@ import {
   differenceInDays,
   isValid
 } from 'date-fns';
-import { Tenant, UserPlan } from './types';
+import { Tenant, UserPlan, Job } from './types';
 
 export const formatCurrency = (amount: number, userSettings?: Tenant | null): string => {
   const currency = userSettings?.currency || 'GBP';
@@ -61,17 +61,34 @@ export const checkSubscriptionStatus = (user: Tenant | null) => {
 };
 
 /**
- * High-Entropy Job ID Generation
- * Format: YYMM-XXXXXX (e.g. 2603-849201)
- * Uses 6-digit entropy to ensure absolute uniqueness in multi-user cloud DB
+ * Sequential Job ID Generation
+ * Format: YYMMXX (e.g. 260201, 260202)
+ * Calculates next number based on existing jobs for that specific month.
  */
+export const generateSequentialJobId = (startDate: string, existingJobs: Job[]): string => {
+  const date = parseISO(startDate);
+  const prefix = format(date, 'yyMM'); // e.g. "2602"
+  
+  // Filter jobs that belong to this month/year prefix
+  const monthlyJobs = existingJobs.filter(j => j.id.startsWith(prefix));
+  
+  // Extract sequence numbers and find the max
+  const sequences = monthlyJobs.map(j => {
+    const seqPart = j.id.slice(4);
+    return parseInt(seqPart) || 0;
+  });
+  
+  const nextSeq = sequences.length > 0 ? Math.max(...sequences) + 1 : 1;
+  return `${prefix}${nextSeq.toString().padStart(2, '0')}`;
+};
+
+// Legacy support for other files
 export const generateJobId = (startDate: string): string => {
   const date = parseISO(startDate);
   const yy = format(date, 'yy');
   const mm = format(date, 'MM');
-  // Boost entropy to 6 digits to prevent collisions like '260347'
-  const entropy = Math.floor(100000 + Math.random() * 899999); 
-  return `${yy}${mm}-${entropy}`;
+  const entropy = Math.floor(1000 + Math.random() * 8999); 
+  return `${yy}${mm}${entropy}`;
 };
 
 export const generateInvoiceId = (userSettings: Tenant | null): string => {

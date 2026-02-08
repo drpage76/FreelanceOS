@@ -31,9 +31,6 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
   static getDerivedStateFromError(error: any) {
     return { hasError: true, error };
   }
-  componentDidCatch(error: any, errorInfo: any) {
-    console.error("FreelanceOS Error Boundary caught crash:", error, errorInfo);
-  }
   render() {
     if (this.state.hasError) {
       return (
@@ -67,10 +64,11 @@ const MainLayout: React.FC<{
   isNewJobModalOpen: boolean;
   setIsNewJobModalOpen: (open: boolean) => void;
   clients: any[];
+  existingJobs: Job[];
   onSaveJob: (job: Job, items: JobItem[], clientName: string) => Promise<void>;
 }> = ({ 
   isSyncing, currentUser, isReadOnly, 
-  isNewJobModalOpen, setIsNewJobModalOpen, clients, onSaveJob 
+  isNewJobModalOpen, setIsNewJobModalOpen, clients, existingJobs, onSaveJob 
 }) => {
   const location = useLocation();
 
@@ -91,10 +89,18 @@ const MainLayout: React.FC<{
           <Outlet />
         </div>
       </main>
+      
+      {/* 
+          CRITICAL FIX: key={isNewJobModalOpen ? 'open' : 'closed'} 
+          forces a complete re-mount of the modal when opened. 
+          This destroys the internal state and prevents data leakage from old jobs.
+      */}
       <CreateJobModal 
+        key={isNewJobModalOpen ? 'modal-active' : 'modal-idle'}
         isOpen={isNewJobModalOpen} 
         onClose={() => setIsNewJobModalOpen(false)} 
         clients={clients} 
+        existingJobs={existingJobs}
         tenant_id={currentUser?.email || ''}
         onSave={onSaveJob}
       />
@@ -190,25 +196,16 @@ const App: React.FC = () => {
     }
   }, [getLatestToken]);
 
-  /**
-   * Powerful Sync Protocol:
-   * Forces a re-sync of all internal state to the Google Calendar cloud.
-   */
   const handleSyncAll = useCallback(async () => {
     if (syncInProgress.current || !currentUser) return;
-    
-    // Explicitly set syncing true to show spinner immediately
     setIsSyncing(true);
-    
     try {
       const token = await getLatestToken();
       if (!token) {
-        alert("Google Authentication required. Please sign in again.");
+        alert("Google Authentication required.");
         setIsSyncing(false);
         return;
       }
-
-      // Sync active jobs and clean up ghosts
       for (const job of appState.jobs) {
         const client = appState.clients.find(c => c.id === job.clientId);
         if (job.syncToCalendar === false || job.status === JobStatus.CANCELLED) {
@@ -217,12 +214,9 @@ const App: React.FC = () => {
           await syncJobToGoogle(job, token, client?.name);
         }
       }
-
-      // Explicitly reload all data to refresh calendar entries in the UI
-      syncInProgress.current = false; // Allow loadData to run
+      syncInProgress.current = false;
       await loadData(currentUser);
     } catch (err) {
-      console.error("Mass Sync Protocol Failure:", err);
       setIsSyncing(false);
     }
   }, [appState.jobs, appState.clients, currentUser, getLatestToken, loadData]);
@@ -252,7 +246,6 @@ const App: React.FC = () => {
           setIsLoading(false);
         }
       } catch (e) {
-        console.error("Initialization error:", e);
         setIsLoading(false);
       } finally {
         clearTimeout(safetyTimeout);
@@ -287,7 +280,7 @@ const App: React.FC = () => {
 
   const handleSaveNewJob = async (job: Job, items: JobItem[], clientName: string) => {
     if (isReadOnly) {
-      alert("Workspace is currently read-only. Please reactivate your subscription.");
+      alert("Workspace is currently read-only.");
       return;
     }
     
@@ -322,9 +315,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
-          
           <Route path="/" element={!currentUser ? <Landing /> : <Navigate to="/dashboard" replace />} />
-          
           <Route path="/" element={
             <MainLayout 
               isSyncing={isSyncing} 
@@ -333,6 +324,7 @@ const App: React.FC = () => {
               isNewJobModalOpen={isNewJobModalOpen}
               setIsNewJobModalOpen={setIsNewJobModalOpen}
               clients={appState.clients}
+              existingJobs={appState.jobs}
               onSaveJob={handleSaveNewJob}
             />
           }>
@@ -345,7 +337,6 @@ const App: React.FC = () => {
             <Route path="mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
             <Route path="settings" element={<Settings user={currentUser} onLogout={() => DB.signOut().then(() => window.location.reload())} onRefresh={loadData} />} />
           </Route>
-
           <Route path="*" element={<Navigate to={currentUser ? "/dashboard" : "/"} replace />} />
         </Routes>
       </HashRouter>

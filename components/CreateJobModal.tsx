@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Client, Job, JobStatus, JobItem, JobShift, SchedulingType } from '../types';
-import { generateJobId } from '../utils';
+import { generateSequentialJobId } from '../utils';
 import { DB, generateId } from '../services/db';
 import { STATUS_COLORS } from '../constants';
 
@@ -9,9 +9,9 @@ interface CreateJobModalProps {
   isOpen: boolean;
   onClose: () => void;
   clients: Client[];
+  existingJobs: Job[];
   onSave: (job: Job, items: JobItem[], clientName: string) => Promise<void>;
   tenant_id: string;
-  googleAccessToken?: string;
 }
 
 const DEFAULT_JOB_DETAILS = {
@@ -25,7 +25,7 @@ const DEFAULT_JOB_DETAILS = {
   syncToCalendar: true
 };
 
-export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose, clients, onSave, tenant_id }) => {
+export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose, clients, existingJobs, onSave, tenant_id }) => {
   const [isAddingClient, setIsAddingClient] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState('');
   const [newClient, setNewClient] = useState({ name: '', email: '', phone: '', address: '', terms: 30 });
@@ -35,15 +35,12 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
   const [shifts, setShifts] = useState<Partial<JobShift>[]>([]);
   const [items, setItems] = useState<any[]>([{ description: 'Professional Services', qty: 1, unitPrice: 0 }]);
 
-  // Atomic Reset Protocol: Ensuring no state leakage from old jobs (e.g. 260347)
+  // Local effect to reset when modal is triggered (extra safety)
   useEffect(() => {
     if (isOpen) {
       setJobDetails({ ...DEFAULT_JOB_DETAILS, startDate: new Date().toISOString().split('T')[0], endDate: new Date().toISOString().split('T')[0] });
-      setShifts([]);
       setItems([{ description: 'Professional Services', qty: 1, unitPrice: 0 }]);
-      setSelectedClientId('');
-      setIsAddingClient(false);
-      setNewClient({ name: '', email: '', phone: '', address: '', terms: 30 });
+      setShifts([]);
     }
   }, [isOpen]);
 
@@ -118,8 +115,8 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
         if (endDates.length > 0) endDate = endDates[endDates.length - 1]!;
       }
 
-      // Generate New High-Entropy Unique ID
-      const jobId = generateJobId(startDate);
+      // 1. Generate the sequential Job ID YYMMXX
+      const jobId = generateSequentialJobId(startDate, existingJobs);
       
       const newJob: Job = {
         ...jobDetails,
@@ -143,12 +140,13 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
         })) as JobShift[]
       };
 
+      // 2. Map items strictly to this newly generated Job ID to prevent leakage
       const jobItems: JobItem[] = items.map(i => ({ 
         description: i.description,
         qty: parseFloat(i.qty) || 0,
         unitPrice: parseFloat(i.unitPrice) || 0,
         id: generateId(), 
-        jobId, 
+        jobId, // Use the new sequential ID
         rechargeAmount: (parseFloat(i.qty) || 0) * (parseFloat(i.unitPrice) || 0), 
         actualCost: 0 
       }));
