@@ -36,10 +36,11 @@ jobs:
       - name: Fix permissions
         run: chmod +x node_modules/.bin/vite
         
-      - name: Build
+            - name: Build
         run: npm run build
         env:
-          API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+
           
       - name: Setup Pages
         uses: actions/configure-pages@v4
