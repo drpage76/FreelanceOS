@@ -42,6 +42,7 @@ const FIELD_MAP: Record<string, string> = {
   businessName: 'business_name',
   businessAddress: 'business_address',
   companyRegNumber: 'company_reg_number',
+  country: 'country',
   accountName: 'account_name',
   accountNumber: 'account_number',
   sortCodeOrIBAN: 'sort_code_iban',
@@ -282,6 +283,7 @@ export const DB = {
     
     const n: Tenant = { 
       email, name: email.split('@')[0], businessName: 'My Freelance Business', businessAddress: '', 
+      country: 'United Kingdom',
       currency: 'GBP', taxName: 'VAT', taxRate: 20, isVatRegistered: false, fiscalYearStartDay: 6,
       fiscalYearStartMonth: 4, invoicePrefix: 'INV-', invoiceNextNumber: 1, invoiceNumberingType: 'INCREMENTAL',
       plan: UserPlan.TRIAL, trialStartDate: new Date().toISOString(), paymentStatus: 'TRIALING'

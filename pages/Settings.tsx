@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DB } from '../services/db';
 import { Tenant, UserPlan, InvoiceNumberingType } from '../types';
-import { checkSubscriptionStatus } from '../utils';
+import { checkSubscriptionStatus, COUNTRIES } from '../utils';
 import { format, addMonths } from 'date-fns';
 import { startStripeCheckout, openStripePortal } from '../services/payment';
 
@@ -18,6 +18,9 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
   const [isUpgrading, setIsUpgrading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [logoBase64, setLogoBase64] = useState<string | undefined>(user?.logoUrl);
+  
+  // Local currency state for auto-updates when country changes
+  const [currentCurrency, setCurrentCurrency] = useState(user?.currency || 'GBP');
 
   const sub = useMemo(() => checkSubscriptionStatus(user), [user]);
 
@@ -36,6 +39,14 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
     }
   };
 
+  const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const countryName = e.target.value;
+    const countryData = COUNTRIES.find(c => c.name === countryName);
+    if (countryData) {
+      setCurrentCurrency(countryData.currency);
+    }
+  };
+
   const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!user) return;
@@ -50,6 +61,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
         businessName: (formData.get('businessName') as string) || user.businessName || '',
         businessAddress: (formData.get('businessAddress') as string) || user.businessAddress || '',
         companyRegNumber: (formData.get('companyRegNumber') as string) || user.companyRegNumber || '',
+        country: (formData.get('country') as string) || user.country || 'United Kingdom',
         
         accountName: (formData.get('accountName') as string) || user.accountName || '',
         accountNumber: (formData.get('accountNumber') as string) || user.accountNumber || '',
@@ -222,6 +234,13 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                   <input name="businessName" defaultValue={user?.businessName} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
                 </div>
                 
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Operating Country</label>
+                  <select name="country" defaultValue={user?.country || 'United Kingdom'} onChange={handleCountryChange} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none custom-scrollbar">
+                    {COUNTRIES.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
+                  </select>
+                </div>
+
                 <div className="md:col-span-2 space-y-4">
                   <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Business Logo</label>
                   <div className="flex flex-col md:flex-row gap-6 items-center bg-slate-50 p-6 rounded-[24px] border border-slate-100">
@@ -285,12 +304,25 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Trading Currency</label>
-                  <select name="currency" defaultValue={user?.currency || 'GBP'} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none">
+                  <select name="currency" key={currentCurrency} defaultValue={currentCurrency} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none">
                     <option value="GBP">GBP - British Pound (£)</option>
                     <option value="USD">USD - US Dollar ($)</option>
                     <option value="EUR">EUR - Euro (€)</option>
                     <option value="AUD">AUD - Australian Dollar ($)</option>
                     <option value="CAD">CAD - Canadian Dollar ($)</option>
+                    <option value="JPY">JPY - Japanese Yen (¥)</option>
+                    <option value="CNY">CNY - Chinese Yuan (¥)</option>
+                    <option value="INR">INR - Indian Rupee (₹)</option>
+                    <option value="BRL">BRL - Brazilian Real (R$)</option>
+                    <option value="ZAR">ZAR - South African Rand (R)</option>
+                    <option value="AED">AED - UAE Dirham</option>
+                    <option value="SAR">SAR - Saudi Riyal</option>
+                    <option value="SGD">SGD - Singapore Dollar</option>
+                    <option value="CHF">CHF - Swiss Franc</option>
+                    {/* Fallback code for any other dynamic currencies detected */}
+                    {!['GBP','USD','EUR','AUD','CAD','JPY','CNY','INR','BRL','ZAR','AED','SAR','SGD','CHF'].includes(currentCurrency) && (
+                       <option value={currentCurrency}>{currentCurrency}</option>
+                    )}
                   </select>
                 </div>
 

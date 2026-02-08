@@ -137,6 +137,7 @@ export interface Tenant {
   businessName: string;
   businessAddress: string;
   companyRegNumber?: string;
+  country: string;
   
   // Banking
   accountName?: string;
