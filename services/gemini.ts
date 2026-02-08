@@ -12,7 +12,7 @@ const getAIClient = () => {
 
 /**
  * Calculates driving distance using Google Maps grounding.
- * Optimized to strictly separate result from input postcode digits.
+ * Optimized for natural language grounding retrieval.
  */
 export const calculateDrivingDistance = async (start: string, end: string, country: string = "United Kingdom") => {
   const ai = getAIClient();
@@ -20,25 +20,9 @@ export const calculateDrivingDistance = async (start: string, end: string, count
 
   const model = "gemini-2.5-flash"; 
   
-  // Refined prompt to avoid "number leakage" from postcodes into the final result
-  const prompt = `Find the shortest driving distance between these two locations.
-  
-  LOCATIONS:
-  - FROM: "${start}"
-  - TO: "${end}"
-  - REGION: "${country}"
-
-  TASK:
-  Use Google Maps grounding. Calculate the distance in MILES.
-  
-  RESPONSE FORMAT:
-  Your response MUST contain the distance clearly labeled like this: "RESULT: [number]"
-  Example: "RESULT: 14.5"
-  
-  RULES:
-  - Convert KM to Miles (x 0.621371) if necessary.
-  - Do not let the numbers in the postcodes affect your output.
-  - Provide ONLY the RESULT line.`;
+  // Use a natural query which works best for grounding tools
+  const prompt = `What is the shortest driving distance between the postcode "${start}" and the postcode "${end}" in the ${country}? 
+  Please provide the distance in miles. Return the numeric value clearly.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -48,35 +32,36 @@ export const calculateDrivingDistance = async (start: string, end: string, count
         tools: [{ googleMaps: {} }],
         toolConfig: {
           retrievalConfig: {
-            latLng: { latitude: 51.5074, longitude: -0.1278 } 
+            // Hint for UK focus
+            latLng: { latitude: 52.3555, longitude: -1.1743 } 
           }
         }
       },
     });
 
-    const text = response.text?.trim() || "";
+    const text = response.text || "";
     
-    // Look specifically for the "RESULT: [number]" pattern to avoid picking up numbers from postcodes
-    const resultMatch = text.match(/RESULT:\s*(\d+(\.\d+)?)/i);
+    // Improved extraction: 
+    // 1. Look for a number followed by 'miles' or 'mi'
+    // 2. Look for a number after 'is' or 'approximately'
+    // 3. Just find the most likely distance number in the text
+    const milesMatch = text.match(/(\d+(\.\d+)?)\s*(miles|mi)/i) || 
+                       text.match(/(?:is|approximately|distance of)\s*(\d+(\.\d+)?)/i) ||
+                       text.match(/(\d+(\.\d+)?)/);
+                       
     let miles = null;
-    
-    if (resultMatch) {
-      miles = parseFloat(resultMatch[1]);
-    } else {
-      // Fallback: search for a number that follows a word like "distance", "is", or "miles"
-      const fallbackMatch = text.match(/(?:distance|is|total)\s*(\d+(\.\d+)?)/i) || text.match(/(\d+(\.\d+)?)\s*(?:miles|mi)/i);
-      if (fallbackMatch) {
-        miles = parseFloat(fallbackMatch[1]);
-      } else {
-        // Last resort: find the very last numeric sequence in the text (assuming postcodes are at start)
-        const allNums = text.match(/(\d+(\.\d+)?)/g);
-        if (allNums && allNums.length > 0) {
-          miles = parseFloat(allNums[allNums.length - 1]);
-        }
-      }
+    if (milesMatch) {
+      miles = parseFloat(milesMatch[1]);
+      // Safety check: if the distance seems like a postcode (very large or exactly matching input digits), reject it
+      if (miles > 1000) miles = null; 
     }
 
-    console.debug("Grounding Protocol:", { input: { start, end }, output: text, parsed: miles });
+    console.debug("Grounding Protocol Execution:", { 
+      query: { start, end }, 
+      raw: text, 
+      parsed: miles,
+      chunks: response.candidates?.[0]?.groundingMetadata?.groundingChunks
+    });
 
     return {
       miles: (miles !== null && !isNaN(miles) && miles > 0) ? miles : null,

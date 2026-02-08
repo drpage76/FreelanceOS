@@ -52,7 +52,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
     const start = newEntry.startPostcode.trim();
     const end = newEntry.endPostcode.trim();
 
-    if (!start || !end) return;
+    if (!start || !end || start.length < 3 || end.length < 3) return;
     
     setIsCalculating(true);
     setCalcError(false);
@@ -174,7 +174,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
             <div className="space-y-2 md:col-span-3">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Link to Project</label>
-              <select className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.jobId} onChange={e => setNewEntry({...newEntry, jobId: e.target.value})}>
+              <select className="w-full h-[56px] px-5 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.jobId} onChange={e => setNewEntry({...newEntry, jobId: e.target.value})}>
                 <option value="">(None - General Travel)</option>
                 {state.jobs.filter(j => j.status !== 'Cancelled').map(j => (
                   <option key={j.id} value={j.id}>{j.id} - {j.description}</option>
@@ -183,32 +183,32 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
             </div>
             <div className="space-y-2 md:col-span-2">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Start Date</label>
-              <input type="date" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.date} onChange={e => setNewEntry({...newEntry, date: e.target.value})} />
+              <input type="date" className="w-full h-[56px] px-5 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.date} onChange={e => setNewEntry({...newEntry, date: e.target.value})} />
             </div>
             <div className="space-y-2 md:col-span-2">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">End Date (Optional)</label>
-              <input type="date" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.endDate} onChange={e => setNewEntry({...newEntry, endDate: e.target.value})} />
+              <input type="date" className="w-full h-[56px] px-5 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.endDate} onChange={e => setNewEntry({...newEntry, endDate: e.target.value})} />
             </div>
             <div className="space-y-2 md:col-span-5">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Internal Memo</label>
-              <input placeholder="Project reference or meeting notes..." className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={newEntry.description} onChange={e => setNewEntry({...newEntry, description: e.target.value})} />
+              <input placeholder="Project reference or notes..." className="w-full h-[56px] px-5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={newEntry.description} onChange={e => setNewEntry({...newEntry, description: e.target.value})} />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
             <div className="space-y-2 md:col-span-3">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Start Point</label>
-              <input placeholder="Postcode / City" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase" value={newEntry.startPostcode} onChange={e => setNewEntry({...newEntry, startPostcode: e.target.value.toUpperCase()})} />
+              <input placeholder="Postcode / City" className="w-full h-[56px] px-6 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase" value={newEntry.startPostcode} onChange={e => setNewEntry({...newEntry, startPostcode: e.target.value.toUpperCase()})} />
             </div>
             
             <div className="space-y-2 md:col-span-3">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">End Point</label>
-              <input placeholder="Postcode / City" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase" value={newEntry.endPostcode} onChange={e => setNewEntry({...newEntry, endPostcode: e.target.value.toUpperCase()})} />
+              <input placeholder="Postcode / City" className="w-full h-[56px] px-6 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase" value={newEntry.endPostcode} onChange={e => setNewEntry({...newEntry, endPostcode: e.target.value.toUpperCase()})} />
             </div>
 
             <div className="space-y-2 md:col-span-2">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Single Leg</label>
-              <div className={`relative px-4 py-4 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[60px] transition-all ${isCalculating ? 'border-indigo-400 animate-pulse' : calcError ? 'border-rose-300 bg-rose-50' : 'border-indigo-100 text-indigo-700'}`}>
+              <div className={`relative px-4 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[56px] transition-all ${isCalculating ? 'border-indigo-400 animate-pulse' : calcError ? 'border-rose-300 bg-rose-50' : 'border-indigo-100 text-indigo-700'}`}>
                 <input 
                   type="number" 
                   step="0.01" 
@@ -235,17 +235,17 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
             <div className="grid grid-cols-2 gap-4 md:col-span-2">
                <div className="space-y-2">
                  <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Trips</label>
-                 <input type="number" min="1" className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl font-black outline-none h-[60px] text-center" value={newEntry.numTrips} onChange={e => setNewEntry({...newEntry, numTrips: parseInt(e.target.value) || 1})} />
+                 <input type="number" min="1" className="w-full h-[56px] px-4 bg-white border border-slate-200 rounded-2xl font-black outline-none text-center" value={newEntry.numTrips} onChange={e => setNewEntry({...newEntry, numTrips: parseInt(e.target.value) || 1})} />
                </div>
                <div className="space-y-2">
                  <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Return?</label>
-                 <button type="button" onClick={() => setNewEntry({...newEntry, isReturn: !newEntry.isReturn})} className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase border transition-all h-[60px] ${newEntry.isReturn ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-200'}`}>
+                 <button type="button" onClick={() => setNewEntry({...newEntry, isReturn: !newEntry.isReturn})} className={`w-full h-[56px] py-4 rounded-2xl font-black text-[10px] uppercase border transition-all ${newEntry.isReturn ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-400 border-slate-200'}`}>
                    {newEntry.isReturn ? 'YES' : 'NO'}
                  </button>
                </div>
             </div>
 
-            <button type="submit" disabled={isSaving || (newEntry.distanceMiles === 0 && !isCalculating)} className="h-[60px] md:col-span-2 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50">
+            <button type="submit" disabled={isSaving || (newEntry.distanceMiles === 0 && !isCalculating)} className="h-[56px] md:col-span-2 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50">
                {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-plus mr-1"></i>}
                {isSaving ? 'Syncing' : 'Add to Ledger'}
             </button>
