@@ -35,6 +35,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
   const [shifts, setShifts] = useState<Partial<JobShift>[]>([]);
   const [items, setItems] = useState<any[]>([{ description: 'Professional Services', qty: 1, unitPrice: 0 }]);
 
+  // Atomic Reset Protocol: Ensuring no state leakage from old jobs (e.g. 260347)
   useEffect(() => {
     if (isOpen) {
       setJobDetails({ ...DEFAULT_JOB_DETAILS, startDate: new Date().toISOString().split('T')[0], endDate: new Date().toISOString().split('T')[0] });
@@ -117,7 +118,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
         if (endDates.length > 0) endDate = endDates[endDates.length - 1]!;
       }
 
-      // Updated Unique ID Protocol
+      // Generate New High-Entropy Unique ID
       const jobId = generateJobId(startDate);
       
       const newJob: Job = {

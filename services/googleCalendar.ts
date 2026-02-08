@@ -40,10 +40,10 @@ export const fetchGoogleEvents = async (email: string, accessToken?: string): Pr
 
 const deleteExistingEvents = async (jobId: string, accessToken: string) => {
   try {
-    // Broad search for the Job ID to catch all related entries
-    const query = encodeURIComponent(jobId);
+    // Exact Match Protocol: Using double quotes in query to prevent 'ghost' collisions
+    const exactQuery = encodeURIComponent(`"(Ref: ${jobId})"`);
     const search = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/primary/events?q=${query}`,
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?q=${exactQuery}`,
       { headers: { 'Authorization': `Bearer ${accessToken}` } }
     );
     
@@ -62,7 +62,7 @@ const deleteExistingEvents = async (jobId: string, accessToken: string) => {
       });
     }
   } catch (err) {
-    console.error("Google Cleanup Protocol Error:", err);
+    console.error("Google Exact Cleanup Error:", err);
   }
 };
 
@@ -74,10 +74,10 @@ export const syncJobToGoogle = async (job: Job, accessToken?: string, clientName
   if (!accessToken) return false;
   
   try {
-    // 1. Always perform a thorough cleanup first
+    // 1. Precise Cleanup
     await deleteExistingEvents(job.id, accessToken);
     
-    // 2. If sync is disabled or cancelled, we are done (cleanup complete)
+    // 2. Sync if Active
     if (job.status === JobStatus.CANCELLED || job.syncToCalendar === false) return true;
 
     const eventsToCreate = [];

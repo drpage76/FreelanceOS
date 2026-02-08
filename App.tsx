@@ -196,6 +196,8 @@ const App: React.FC = () => {
    */
   const handleSyncAll = useCallback(async () => {
     if (syncInProgress.current || !currentUser) return;
+    
+    // Explicitly set syncing true to show spinner immediately
     setIsSyncing(true);
     
     try {
@@ -216,11 +218,11 @@ const App: React.FC = () => {
         }
       }
 
-      // Reload to reflect changes
+      // Explicitly reload all data to refresh calendar entries in the UI
+      syncInProgress.current = false; // Allow loadData to run
       await loadData(currentUser);
     } catch (err) {
       console.error("Mass Sync Protocol Failure:", err);
-    } finally {
       setIsSyncing(false);
     }
   }, [appState.jobs, appState.clients, currentUser, getLatestToken, loadData]);

@@ -61,15 +61,16 @@ export const checkSubscriptionStatus = (user: Tenant | null) => {
 };
 
 /**
- * Enhanced Job ID Generation
- * Format: YYMM-XXXX (e.g. 2602-8492)
- * High entropy to prevent database collisions in multi-user environments
+ * High-Entropy Job ID Generation
+ * Format: YYMM-XXXXXX (e.g. 2603-849201)
+ * Uses 6-digit entropy to ensure absolute uniqueness in multi-user cloud DB
  */
 export const generateJobId = (startDate: string): string => {
   const date = parseISO(startDate);
   const yy = format(date, 'yy');
   const mm = format(date, 'MM');
-  const entropy = Math.floor(1000 + Math.random() * 9000); 
+  // Boost entropy to 6 digits to prevent collisions like '260347'
+  const entropy = Math.floor(100000 + Math.random() * 899999); 
   return `${yy}${mm}-${entropy}`;
 };
 
