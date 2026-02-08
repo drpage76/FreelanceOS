@@ -16,6 +16,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isBilling, setIsBilling] = useState<string | null>(null);
+  const [calcError, setCalcError] = useState(false);
   const lastCalculatedRef = useRef("");
 
   const [newEntry, setNewEntry] = useState({
@@ -47,21 +48,6 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
     }
   }, [newEntry.jobId, state.jobs]);
 
-  useEffect(() => {
-    const start = newEntry.startPostcode.trim();
-    const end = newEntry.endPostcode.trim();
-    
-    if (start.length >= 4 && end.length >= 4) {
-      const key = `${start}-${end}`;
-      if (key !== lastCalculatedRef.current) {
-        const timer = setTimeout(() => {
-          handleCalculateMileage();
-        }, 2000); 
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [newEntry.startPostcode, newEntry.endPostcode]);
-
   const handleCalculateMileage = async () => {
     const start = newEntry.startPostcode.trim();
     const end = newEntry.endPostcode.trim();
@@ -69,14 +55,18 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
     if (!start || !end) return;
     
     setIsCalculating(true);
+    setCalcError(false);
     lastCalculatedRef.current = `${start}-${end}`;
     
     try {
       const result = await calculateDrivingDistance(start, end, state.user?.country);
       if (result.miles !== null && result.miles > 0) {
         setNewEntry(prev => ({ ...prev, distanceMiles: result.miles || 0 }));
+      } else {
+        setCalcError(true);
       }
     } catch (err) {
+      setCalcError(true);
       console.warn("Map Protocol lookup failed:", err);
     } finally {
       setIsCalculating(false);
@@ -218,19 +208,28 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Single Leg Distance</label>
-              <div className={`relative px-4 py-4 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[56px] transition-all ${isCalculating ? 'border-indigo-400 animate-pulse' : 'border-indigo-100 text-indigo-700'}`}>
+              <div className={`relative px-4 py-4 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[56px] transition-all ${isCalculating ? 'border-indigo-400 animate-pulse' : calcError ? 'border-rose-300 bg-rose-50' : 'border-indigo-100 text-indigo-700'}`}>
                 <input 
                   type="number" 
                   step="0.01" 
-                  className="w-full bg-transparent outline-none font-black text-indigo-700 placeholder:text-indigo-300" 
+                  className={`w-full bg-transparent outline-none font-black ${calcError ? 'text-rose-600' : 'text-indigo-700'} placeholder:text-indigo-300`} 
                   value={newEntry.distanceMiles || ''} 
                   placeholder={isCalculating ? "Calculating..." : "0.00"}
-                  onChange={e => setNewEntry({...newEntry, distanceMiles: parseFloat(e.target.value) || 0})} 
+                  onChange={e => {
+                    setCalcError(false);
+                    setNewEntry({...newEntry, distanceMiles: parseFloat(e.target.value) || 0});
+                  }} 
                 />
-                <button type="button" onClick={handleCalculateMileage} className="text-indigo-400 hover:text-indigo-600 ml-1 shrink-0">
-                  <i className="fa-solid fa-arrows-rotate text-[12px]"></i>
+                <button 
+                  type="button" 
+                  onClick={handleCalculateMileage} 
+                  disabled={isCalculating}
+                  className={`${isCalculating ? 'opacity-30' : 'hover:text-indigo-600'} text-indigo-400 ml-1 shrink-0 transition-colors`}
+                >
+                  <i className={`fa-solid ${isCalculating ? 'fa-spinner animate-spin' : 'fa-arrows-rotate'} text-[12px]`}></i>
                 </button>
               </div>
+              {calcError && <p className="text-[8px] text-rose-500 font-black uppercase tracking-tighter px-1">Lookup failed. Check postcodes.</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
