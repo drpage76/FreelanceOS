@@ -21,12 +21,17 @@ import { Tenant, UserPlan, Job } from './types';
 
 export const formatCurrency = (amount: number, userSettings?: Tenant | null): string => {
   const currency = userSettings?.currency || 'GBP';
-  return new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(amount);
+  try {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount);
+  } catch (e) {
+    // Fallback if the currency code is invalid or unsupported by the environment
+    return `${currency} ${amount.toFixed(2)}`;
+  }
 };
 
 export const formatDate = (dateStr: string): string => {
@@ -165,6 +170,7 @@ export const COUNTRIES = [
   { name: 'Algeria', code: 'DZ', currency: 'DZD' },
   { name: 'Andorra', code: 'AD', currency: 'EUR' },
   { name: 'Angola', code: 'AO', currency: 'AOA' },
+  { name: 'Antigua and Barbuda', code: 'AG', currency: 'XCD' },
   { name: 'Argentina', code: 'AR', currency: 'ARS' },
   { name: 'Armenia', code: 'AM', currency: 'AMD' },
   { name: 'Australia', code: 'AU', currency: 'AUD' },
@@ -354,3 +360,5 @@ export const COUNTRIES = [
   { name: 'Zambia', code: 'ZM', currency: 'ZMW' },
   { name: 'Zimbabwe', code: 'ZW', currency: 'ZWG' }
 ];
+
+export const UNIQUE_CURRENCIES = Array.from(new Set(COUNTRIES.map(c => c.currency))).sort();

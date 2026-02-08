@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DB } from '../services/db';
 import { Tenant, UserPlan, InvoiceNumberingType } from '../types';
-import { checkSubscriptionStatus, COUNTRIES } from '../utils';
+import { checkSubscriptionStatus, COUNTRIES, UNIQUE_CURRENCIES } from '../utils';
 import { format, addMonths } from 'date-fns';
 import { startStripeCheckout, openStripePortal } from '../services/payment';
 
@@ -304,25 +304,10 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">Trading Currency</label>
-                  <select name="currency" key={currentCurrency} defaultValue={currentCurrency} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none">
-                    <option value="GBP">GBP - British Pound (£)</option>
-                    <option value="USD">USD - US Dollar ($)</option>
-                    <option value="EUR">EUR - Euro (€)</option>
-                    <option value="AUD">AUD - Australian Dollar ($)</option>
-                    <option value="CAD">CAD - Canadian Dollar ($)</option>
-                    <option value="JPY">JPY - Japanese Yen (¥)</option>
-                    <option value="CNY">CNY - Chinese Yuan (¥)</option>
-                    <option value="INR">INR - Indian Rupee (₹)</option>
-                    <option value="BRL">BRL - Brazilian Real (R$)</option>
-                    <option value="ZAR">ZAR - South African Rand (R)</option>
-                    <option value="AED">AED - UAE Dirham</option>
-                    <option value="SAR">SAR - Saudi Riyal</option>
-                    <option value="SGD">SGD - Singapore Dollar</option>
-                    <option value="CHF">CHF - Swiss Franc</option>
-                    {/* Fallback code for any other dynamic currencies detected */}
-                    {!['GBP','USD','EUR','AUD','CAD','JPY','CNY','INR','BRL','ZAR','AED','SAR','SGD','CHF'].includes(currentCurrency) && (
-                       <option value={currentCurrency}>{currentCurrency}</option>
-                    )}
+                  <select name="currency" key={currentCurrency} defaultValue={currentCurrency} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none custom-scrollbar">
+                    {UNIQUE_CURRENCIES.map(curr => (
+                       <option key={curr} value={curr}>{curr}</option>
+                    ))}
                   </select>
                 </div>
 
