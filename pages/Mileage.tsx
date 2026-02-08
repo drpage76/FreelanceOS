@@ -52,7 +52,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
     const start = newEntry.startPostcode.trim();
     const end = newEntry.endPostcode.trim();
 
-    if (!start || !end || start.length < 3 || end.length < 3) return;
+    if (!start || !end) return;
     
     setIsCalculating(true);
     setCalcError(false);
@@ -171,8 +171,9 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
 
       <div className="bg-white p-6 md:p-10 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden">
         <form onSubmit={handleSubmit} className="space-y-10 relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            <div className="space-y-2 md:col-span-3">
+          {/* Top Row: Reorganized into 4 columns for perfect alignment */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+            <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Link to Project</label>
               <select className="w-full h-[56px] px-5 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.jobId} onChange={e => setNewEntry({...newEntry, jobId: e.target.value})}>
                 <option value="">(None - General Travel)</option>
@@ -181,20 +182,25 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                 ))}
               </select>
             </div>
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Start Date</label>
-              <input type="date" className="w-full h-[56px] px-5 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.date} onChange={e => setNewEntry({...newEntry, date: e.target.value})} />
+              <div className="w-full">
+                <input type="date" className="w-full h-[56px] px-5 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.date} onChange={e => setNewEntry({...newEntry, date: e.target.value})} />
+              </div>
             </div>
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">End Date (Optional)</label>
-              <input type="date" className="w-full h-[56px] px-5 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.endDate} onChange={e => setNewEntry({...newEntry, endDate: e.target.value})} />
+              <div className="w-full">
+                <input type="date" className="w-full h-[56px] px-5 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" value={newEntry.endDate} onChange={e => setNewEntry({...newEntry, endDate: e.target.value})} />
+              </div>
             </div>
-            <div className="space-y-2 md:col-span-5">
+            <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Internal Memo</label>
-              <input placeholder="Project reference or notes..." className="w-full h-[56px] px-5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={newEntry.description} onChange={e => setNewEntry({...newEntry, description: e.target.value})} />
+              <input placeholder="Notes..." className="w-full h-[56px] px-5 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={newEntry.description} onChange={e => setNewEntry({...newEntry, description: e.target.value})} />
             </div>
           </div>
 
+          {/* Bottom Row: Postcodes and Calculation */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
             <div className="space-y-2 md:col-span-3">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Start Point</label>
@@ -214,7 +220,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                   step="0.01" 
                   className={`w-full bg-transparent outline-none font-black ${calcError ? 'text-rose-600' : 'text-indigo-700'} placeholder:text-indigo-300`} 
                   value={newEntry.distanceMiles || ''} 
-                  placeholder={isCalculating ? "Syncing..." : "0.00"}
+                  placeholder={isCalculating ? "..." : "0.00"}
                   onChange={e => {
                     setCalcError(false);
                     setNewEntry({...newEntry, distanceMiles: parseFloat(e.target.value) || 0});
@@ -229,7 +235,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                   <i className={`fa-solid ${isCalculating ? 'fa-spinner animate-spin' : 'fa-arrows-rotate'} text-[14px]`}></i>
                 </button>
               </div>
-              {calcError && <p className="text-[8px] text-rose-500 font-black uppercase tracking-tighter px-1 absolute mt-1">Lookup failed. Check postcodes.</p>}
+              {calcError && <p className="text-[8px] text-rose-500 font-black uppercase tracking-tighter px-1 absolute mt-1">Lookup failed.</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-4 md:col-span-2">

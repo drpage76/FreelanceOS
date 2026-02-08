@@ -12,7 +12,7 @@ const getAIClient = () => {
 
 /**
  * Calculates driving distance using Google Maps grounding.
- * Optimized for natural language grounding retrieval.
+ * Optimized for strict numerical extraction from map data.
  */
 export const calculateDrivingDistance = async (start: string, end: string, country: string = "United Kingdom") => {
   const ai = getAIClient();
@@ -20,9 +20,24 @@ export const calculateDrivingDistance = async (start: string, end: string, count
 
   const model = "gemini-2.5-flash"; 
   
-  // Use a natural query which works best for grounding tools
-  const prompt = `What is the shortest driving distance between the postcode "${start}" and the postcode "${end}" in the ${country}? 
-  Please provide the distance in miles. Return the numeric value clearly.`;
+  // Use a highly directive prompt to ensure the model focuses on the numeric result
+  const prompt = `CRITICAL SYSTEM INSTRUCTION: Use Google Maps to calculate the shortest driving distance.
+  
+  LOCATIONS:
+  - From: "${start}"
+  - To: "${end}"
+  - Region: "${country}"
+
+  REQUIREMENT:
+  Find the distance in miles. If you find it in kilometers, multiply by 0.621 to convert.
+  
+  FORMAT:
+  Return the final answer in the following exact format:
+  DISTANCE_VALUE: [number]
+  
+  Example: "DISTANCE_VALUE: 12.4"
+  
+  Do not include any other text or reasoning.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -32,7 +47,7 @@ export const calculateDrivingDistance = async (start: string, end: string, count
         tools: [{ googleMaps: {} }],
         toolConfig: {
           retrievalConfig: {
-            // Hint for UK focus
+            // Center on UK for better grounding relevance
             latLng: { latitude: 52.3555, longitude: -1.1743 } 
           }
         }
@@ -41,26 +56,30 @@ export const calculateDrivingDistance = async (start: string, end: string, count
 
     const text = response.text || "";
     
-    // Improved extraction: 
-    // 1. Look for a number followed by 'miles' or 'mi'
-    // 2. Look for a number after 'is' or 'approximately'
-    // 3. Just find the most likely distance number in the text
-    const milesMatch = text.match(/(\d+(\.\d+)?)\s*(miles|mi)/i) || 
-                       text.match(/(?:is|approximately|distance of)\s*(\d+(\.\d+)?)/i) ||
-                       text.match(/(\d+(\.\d+)?)/);
+    // Extraction logic:
+    // 1. Look for our specific tag DISTANCE_VALUE:
+    // 2. Fallback to any number that isn't clearly a postcode
+    const tagMatch = text.match(/DISTANCE_VALUE:\s*(\d+(\.\d+)?)/i);
+    const milesMatch = tagMatch || text.match(/(\d+(\.\d+)?)\s*(?:miles|mi)/i) || text.match(/(?:is|of)\s*(\d+(\.\d+)?)/i);
                        
     let miles = null;
     if (milesMatch) {
       miles = parseFloat(milesMatch[1]);
-      // Safety check: if the distance seems like a postcode (very large or exactly matching input digits), reject it
-      if (miles > 1000) miles = null; 
+      
+      // Sanity check: If the number extracted is exactly one of the postcode numbers (e.g. 3 or 8 from WV3 8DA), 
+      // it's likely a false positive. We look for decimals or values that don't match the inputs exactly.
+      const startDigits = start.replace(/[^0-9]/g, '');
+      const endDigits = end.replace(/[^0-9]/g, '');
+      if ((miles.toString() === startDigits || miles.toString() === endDigits) && !text.includes('DISTANCE_VALUE')) {
+        miles = null; 
+      }
     }
 
-    console.debug("Grounding Protocol Execution:", { 
+    console.debug("Grounding Protocol Result:", { 
       query: { start, end }, 
       raw: text, 
       parsed: miles,
-      chunks: response.candidates?.[0]?.groundingMetadata?.groundingChunks
+      grounding: response.candidates?.[0]?.groundingMetadata?.groundingChunks
     });
 
     return {
@@ -69,7 +88,7 @@ export const calculateDrivingDistance = async (start: string, end: string, count
     };
   } catch (error) {
     console.error("Mileage Protocol Error:", error);
-    return { miles: null, error: "Network or Protocol Failure" };
+    return { miles: null, error: "Protocol Failure" };
   }
 };
 
