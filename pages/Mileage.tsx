@@ -16,12 +16,12 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
   const [isCalculating, setIsCalculating] = useState(false);
   const [isBilling, setIsBilling] = useState<string | null>(null);
 
-  // Change from boolean -> message (so we can see the REAL reason)
+  // Show real error text, not just boolean
   const [calcError, setCalcError] = useState<string | null>(null);
 
-  // Used to prevent repeated calls for the same route
+  // Avoid hammering / repeats
   const lastCalculatedRef = useRef<string>('');
-  const calcDebounceRef = useRef<number | null>(null);
+  const debounceRef = useRef<number | null>(null);
 
   const [newEntry, setNewEntry] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -50,70 +50,64 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
         }));
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newEntry.jobId, state.jobs]);
 
   const handleCalculateMileage = async (opts?: { force?: boolean }) => {
     const start = (newEntry.startPostcode || '').trim();
     const end = (newEntry.endPostcode || '').trim();
+    const country = state.user?.country || 'United Kingdom';
 
-    // Basic validation
     if (!start || !end) {
       setCalcError('Enter both start and end locations.');
       return;
     }
 
-    // Prevent spam / repeats
-    const routeKey = `${start} -> ${end} | ${state.user?.country || ''}`;
+    const routeKey = `${start} -> ${end} | ${country}`;
+
+    // skip repeated calls unless forced
     if (!opts?.force && routeKey === lastCalculatedRef.current) return;
     if (isCalculating) return;
 
     setIsCalculating(true);
     setCalcError(null);
-
-    // record the route we’re attempting (so we don’t hammer the API)
     lastCalculatedRef.current = routeKey;
 
     try {
-      // IMPORTANT: log so you can see clicks and failures in prod
-      console.log('[Mileage] Calculating distance:', { start, end, country: state.user?.country });
+      console.log('[Mileage] Calculating distance:', { start, end, country });
 
-      const result: any = await calculateDrivingDistance(start, end, state.user?.country);
+      const result: any = await calculateDrivingDistance(start, end, country);
 
-      // Handle different shapes (in case service returns { miles, error } etc.)
       const miles =
         typeof result?.miles === 'number' ? result.miles :
         typeof result?.distanceMiles === 'number' ? result.distanceMiles :
         null;
 
       if (miles !== null && miles > 0) {
+        console.log('✅ Mileage result:', miles);
         setNewEntry(prev => ({ ...prev, distanceMiles: miles }));
         setCalcError(null);
       } else {
         const reason =
           result?.error ||
           result?.message ||
-          'Lookup failed (no mileage returned). Check API key / billing / domain restrictions.';
+          'NO_DISTANCE_RETURNED';
+        console.warn('❌ Mileage parse failed:', reason);
         setCalcError(String(reason));
       }
     } catch (err: any) {
-      console.warn('[Mileage] Map Protocol lookup failed:', err);
-      const msg =
-        err?.message ||
-        err?.toString?.() ||
-        'Lookup failed (unexpected error).';
-      setCalcError(String(msg));
+      console.warn('❌ Mileage lookup failed:', err);
+      setCalcError(err?.message || 'PROTOCOL_FAILURE');
     } finally {
       setIsCalculating(false);
     }
   };
 
-  // Auto-calc whenever route changes (debounced)
+  // Debounced auto-calc when start/end changes ONLY
   useEffect(() => {
     const start = (newEntry.startPostcode || '').trim();
     const end = (newEntry.endPostcode || '').trim();
 
-    // Reset mileage if the user clears a field
+    // If user clears either input, reset
     if (!start || !end) {
       setCalcError(null);
       setNewEntry(prev => ({ ...prev, distanceMiles: 0 }));
@@ -121,23 +115,30 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
       return;
     }
 
-    // Debounce
-    if (calcDebounceRef.current) window.clearTimeout(calcDebounceRef.current);
-    calcDebounceRef.current = window.setTimeout(() => {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => {
       handleCalculateMileage();
-    }, 500);
+    }, 650);
 
     return () => {
-      if (calcDebounceRef.current) window.clearTimeout(calcDebounceRef.current);
+      if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newEntry.startPostcode, newEntry.endPostcode, state.user?.country]);
+
+  // This is what Return + Trips should affect
+  const entryTotalMiles =
+    (newEntry.distanceMiles || 0) *
+    (newEntry.numTrips || 1) *
+    (newEntry.isReturn ? 2 : 1);
+
+  const entryTotalValue = entryTotalMiles * MILEAGE_RATE;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving || !newEntry.startPostcode || !newEntry.endPostcode) return;
 
-    // Don’t allow saving if lookup failed (unless user manually entered miles)
+    // Allow manual entry, but don’t allow saving 0
     if ((newEntry.distanceMiles || 0) <= 0) {
       setCalcError('Distance is 0.00 — click refresh or enter miles manually.');
       return;
@@ -197,7 +198,6 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
       const existingItems = await DB.getJobItems(record.jobId);
       await DB.saveJobItems(record.jobId, [...existingItems, newItem]);
 
-      // Update Job total
       const job = state.jobs.find(j => j.id === record.jobId);
       if (job) {
         await DB.saveJob({
@@ -254,38 +254,32 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                 onChange={e => setNewEntry({ ...newEntry, jobId: e.target.value })}
               >
                 <option value="">(None - General Travel)</option>
-                {state.jobs
-                  .filter(j => j.status !== 'Cancelled')
-                  .map(j => (
-                    <option key={j.id} value={j.id}>
-                      {j.id} - {j.description}
-                    </option>
-                  ))}
+                {state.jobs.filter(j => j.status !== 'Cancelled').map(j => (
+                  <option key={j.id} value={j.id}>
+                    {j.id} - {j.description}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Start Date</label>
-              <div className="w-full">
-                <input
-                  type="date"
-                  className="w-full h-[56px] px-5 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none"
-                  value={newEntry.date}
-                  onChange={e => setNewEntry({ ...newEntry, date: e.target.value })}
-                />
-              </div>
+              <input
+                type="date"
+                className="w-full h-[56px] px-5 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none"
+                value={newEntry.date}
+                onChange={e => setNewEntry({ ...newEntry, date: e.target.value })}
+              />
             </div>
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">End Date (Optional)</label>
-              <div className="w-full">
-                <input
-                  type="date"
-                  className="w-full h-[56px] px-5 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none"
-                  value={newEntry.endDate}
-                  onChange={e => setNewEntry({ ...newEntry, endDate: e.target.value })}
-                />
-              </div>
+              <input
+                type="date"
+                className="w-full h-[56px] px-5 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none"
+                value={newEntry.endDate}
+                onChange={e => setNewEntry({ ...newEntry, endDate: e.target.value })}
+              />
             </div>
 
             <div className="space-y-2">
@@ -311,7 +305,6 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                   setCalcError(null);
                   setNewEntry({ ...newEntry, startPostcode: e.target.value.toUpperCase() });
                 }}
-                onBlur={() => handleCalculateMileage()}
               />
             </div>
 
@@ -325,7 +318,6 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                   setCalcError(null);
                   setNewEntry({ ...newEntry, endPostcode: e.target.value.toUpperCase() });
                 }}
-                onBlur={() => handleCalculateMileage()}
               />
             </div>
 
@@ -356,7 +348,6 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                   }}
                 />
 
-                {/* THIS is now a guaranteed clickable button; force recalculation */}
                 <button
                   type="button"
                   onClick={() => handleCalculateMileage({ force: true })}
@@ -367,6 +358,16 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                 >
                   <i className={`fa-solid ${isCalculating ? 'fa-spinner animate-spin' : 'fa-arrows-rotate'} text-[14px]`} />
                 </button>
+              </div>
+
+              {/* Total for entry: THIS is what trips/return changes */}
+              <div className="flex justify-between px-1 mt-2">
+                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  Total for entry
+                </span>
+                <span className="text-[10px] font-black text-slate-700">
+                  {entryTotalMiles.toFixed(1)} mi • {formatCurrency(entryTotalValue, state.user)}
+                </span>
               </div>
 
               {calcError && (
