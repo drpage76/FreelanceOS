@@ -5,7 +5,7 @@ import { Client, Job, JobItem, Invoice, Tenant, UserPlan, MileageRecord, JobShif
 const SUPABASE_URL = 'https://hucvermrtjxsjcsjirwj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1Y3Zlcm1ydGp4c2pjc2ppcndqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNDQ1NDAsImV4cCI6MjA4MzgyMDU0MH0.hpdDWrdQubhBW2ga3Vho8J_fOtVw7Xr6GZexF8ksSmA';
 const CLOUD_CONFIG_KEY = 'freelance_os_cloud_config';
-const LOCAL_STORAGE_KEY = 'freelance_os_local_data_v3'; // Incremented version to clear potential local corruption
+const LOCAL_STORAGE_KEY = 'freelance_os_local_data_v4'; // Bumped to v4 to clear any randomized/collided legacy data
 const DELETED_ITEMS_KEY = 'freelance_os_deleted_ids';
 const LOCAL_USER_EMAIL = 'local@freelanceos.internal';
 
@@ -319,7 +319,11 @@ export const DB = {
   getMileage: async () => DB.call('mileage', 'select').then(res => res || []),
   saveMileage: async (m: MileageRecord) => DB.call('mileage', 'upsert', m),
   getJobItems: async (jobId: string) => DB.call('job_items', 'select', null, { jobId }).then(res => res || []),
-  saveJobItems: async (jobId: string, items: JobItem[]) => DB.call('job_items', 'upsert', items),
+  saveJobItems: async (jobId: string, items: JobItem[]) => {
+    // ATOMIC INTEGRITY PROTOCOL: Delete existing items for this job ID first to prevent ghost leakage
+    await DB.call('job_items', 'delete', null, { jobId });
+    await DB.call('job_items', 'upsert', items);
+  },
   getShifts: async (jobId: string) => DB.call('job_shifts', 'select', null, { jobId }).then(res => res || []),
   saveShifts: async (jobId: string, shifts: JobShift[]) => {
     await DB.call('job_shifts', 'delete', null, { jobId });

@@ -61,18 +61,23 @@ export const checkSubscriptionStatus = (user: Tenant | null) => {
 };
 
 /**
- * Sequential Job ID Generation
+ * Robust Sequential Job ID Generation
  * Format: YYMMXX (e.g. 260201, 260202)
- * Calculates next number based on existing jobs for that specific month.
+ * Strictly ignores legacy IDs containing hyphens or randomized strings.
  */
 export const generateSequentialJobId = (startDate: string, existingJobs: Job[]): string => {
   const date = parseISO(startDate);
   const prefix = format(date, 'yyMM'); // e.g. "2602"
   
-  // Filter jobs that belong to this month/year prefix
-  const monthlyJobs = existingJobs.filter(j => j.id.startsWith(prefix));
+  // Filter jobs for this month AND ensure they are exactly 6 digits (the standard YYMMXX pattern)
+  // This ignores legacy IDs like '2602-124157' or randomized entropy.
+  const monthlyJobs = existingJobs.filter(j => 
+    j.id.startsWith(prefix) && 
+    j.id.length === 6 && 
+    !j.id.includes('-')
+  );
   
-  // Extract sequence numbers and find the max
+  // Extract sequence numbers (the last 2 digits)
   const sequences = monthlyJobs.map(j => {
     const seqPart = j.id.slice(4);
     return parseInt(seqPart) || 0;
