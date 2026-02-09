@@ -1,9 +1,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 /**
- * IMPORTANT (Vite + GitHub Actions):
- * - Set a GitHub Actions secret named: VITE_GEMINI_API_KEY
- * - Inject it into the build step in deploy.yml
+ * Vite + GitHub Actions:
+ * - Add GitHub secret: VITE_GEMINI_API_KEY
+ * - Inject into build step in deploy.yml
  */
 const getAIClient = () => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -18,7 +18,7 @@ const getAIClient = () => {
 
 /**
  * Calculates driving distance using Gemini + Google Maps grounding.
- * Robust parsing to reduce NO_DISTANCE_RETURNED.
+ * Uses JSON schema output to avoid flaky text parsing.
  */
 export const calculateDrivingDistance = async (
   start: string,
@@ -37,12 +37,10 @@ FROM: "${start}"
 TO: "${end}"
 REGION: "${country}"
 
-Return the answer as:
-DISTANCE_VALUE: [number in miles]
+Return JSON ONLY with:
+{ "miles": number }
 
 If the distance is in km, convert to miles using miles = km * 0.621371.
-
-Return ONLY the line starting with DISTANCE_VALUE.
 `.trim();
 
   try {
@@ -53,60 +51,45 @@ Return ONLY the line starting with DISTANCE_VALUE.
         tools: [{ googleMaps: {} }],
         toolConfig: {
           retrievalConfig: {
-            // UK-ish centroid; helps grounding relevance
+            // UK-ish centroid for grounding relevance
             latLng: { latitude: 52.3555, longitude: -1.1743 }
           }
+        },
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            miles: { type: Type.NUMBER }
+          },
+          required: ["miles"]
         }
       }
     });
 
-    const text = (response.text || "").trim();
+    const raw = (response.text || "").trim();
 
-    // 1) Preferred: DISTANCE_VALUE: xx.x
-    const tagged = text.match(/DISTANCE_VALUE:\s*([0-9]+(?:\.[0-9]+)?)/i);
-    if (tagged) {
-      const miles = parseFloat(tagged[1]);
-      return {
-        miles: miles > 0 ? miles : null,
-        sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
-      };
+    if (!raw) {
+      console.warn("❌ EMPTY_RESPONSE from Gemini (response.text was blank).");
+      return { miles: null, error: "EMPTY_RESPONSE" };
     }
 
-    // 2) Look for "xx mi/miles"
-    const miMatch = text.match(/([0-9]+(?:\.[0-9]+)?)\s*(mi|miles)\b/i);
-    if (miMatch) {
-      const miles = parseFloat(miMatch[1]);
-      return {
-        miles: miles > 0 ? miles : null,
-        sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
-      };
+    let data: any;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      console.warn("❌ JSON_PARSE_FAILED. Raw:", raw);
+      return { miles: null, error: "JSON_PARSE_FAILED" };
     }
 
-    // 3) Look for "xx km" and convert
-    const kmMatch = text.match(/([0-9]+(?:\.[0-9]+)?)\s*(km|kilometers|kilometres)\b/i);
-    if (kmMatch) {
-      const km = parseFloat(kmMatch[1]);
-      const miles = km * 0.621371;
-      return {
-        miles: miles > 0 ? miles : null,
-        sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
-      };
-    }
+    const miles = typeof data?.miles === "number" ? data.miles : null;
 
-    // 4) Last resort: pick the largest plausible number
-    const nums = (text.match(/[0-9]+(?:\.[0-9]+)?/g) || [])
-      .map(n => parseFloat(n))
-      .filter(n => !isNaN(n) && n >= 1 && n <= 1000);
-
-    const best = nums.length ? Math.max(...nums) : null;
-
-    if (!best) {
-      console.warn("❌ NO_DISTANCE_RETURNED. Raw text:", text);
+    if (!miles || isNaN(miles) || miles <= 0) {
+      console.warn("❌ NO_DISTANCE_RETURNED. Parsed:", miles, "Raw:", raw);
       return { miles: null, error: "NO_DISTANCE_RETURNED" };
     }
 
     return {
-      miles: best,
+      miles,
       sources: response.candidates?.[0]?.groundingMetadata?.groundingChunks || []
     };
   } catch (err: any) {
@@ -115,6 +98,9 @@ Return ONLY the line starting with DISTANCE_VALUE.
   }
 };
 
+/**
+ * Smart Job Extraction (kept, using same key handling)
+ */
 export const smartExtractJob = async (rawText: string) => {
   const ai = getAIClient();
   if (!ai) return null;

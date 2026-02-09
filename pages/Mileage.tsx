@@ -16,7 +16,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
   const [isCalculating, setIsCalculating] = useState(false);
   const [isBilling, setIsBilling] = useState<string | null>(null);
 
-  // Show real error text, not just boolean
+  // String so you see the real reason: EMPTY_RESPONSE / PROTOCOL_FAILURE etc.
   const [calcError, setCalcError] = useState<string | null>(null);
 
   // Avoid hammering / repeats
@@ -62,9 +62,12 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
       return;
     }
 
-    const routeKey = `${start} -> ${end} | ${country}`;
+    // (Optional) Add ", UK" for UK entries to help geocoding consistency
+    const normalizedStart = country.toLowerCase().includes('united') ? `${start}, UK` : start;
+    const normalizedEnd = country.toLowerCase().includes('united') ? `${end}, UK` : end;
 
-    // skip repeated calls unless forced
+    const routeKey = `${normalizedStart} -> ${normalizedEnd} | ${country}`;
+
     if (!opts?.force && routeKey === lastCalculatedRef.current) return;
     if (isCalculating) return;
 
@@ -73,9 +76,9 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
     lastCalculatedRef.current = routeKey;
 
     try {
-      console.log('[Mileage] Calculating distance:', { start, end, country });
+      console.log('[Mileage] Calculating distance:', { start: normalizedStart, end: normalizedEnd, country });
 
-      const result: any = await calculateDrivingDistance(start, end, country);
+      const result: any = await calculateDrivingDistance(normalizedStart, normalizedEnd, country);
 
       const miles =
         typeof result?.miles === 'number' ? result.miles :
@@ -107,7 +110,6 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
     const start = (newEntry.startPostcode || '').trim();
     const end = (newEntry.endPostcode || '').trim();
 
-    // If user clears either input, reset
     if (!start || !end) {
       setCalcError(null);
       setNewEntry(prev => ({ ...prev, distanceMiles: 0 }));
@@ -126,7 +128,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newEntry.startPostcode, newEntry.endPostcode, state.user?.country]);
 
-  // This is what Return + Trips should affect
+  // Return/Trips should affect total entry miles + valuation (not the single leg)
   const entryTotalMiles =
     (newEntry.distanceMiles || 0) *
     (newEntry.numTrips || 1) *
@@ -138,7 +140,6 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
     e.preventDefault();
     if (isSaving || !newEntry.startPostcode || !newEntry.endPostcode) return;
 
-    // Allow manual entry, but don’t allow saving 0
     if ((newEntry.distanceMiles || 0) <= 0) {
       setCalcError('Distance is 0.00 — click refresh or enter miles manually.');
       return;
@@ -360,7 +361,7 @@ export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                 </button>
               </div>
 
-              {/* Total for entry: THIS is what trips/return changes */}
+              {/* Total for entry */}
               <div className="flex justify-between px-1 mt-2">
                 <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
                   Total for entry
