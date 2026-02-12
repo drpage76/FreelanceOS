@@ -8,7 +8,7 @@ import { Jobs } from './pages/Jobs';
 import { JobDetails } from './pages/JobDetails';
 import { Clients } from './pages/Clients';
 import { Invoices } from './pages/Invoices';
-import { Mileage } from './pages/Mileage';
+import  Mileage  from './pages/Mileage';
 import { Quotes } from './pages/Quotes';
 import { Settings } from './pages/Settings';
 import { Landing } from './pages/Landing'; 

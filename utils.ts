@@ -35,13 +35,25 @@ export const formatCurrency = (amount: number, userSettings?: Tenant | null): st
 };
 
 export const formatDate = (dateStr: string): string => {
-  if (!dateStr) return '-';
+  if (!dateStr) return "-";
   try {
-    return format(parseISO(dateStr), 'dd MMM yy');
-  } catch (e) {
+    const d = parseISO(dateStr);
+    if (!isValid(d)) return dateStr;
+
+    const dayNum = d.getDate();
+
+    const suffix =
+      dayNum % 10 === 1 && dayNum !== 11 ? "st" :
+      dayNum % 10 === 2 && dayNum !== 12 ? "nd" :
+      dayNum % 10 === 3 && dayNum !== 13 ? "rd" : "th";
+
+    return `${dayNum}${suffix} ${format(d, "MMM yy")}`;
+  } catch {
     return dateStr;
   }
 };
+
+
 
 export const checkSubscriptionStatus = (user: Tenant | null) => {
   if (!user) return { isTrialExpired: false, daysLeft: 0, plan: UserPlan.TRIAL };

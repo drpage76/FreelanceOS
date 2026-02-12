@@ -1,57 +1,72 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// supabase/functions/mileage/index.ts
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-serve(async (req) => {
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "METHOD_NOT_ALLOWED" }), {
-      status: 405,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  });
+}
+
+function metersToMiles(meters: number) {
+  return meters / 1609.344;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
 
   try {
-    const { start, end, country } = await req.json();
+    const { start, end } = await req.json().catch(() => ({} as any));
 
     if (!start || !end) {
-      return new Response(JSON.stringify({ error: "MISSING_PARAMS" }), {
-        status: 400,
-      });
+      return json({ miles: null, error: "MISSING_START_OR_END", raw: null }, 400);
     }
 
-    const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_KEY) throw new Error("Missing GEMINI_API_KEY");
+    const apiKey = Deno.env.get("GOOGLE_MAPS_API_KEY");
+    if (!apiKey) {
+      return json({ miles: null, error: "MISSING_GOOGLE_MAPS_API_KEY", raw: null }, 500);
+    }
 
-    const prompt = `Give driving distance in miles between ${start} and ${end} in ${country}. Only return a number.`;
+    // Distance Matrix (driving)
+    const url =
+      "https://maps.googleapis.com/maps/api/distancematrix/json" +
+      `?origins=${encodeURIComponent(start)}` +
+      `&destinations=${encodeURIComponent(end)}` +
+      `&mode=driving` +
+      `&units=imperial` +
+      `&key=${encodeURIComponent(apiKey)}`;
 
-    const r = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" +
-        GEMINI_KEY,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
-      }
-    );
+    const r = await fetch(url);
+    const raw = await r.json();
 
-    const j = await r.json();
-    const text = j?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const element = raw?.rows?.[0]?.elements?.[0];
+    const status = element?.status;
 
-    const match = text.match(/([\d.]+)/);
-
-    if (!match) {
-      return new Response(
-        JSON.stringify({ miles: null, error: "NO_DISTANCE_RETURNED" }),
-        { status: 200 }
+    if (!element || status !== "OK") {
+      return json(
+        {
+          miles: null,
+          error: status ? `GOOGLE_DISTANCE_STATUS_${status}` : "GOOGLE_DISTANCE_NO_ELEMENT",
+          raw,
+        },
+        200
       );
     }
 
-    return new Response(JSON.stringify({ miles: Number(match[1]) }), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
-    });
+    const meters = element?.distance?.value; // meters
+    if (typeof meters !== "number" || !isFinite(meters)) {
+      return json({ miles: null, error: "NO_DISTANCE_METERS", raw }, 200);
+    }
+
+    const miles = Number(metersToMiles(meters).toFixed(1));
+    return json({ miles, error: null, raw }, 200);
+  } catch (e: any) {
+    return json({ miles: null, error: e?.message ?? "UNKNOWN_ERROR", raw: null }, 500);
   }
 });
