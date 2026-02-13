@@ -1,6 +1,6 @@
 // services/db.ts
-import { supabase } from "../lib/supabaseClient";
-import { supabase } from "../lib/supabaseClient";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import {
   Client,
   Job,
@@ -76,7 +76,9 @@ const FIELD_MAP: Record<string, string> = {
 
 export const generateId = () => crypto.randomUUID();
 
-const inverseMap = Object.fromEntries(Object.entries(FIELD_MAP).map(([k, v]) => [v, k]));
+const inverseMap = Object.fromEntries(
+  Object.entries(FIELD_MAP).map(([k, v]) => [v, k])
+);
 
 const toDb = (table: string, obj: any, tenantId: string) => {
   const out: any = {};
@@ -98,7 +100,7 @@ const fromDb = (obj: any) => {
   if (!obj) return null;
   const out: any = {};
   for (const key in obj) {
-    const jsKey = inverseMap[key] || key;
+    const jsKey = (inverseMap as any)[key] || key;
     out[jsKey] = obj[key];
   }
   return out;
@@ -106,22 +108,47 @@ const fromDb = (obj: any) => {
 
 const getLocalData = () => {
   const data = localStorage.getItem(LOCAL_STORAGE_KEY);
-  if (!data) return { tenants: [], clients: [], jobs: [], job_items: [], invoices: [], mileage: [], job_shifts: [], quotes: [] };
+  if (!data)
+    return {
+      tenants: [],
+      clients: [],
+      jobs: [],
+      job_items: [],
+      invoices: [],
+      mileage: [],
+      job_shifts: [],
+      quotes: [],
+    };
   try {
     return JSON.parse(data);
   } catch {
-    return { tenants: [], clients: [], jobs: [], job_items: [], invoices: [], mileage: [], job_shifts: [], quotes: [] };
+    return {
+      tenants: [],
+      clients: [],
+      jobs: [],
+      job_items: [],
+      invoices: [],
+      mileage: [],
+      job_shifts: [],
+      quotes: [],
+    };
   }
 };
 
 const saveLocalData = (data: any) => {
-  try { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data)); } catch {}
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+  } catch {}
 };
 
 const getDeletedIds = (): Set<string> => {
   const stored = localStorage.getItem(DELETED_ITEMS_KEY);
   if (!stored) return new Set();
-  try { return new Set(JSON.parse(stored)); } catch { return new Set(); }
+  try {
+    return new Set(JSON.parse(stored));
+  } catch {
+    return new Set();
+  }
 };
 
 const markAsDeleted = (id: string) => {
@@ -140,59 +167,50 @@ const removeFromDeletions = (id: string) => {
 export const getSupabase = (): SupabaseClient => supabase;
 
 export const DB = {
-    isCloudConfigured: () =>
-  !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY,
-  testConnection: async (): Promise<{ success: boolean }> => {
-    try {
-      if (!DB.isCloudConfigured()) return { success: false };
-
-      const email = await DB.getTenantId();
-      if (!email) return { success: false };
-testConnection: async (): Promise<{ success: boolean; message?: string }> => {
-  try {
-    if (!DB.isCloudConfigured()) return { success: false, message: "Not configured" };
-
-    const tenantId = await DB.getTenantId();
-    if (!tenantId) return { success: false, message: "No session" };
-
-    // super-light query (pick any table that exists for sure)
-    const { error } = await supabase.from("tenants").select("email").eq("email", tenantId).limit(1);
-
-    if (error) return { success: false, message: error.message };
-    return { success: true };
-  } catch (e: any) {
-    return { success: false, message: e?.message || "Unknown error" };
-  }
-},
-
-      // lightweight ping to confirm the REST endpoint is reachable + authed
-      const { error } = await supabase
-        .from("tenants")
-        .select("email")
-        .eq("email", email)
-        .limit(1);
-
-      return { success: !error };
-    } catch {
-      return { success: false };
-    }
-  },
-
-
+  // IMPORTANT: matches supabaseClient.ts (env OR fallback)
+  isCloudConfigured: () => isSupabaseConfigured(),
 
   getTenantId: async (): Promise<string | null> => {
     try {
-      const client = getSupabase();
-      const { data } = await client.auth.getSession();
+      const { data } = await supabase.auth.getSession();
       return data?.session?.user?.email || null;
     } catch {
       return null;
     }
   },
 
-  initializeSession: async () => { await DB.getTenantId(); },
+  initializeSession: async () => {
+    await DB.getTenantId();
+  },
 
-  async call(table: string, method: "select" | "upsert" | "delete", payload?: any, filter?: any): Promise<any> {
+  // Navigation.tsx calls this
+  testConnection: async (): Promise<{ success: boolean; message?: string }> => {
+    try {
+      if (!DB.isCloudConfigured()) return { success: false, message: "Not configured" };
+
+      const email = await DB.getTenantId();
+      if (!email) return { success: false, message: "No session" };
+
+      // lightweight ping
+      const { error } = await supabase
+        .from("tenants")
+        .select("email")
+        .eq("email", email)
+        .limit(1);
+
+      if (error) return { success: false, message: error.message };
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, message: e?.message || "Unknown error" };
+    }
+  },
+
+  async call(
+    table: string,
+    method: "select" | "upsert" | "delete",
+    payload?: any,
+    filter?: any
+  ): Promise<any> {
     const localData = getLocalData();
     let localList = (localData as any)[table] || [];
 
@@ -221,7 +239,8 @@ testConnection: async (): Promise<{ success: boolean; message?: string }> => {
 
       (localData as any)[table] = localList.filter((item: any) => {
         if (filter?.id) return item[pk] !== filter.id;
-        if (filter?.jobId) return item["jobId"] !== filter.jobId && item["job_id"] !== filter.jobId;
+        if (filter?.jobId)
+          return item["jobId"] !== filter.jobId && item["job_id"] !== filter.jobId;
         return true;
       });
 
@@ -266,7 +285,10 @@ testConnection: async (): Promise<{ success: boolean; message?: string }> => {
             const merged = [...remoteData];
             localList.forEach((localItem: any) => {
               const pk = table === "tenants" ? "email" : "id";
-              if (!merged.find((r: any) => r[pk] === localItem[pk]) && !deletedIds.has(localItem[pk])) {
+              if (
+                !merged.find((r: any) => r[pk] === localItem[pk]) &&
+                !deletedIds.has(localItem[pk])
+              ) {
                 merged.push(localItem);
               }
             });
@@ -284,7 +306,9 @@ testConnection: async (): Promise<{ success: boolean; message?: string }> => {
 
     // ----- LOCAL SELECT FALLBACK
     if (method === "select") {
-      let base = (localList || []).filter((i: any) => i.tenant_id === tenantId || i.email === tenantId);
+      let base = (localList || []).filter(
+        (i: any) => i.tenant_id === tenantId || i.email === tenantId
+      );
       if (filter) {
         Object.entries(filter).forEach(([k, v]) => {
           base = base.filter((i: any) => i[k] === v || i[FIELD_MAP[k] || k] === v);
@@ -304,7 +328,11 @@ testConnection: async (): Promise<{ success: boolean; message?: string }> => {
     if (!email) return null;
 
     try {
-      const { data } = await getSupabase().from("tenants").select("*").eq("email", email).maybeSingle();
+      const { data } = await getSupabase()
+        .from("tenants")
+        .select("*")
+        .eq("email", email)
+        .maybeSingle();
       if (data) return fromDb(data) as Tenant;
     } catch {}
 
@@ -362,7 +390,9 @@ testConnection: async (): Promise<{ success: boolean; message?: string }> => {
     await DB.call("invoices", "delete", null, { jobId: id });
   },
 
-  getShifts: async (jobId: string) => DB.call("job_shifts", "select", null, { jobId }).then((r) => r || []),
+  getShifts: async (jobId: string) =>
+    DB.call("job_shifts", "select", null, { jobId }).then((r) => r || []),
+
   saveShifts: async (jobId: string, shifts: JobShift[]) => {
     await DB.call("job_shifts", "delete", null, { jobId });
     if (shifts && shifts.length > 0) {
@@ -373,11 +403,14 @@ testConnection: async (): Promise<{ success: boolean; message?: string }> => {
   },
 
   // Job items
-  getJobItems: async (jobId: string) => DB.call("job_items", "select", null, { jobId }).then((r) => r || []),
+  getJobItems: async (jobId: string) =>
+    DB.call("job_items", "select", null, { jobId }).then((r) => r || []),
+
   saveJobItems: async (jobId: string, items: JobItem[]) => {
     await DB.call("job_items", "delete", null, { jobId });
     await DB.call("job_items", "upsert", items);
   },
+
   deleteJobItem: async (id: string) => DB.call("job_items", "delete", null, { id }),
 
   // Quotes
@@ -396,6 +429,8 @@ testConnection: async (): Promise<{ success: boolean; message?: string }> => {
   deleteMileage: async (id: string) => DB.call("mileage", "delete", null, { id }),
 
   signOut: async () => {
-    try { await getSupabase().auth.signOut(); } catch {}
+    try {
+      await getSupabase().auth.signOut();
+    } catch {}
   },
 };
