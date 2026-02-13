@@ -148,6 +148,22 @@ export const DB = {
 
       const email = await DB.getTenantId();
       if (!email) return { success: false };
+testConnection: async (): Promise<{ success: boolean; message?: string }> => {
+  try {
+    if (!DB.isCloudConfigured()) return { success: false, message: "Not configured" };
+
+    const tenantId = await DB.getTenantId();
+    if (!tenantId) return { success: false, message: "No session" };
+
+    // super-light query (pick any table that exists for sure)
+    const { error } = await supabase.from("tenants").select("email").eq("email", tenantId).limit(1);
+
+    if (error) return { success: false, message: error.message };
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, message: e?.message || "Unknown error" };
+  }
+},
 
       // lightweight ping to confirm the REST endpoint is reachable + authed
       const { error } = await supabase
