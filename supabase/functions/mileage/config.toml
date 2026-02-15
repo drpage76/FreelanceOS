@@ -1,0 +1,2 @@
+# supabase/functions/mileage/config.toml
+verify_jwt = false

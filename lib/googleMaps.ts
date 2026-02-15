@@ -1,4 +1,5 @@
 // lib/googleMaps.ts
+import { supabase } from "./supabaseClient";
 
 export type GoogleMapsDistanceResult = {
   miles: number | null;
@@ -7,13 +8,10 @@ export type GoogleMapsDistanceResult = {
 };
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 function assertEnv() {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error(
-      "Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY. Check .env and restart Vite."
-    );
+  if (!SUPABASE_URL) {
+    throw new Error("Missing VITE_SUPABASE_URL. Check .env and restart Vite.");
   }
 }
 
@@ -24,20 +22,34 @@ export async function getDrivingDistanceFromGoogleMaps(
   try {
     assertEnv();
 
+    // ✅ Get the signed-in user's access token
+    const { data: sessData, error: sessErr } = await supabase.auth.getSession();
+    if (sessErr) {
+      return { miles: null, error: `SESSION_ERROR_${sessErr.message}`, raw: sessErr };
+    }
+
+    const accessToken = sessData?.session?.access_token;
+    if (!accessToken) {
+      return { miles: null, error: "NO_SESSION_TOKEN" };
+    }
+
+    // ✅ Call the Edge Function directly, with the USER token as Bearer
     const res = await fetch(`${SUPABASE_URL}/functions/v1/mileage`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        // These two are the important bits:
-        apikey: SUPABASE_ANON_KEY!,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY!}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ start, end }),
     });
 
     const text = await res.text();
     let data: any = null;
-    try { data = text ? JSON.parse(text) : null; } catch { data = { rawText: text }; }
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = { rawText: text };
+    }
 
     if (!res.ok) {
       return {

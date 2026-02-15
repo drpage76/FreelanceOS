@@ -1,6 +1,6 @@
 // services/db.ts
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import { supabase } from "../lib/supabaseClient";
 import {
   Client,
   Job,
@@ -167,32 +167,19 @@ const removeFromDeletions = (id: string) => {
 export const getSupabase = (): SupabaseClient => supabase;
 
 export const DB = {
-  // IMPORTANT: matches supabaseClient.ts (env OR fallback)
-  isCloudConfigured: () => isSupabaseConfigured(),
+  isCloudConfigured: () =>
+    !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY,
 
-  getTenantId: async (): Promise<string | null> => {
-    try {
-      const { data } = await supabase.auth.getSession();
-      return data?.session?.user?.email || null;
-    } catch {
-      return null;
-    }
-  },
-
-  initializeSession: async () => {
-    await DB.getTenantId();
-  },
-
-  // Navigation.tsx calls this
+  // ✅ ADDED: Navigation.tsx expects this to exist
   testConnection: async (): Promise<{ success: boolean; message?: string }> => {
     try {
       if (!DB.isCloudConfigured()) return { success: false, message: "Not configured" };
 
-      const email = await DB.getTenantId();
+      const { data } = await getSupabase().auth.getSession();
+      const email = data?.session?.user?.email;
       if (!email) return { success: false, message: "No session" };
 
-      // lightweight ping
-      const { error } = await supabase
+      const { error } = await getSupabase()
         .from("tenants")
         .select("email")
         .eq("email", email)
@@ -203,6 +190,20 @@ export const DB = {
     } catch (e: any) {
       return { success: false, message: e?.message || "Unknown error" };
     }
+  },
+
+  getTenantId: async (): Promise<string | null> => {
+    try {
+      const client = getSupabase();
+      const { data } = await client.auth.getSession();
+      return data?.session?.user?.email || null;
+    } catch {
+      return null;
+    }
+  },
+
+  initializeSession: async () => {
+    await DB.getTenantId();
   },
 
   async call(
@@ -411,7 +412,8 @@ export const DB = {
     await DB.call("job_items", "upsert", items);
   },
 
-  deleteJobItem: async (id: string) => DB.call("job_items", "delete", null, { id }),
+  deleteJobItem: async (id: string) =>
+    DB.call("job_items", "delete", null, { id }),
 
   // Quotes
   getQuotes: async () => DB.call("quotes", "select").then((r) => r || []),

@@ -1,5 +1,6 @@
-// supabase/functions/mileage/index.ts
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+/// <reference types="jsr:@supabase/functions-js/edge-runtime.d.ts" />
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -17,27 +18,66 @@ function json(data: unknown, status = 200) {
 function metersToMiles(meters: number) {
   return meters / 1609.344;
 }
+function metersToKm(meters: number) {
+  return meters / 1000;
+}
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
 
   try {
-    const { start, end } = await req.json().catch(() => ({} as any));
+    // --- Manual auth (secure) ---
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
-    if (!start || !end) {
-      return json({ miles: null, error: "MISSING_START_OR_END", raw: null }, 400);
+    if (!supabaseUrl || !serviceRoleKey) {
+      return json({ miles: null, km: null, error: "MISSING_SUPABASE_ENV" }, 500);
     }
 
+    const authHeader = req.headers.get("authorization") || "";
+    const token = authHeader.toLowerCase().startsWith("bearer ")
+      ? authHeader.slice(7).trim()
+      : "";
+
+    if (!token) {
+      return json({ miles: null, km: null, error: "MISSING_AUTH_TOKEN" }, 401);
+    }
+
+    const admin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+
+    const { data: userData, error: userErr } = await admin.auth.getUser(token);
+
+    if (userErr || !userData?.user) {
+      return json(
+        { miles: null, km: null, error: "INVALID_AUTH_TOKEN", raw: userErr?.message ?? null },
+        401
+      );
+    }
+
+    // --- Body ---
+    const body = await req.json().catch(() => ({} as any));
+    const from = (body?.origin ?? body?.start ?? "").toString().trim();
+    const to = (body?.destination ?? body?.end ?? "").toString().trim();
+
+    if (!from || !to) {
+      return json(
+        { miles: null, km: null, error: "MISSING_ORIGIN_OR_DESTINATION", raw: body },
+        400
+      );
+    }
+
+    // --- Google Maps ---
     const apiKey = Deno.env.get("GOOGLE_MAPS_API_KEY");
     if (!apiKey) {
-      return json({ miles: null, error: "MISSING_GOOGLE_MAPS_API_KEY", raw: null }, 500);
+      return json({ miles: null, km: null, error: "MISSING_GOOGLE_MAPS_API_KEY" }, 500);
     }
 
-    // Distance Matrix (driving)
     const url =
       "https://maps.googleapis.com/maps/api/distancematrix/json" +
-      `?origins=${encodeURIComponent(start)}` +
-      `&destinations=${encodeURIComponent(end)}` +
+      `?origins=${encodeURIComponent(from)}` +
+      `&destinations=${encodeURIComponent(to)}` +
       `&mode=driving` +
       `&units=imperial` +
       `&key=${encodeURIComponent(apiKey)}`;
@@ -52,6 +92,7 @@ Deno.serve(async (req) => {
       return json(
         {
           miles: null,
+          km: null,
           error: status ? `GOOGLE_DISTANCE_STATUS_${status}` : "GOOGLE_DISTANCE_NO_ELEMENT",
           raw,
         },
@@ -59,14 +100,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    const meters = element?.distance?.value; // meters
+    const meters = element?.distance?.value;
     if (typeof meters !== "number" || !isFinite(meters)) {
-      return json({ miles: null, error: "NO_DISTANCE_METERS", raw }, 200);
+      return json({ miles: null, km: null, error: "NO_DISTANCE_METERS", raw }, 200);
     }
 
     const miles = Number(metersToMiles(meters).toFixed(1));
-    return json({ miles, error: null, raw }, 200);
+    const km = Number(metersToKm(meters).toFixed(1));
+
+    return json({ miles, km, error: null }, 200);
   } catch (e: any) {
-    return json({ miles: null, error: e?.message ?? "UNKNOWN_ERROR", raw: null }, 500);
+    return json({ miles: null, km: null, error: e?.message ?? "UNKNOWN_ERROR" }, 500);
   }
 });
