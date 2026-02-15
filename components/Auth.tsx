@@ -1,3 +1,4 @@
+// src/components/Auth.tsx
 import React, { useEffect, useState } from "react";
 import { getSupabase } from "../services/db";
 
@@ -8,15 +9,11 @@ interface AuthProps {
 
 /**
  * Auth component (Email/Password + Google OAuth)
- * Fixes common login loops for HashRouter deployments by:
- * - Redirecting OAuth + email links to a REAL file: /auth/callback.html (not # routes)
- * - Detecting existing session on mount
- * - Listening for auth state changes to auto-advance the app
+ * HashRouter-safe OAuth by redirecting to:
+ *   /#/auth/callback
+ * (NOT /auth/callback.html, because your host serves index.html for that path)
  */
-export const Auth: React.FC<AuthProps> = ({
-  onSuccess,
-  initialIsSignUp = false,
-}) => {
+export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }) => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,11 +29,9 @@ export const Auth: React.FC<AuthProps> = ({
     const client = getSupabase();
     if (!client) return;
 
-    const { data: authListener } = client.auth.onAuthStateChange(
-      (_event, session) => {
-        if (session) onSuccess();
-      }
-    );
+    const { data: authListener } = client.auth.onAuthStateChange((_event, session) => {
+      if (session) onSuccess();
+    });
 
     (async () => {
       try {
@@ -70,8 +65,8 @@ export const Auth: React.FC<AuthProps> = ({
 
     try {
       if (isSignUp) {
-        // ✅ For email confirmations, use a REAL callback file (hash routes are unreliable)
-        const emailRedirectTo = `${window.location.origin}/auth/callback.html`;
+        // ✅ Email confirmation redirect: HashRouter-safe
+        const emailRedirectTo = `${window.location.origin}/#/auth/callback`;
 
         const { error } = await client.auth.signUp({
           email,
@@ -82,12 +77,8 @@ export const Auth: React.FC<AuthProps> = ({
         if (error) throw error;
         alert("Check your email for the confirmation link!");
       } else {
-        const { error } = await client.auth.signInWithPassword({
-          email,
-          password,
-        });
+        const { error } = await client.auth.signInWithPassword({ email, password });
         if (error) throw error;
-
         onSuccess();
       }
     } catch (err: any) {
@@ -110,8 +101,8 @@ export const Auth: React.FC<AuthProps> = ({
     }
 
     try {
-      // ✅ IMPORTANT: OAuth redirect MUST be a real path (not #/hash route)
-      const redirectTo = `${window.location.origin}/auth/callback.html`;
+      // ✅ OAuth redirect: HashRouter-safe
+      const redirectTo = `${window.location.origin}/#/auth/callback`;
 
       const { error } = await client.auth.signInWithOAuth({
         provider: "google",
@@ -128,8 +119,7 @@ export const Auth: React.FC<AuthProps> = ({
 
       if (error) throw error;
 
-      // Browser will redirect immediately on success.
-      // If something blocks redirect (rare), release loading after a moment.
+      // Browser usually redirects immediately
       window.setTimeout(() => setLoading(false), 1500);
     } catch (err: any) {
       console.error("CRITICAL OAUTH ERROR:", err);
@@ -148,9 +138,7 @@ export const Auth: React.FC<AuthProps> = ({
           Cloud Workspace
         </h1>
         <p className="text-slate-500 text-[10px] md:text-xs font-medium mt-2">
-          {isSignUp
-            ? "Establish your professional identity"
-            : "Unlock your secure business cloud"}
+          {isSignUp ? "Establish your professional identity" : "Unlock your secure business cloud"}
         </p>
       </div>
 
@@ -220,9 +208,7 @@ export const Auth: React.FC<AuthProps> = ({
             disabled={loading}
             className="w-full py-3 md:py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-black transition-all flex items-center justify-center gap-3 disabled:opacity-50"
           >
-            {loading && email ? (
-              <i className="fa-solid fa-spinner animate-spin"></i>
-            ) : null}
+            {loading && email ? <i className="fa-solid fa-spinner animate-spin"></i> : null}
             {isSignUp ? "Create Cloud Account" : "Sign Into Cloud"}
           </button>
         </form>
