@@ -7,25 +7,37 @@
   </head>
   <body>
     <p>Signing you in…</p>
+
     <script type="module">
       import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-      // IMPORTANT: replace these with your actual values
+      // ✅ Put your real values (same as VITE env)
       const SUPABASE_URL = "https://hucvermrtjxsjcsjirwj.supabase.co";
-      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1Y3Zlcm1ydGp4c2pjc2ppcndqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNDQ1NDAsImV4cCI6MjA4MzgyMDU0MH0.hpdDWrdQubhBW2ga3Vho8J_fOtVw7Xr6GZexF8ksSmAANON_KEY";
+      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1Y3Zlcm1ydGp4c2pjc2ppcndqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNDQ1NDAsImV4cCI6MjA4MzgyMDU0MH0.hpdDWrdQubhBW2ga3Vho8J_fOtVw7Xr6GZexF8ksSmA";
 
       const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+        auth: {
+          // IMPORTANT: we are doing explicit code exchange below
+          persistSession: true,
+          autoRefreshToken: true,
+          storage: localStorage,
+          flowType: "pkce",
+          detectSessionInUrl: false,
+        },
       });
 
-      // This processes the OAuth callback and stores the session
-      const { data, error } = await supabase.auth.getSession();
-
+      // ✅ PKCE / code flow: exchange the ?code= for a session
+      const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
       if (error) {
-        console.error("Callback error:", error);
-        document.body.innerHTML = "<p>Sign-in failed. Check console.</p>";
+        document.body.innerHTML = `<pre>OAuth exchange failed:\n${error.message}</pre>`;
+        throw error;
+      }
+
+      // ✅ Confirm session exists before redirecting
+      const { data } = await supabase.auth.getSession();
+      if (!data?.session) {
+        document.body.innerHTML = `<pre>No session after exchange. Check storage/cookies.</pre>`;
       } else {
-        // After session is set, go back into the SPA (hash route)
         window.location.replace("/#/");
       }
     </script>
