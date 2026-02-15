@@ -34,11 +34,31 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # Optional: only needed if Vite isn't executable in your workflow
+      # Optional (kept from your version)
       - name: Fix permissions
         run: chmod +x node_modules/.bin/vite
 
-      # Safe diagnostic: confirms secret exists without printing it
+      # ---- SAFE ENV CHECKS ----
+
+      - name: Check Supabase env is present (safe)
+        run: |
+          if [ -z "${VITE_SUPABASE_URL}" ]; then
+            echo "VITE_SUPABASE_URL is MISSING"
+            exit 1
+          else
+            echo "VITE_SUPABASE_URL is PRESENT"
+          fi
+
+          if [ -z "${VITE_SUPABASE_ANON_KEY}" ]; then
+            echo "VITE_SUPABASE_ANON_KEY is MISSING"
+            exit 1
+          else
+            echo "VITE_SUPABASE_ANON_KEY is PRESENT"
+          fi
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
       - name: Check Gemini key is present (safe)
         run: |
           if [ -z "${VITE_GEMINI_API_KEY}" ]; then
@@ -50,10 +70,16 @@ jobs:
         env:
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
 
+      # ---- BUILD ----
+
       - name: Build
         run: npm run build
         env:
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      # ---- DEPLOY ----
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
