@@ -8,8 +8,8 @@ interface AuthProps {
 
 /**
  * Auth component (Email/Password + Google OAuth)
- * Fixes common 401 loops by:
- * - Using a stable redirectTo (/#/auth/callback) for HashRouter deployments
+ * Fixes common login loops for HashRouter deployments by:
+ * - Redirecting OAuth + email links to a REAL file: /auth/callback.html (not # routes)
  * - Detecting existing session on mount
  * - Listening for auth state changes to auto-advance the app
  */
@@ -32,30 +32,24 @@ export const Auth: React.FC<AuthProps> = ({
     const client = getSupabase();
     if (!client) return;
 
-    let unsub: { data?: { subscription?: { unsubscribe: () => void } } } | null =
-      null;
+    const { data: authListener } = client.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session) onSuccess();
+      }
+    );
 
     (async () => {
       try {
         const { data } = await client.auth.getSession();
-        if (data?.session) {
-          onSuccess();
-          return;
-        }
-
-        // ✅ If the session is created later (e.g., after OAuth callback),
-        // this will fire and we auto-advance.
-        unsub = client.auth.onAuthStateChange((_event, session) => {
-          if (session) onSuccess();
-        });
-      } catch (e) {
-        // don’t hard-fail UI on session check
+        if (data?.session) onSuccess();
+      } catch {
+        // ignore
       }
     })();
 
     return () => {
       try {
-        unsub?.data?.subscription?.unsubscribe?.();
+        authListener?.subscription?.unsubscribe?.();
       } catch {
         // ignore
       }
@@ -76,8 +70,8 @@ export const Auth: React.FC<AuthProps> = ({
 
     try {
       if (isSignUp) {
-        // For email confirmations, give Supabase a safe redirect back into the app
-        const emailRedirectTo = `${window.location.origin}/#/auth/callback`;
+        // ✅ For email confirmations, use a REAL callback file (hash routes are unreliable)
+        const emailRedirectTo = `${window.location.origin}/auth/callback.html`;
 
         const { error } = await client.auth.signUp({
           email,
@@ -116,8 +110,8 @@ export const Auth: React.FC<AuthProps> = ({
     }
 
     try {
-      // ✅ Always send OAuth back to a known callback route (HashRouter-safe)
-      const redirectTo = `${window.location.origin}/#/auth/callback`;
+      // ✅ IMPORTANT: OAuth redirect MUST be a real path (not #/hash route)
+      const redirectTo = `${window.location.origin}/auth/callback.html`;
 
       const { error } = await client.auth.signInWithOAuth({
         provider: "google",
@@ -126,7 +120,6 @@ export const Auth: React.FC<AuthProps> = ({
           queryParams: {
             prompt: "select_account",
             access_type: "offline",
-            // keep your scopes as requested
             scope:
               "openid email profile https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.file",
           },
@@ -135,8 +128,8 @@ export const Auth: React.FC<AuthProps> = ({
 
       if (error) throw error;
 
-      // Note: On success, the browser usually redirects immediately.
-      // If it doesn't (popup-blocker etc.), we stop loading after a short delay.
+      // Browser will redirect immediately on success.
+      // If something blocks redirect (rare), release loading after a moment.
       window.setTimeout(() => setLoading(false), 1500);
     } catch (err: any) {
       console.error("CRITICAL OAUTH ERROR:", err);

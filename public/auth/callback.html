@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Signing in…</title>
+  </head>
+  <body>
+    <p>Signing you in…</p>
+    <script type="module">
+      import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+      // IMPORTANT: replace these with your actual values
+      const SUPABASE_URL = "https://hucvermrtjxsjcsjirwj.supabase.co";
+      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1Y3Zlcm1ydGp4c2pjc2ppcndqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNDQ1NDAsImV4cCI6MjA4MzgyMDU0MH0.hpdDWrdQubhBW2ga3Vho8J_fOtVw7Xr6GZexF8ksSmAANON_KEY";
+
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+      });
+
+      // This processes the OAuth callback and stores the session
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        console.error("Callback error:", error);
+        document.body.innerHTML = "<p>Sign-in failed. Check console.</p>";
+      } else {
+        // After session is set, go back into the SPA (hash route)
+        window.location.replace("/#/");
+      }
+    </script>
+  </body>
+</html>
