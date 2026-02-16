@@ -16,26 +16,38 @@ export const Auth: React.FC<AuthProps> = ({
   const [isSignUp, setIsSignUp] = useState(initialIsSignUp);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setIsSignUp(initialIsSignUp);
-  }, [initialIsSignUp]);
+  useEffect(() => setIsSignUp(initialIsSignUp), [initialIsSignUp]);
 
-  // Auto-enter app if session already exists
+  // If session already exists, enter app
   useEffect(() => {
     const client = getSupabase();
     if (!client) return;
 
+    let unsub: (() => void) | null = null;
+
     (async () => {
-      const { data } = await client.auth.getSession();
-      if (data.session) onSuccess();
+      try {
+        const { data } = await client.auth.getSession();
+        if (data.session) onSuccess();
+
+        const { data: sub } = client.auth.onAuthStateChange((_e, session) => {
+          if (session) onSuccess();
+        });
+
+        unsub = () => sub.subscription.unsubscribe();
+      } catch {
+        // ignore
+      }
     })();
 
-    const { data } = client.auth.onAuthStateChange((_e, session) => {
-      if (session) onSuccess();
-    });
-
-    return () => data.subscription.unsubscribe();
+    return () => {
+      if (unsub) unsub();
+    };
   }, [onSuccess]);
+
+  // IMPORTANT:
+  // Use the NON-hash callback URL (your callback.html forwarder handles pushing it into HashRouter)
+  const redirectTo = `${window.location.origin}/auth/callback`;
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,27 +55,29 @@ export const Auth: React.FC<AuthProps> = ({
     setError(null);
 
     const client = getSupabase();
-    if (!client) return;
+    if (!client) {
+      setError("Supabase client not available (missing URL/anon key).");
+      setLoading(false);
+      return;
+    }
 
     try {
       if (isSignUp) {
-        const emailRedirectTo = `${window.location.origin}/#/auth/callback`;
-
         const { error } = await client.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo },
+          options: { emailRedirectTo: redirectTo },
         });
-
         if (error) throw error;
+
         alert("Check your email to confirm signup.");
       } else {
         const { error } = await client.auth.signInWithPassword({
           email,
           password,
         });
-
         if (error) throw error;
+
         onSuccess();
       }
     } catch (err: any) {
@@ -78,11 +92,13 @@ export const Auth: React.FC<AuthProps> = ({
     setError(null);
 
     const client = getSupabase();
-    if (!client) return;
+    if (!client) {
+      setError("Supabase client not available (missing URL/anon key).");
+      setLoading(false);
+      return;
+    }
 
     try {
-      const redirectTo = `${window.location.origin}/#/auth/callback`;
-
       await client.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -95,6 +111,7 @@ export const Auth: React.FC<AuthProps> = ({
           },
         },
       });
+      // Redirect happens immediately after this
     } catch (err: any) {
       setError(err?.message || "OAuth failed.");
       setLoading(false);
@@ -108,7 +125,7 @@ export const Auth: React.FC<AuthProps> = ({
         disabled={loading}
         className="w-full mb-4 py-3 bg-white border rounded-xl font-bold"
       >
-        Continue with Google
+        {loading ? "Opening Google…" : "Continue with Google"}
       </button>
 
       <form onSubmit={handleAuth} className="space-y-3">
@@ -137,13 +154,14 @@ export const Auth: React.FC<AuthProps> = ({
           disabled={loading}
           className="w-full py-3 bg-black text-white rounded"
         >
-          {isSignUp ? "Create Account" : "Sign In"}
+          {loading ? "Please wait…" : isSignUp ? "Create Account" : "Sign In"}
         </button>
       </form>
 
       <button
         className="mt-4 text-xs underline"
         onClick={() => setIsSignUp(!isSignUp)}
+        disabled={loading}
       >
         {isSignUp ? "Already have an account?" : "Need an account?"}
       </button>
