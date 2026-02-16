@@ -1,4 +1,3 @@
-// src/components/Auth.tsx
 import React, { useEffect, useState } from "react";
 import { getSupabase } from "../services/db";
 
@@ -7,13 +6,10 @@ interface AuthProps {
   initialIsSignUp?: boolean;
 }
 
-/**
- * Auth component (Email/Password + Google OAuth)
- * HashRouter-safe OAuth by redirecting to:
- *   /#/auth/callback
- * (NOT /auth/callback.html, because your host serves index.html for that path)
- */
-export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }) => {
+export const Auth: React.FC<AuthProps> = ({
+  onSuccess,
+  initialIsSignUp = false,
+}) => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,31 +20,21 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
     setIsSignUp(initialIsSignUp);
   }, [initialIsSignUp]);
 
-  // ✅ If the user already has a valid session (persisted), go straight in
+  // Auto-enter app if session already exists
   useEffect(() => {
     const client = getSupabase();
     if (!client) return;
 
-    const { data: authListener } = client.auth.onAuthStateChange((_event, session) => {
+    (async () => {
+      const { data } = await client.auth.getSession();
+      if (data.session) onSuccess();
+    })();
+
+    const { data } = client.auth.onAuthStateChange((_e, session) => {
       if (session) onSuccess();
     });
 
-    (async () => {
-      try {
-        const { data } = await client.auth.getSession();
-        if (data?.session) onSuccess();
-      } catch {
-        // ignore
-      }
-    })();
-
-    return () => {
-      try {
-        authListener?.subscription?.unsubscribe?.();
-      } catch {
-        // ignore
-      }
-    };
+    return () => data.subscription.unsubscribe();
   }, [onSuccess]);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -57,15 +43,10 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
     setError(null);
 
     const client = getSupabase();
-    if (!client) {
-      setError("Cloud connection not configured.");
-      setLoading(false);
-      return;
-    }
+    if (!client) return;
 
     try {
       if (isSignUp) {
-        // ✅ Email confirmation redirect: HashRouter-safe
         const emailRedirectTo = `${window.location.origin}/#/auth/callback`;
 
         const { error } = await client.auth.signUp({
@@ -75,9 +56,13 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
         });
 
         if (error) throw error;
-        alert("Check your email for the confirmation link!");
+        alert("Check your email to confirm signup.");
       } else {
-        const { error } = await client.auth.signInWithPassword({ email, password });
+        const { error } = await client.auth.signInWithPassword({
+          email,
+          password,
+        });
+
         if (error) throw error;
         onSuccess();
       }
@@ -88,23 +73,17 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
     }
   };
 
-  const handleGoogleLogin = async (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleGoogleLogin = async () => {
     setLoading(true);
     setError(null);
 
     const client = getSupabase();
-    if (!client) {
-      setError("Supabase client failed to initialize.");
-      setLoading(false);
-      return;
-    }
+    if (!client) return;
 
     try {
-      // ✅ OAuth redirect: HashRouter-safe
       const redirectTo = `${window.location.origin}/#/auth/callback`;
 
-      const { error } = await client.auth.signInWithOAuth({
+      await client.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo,
@@ -116,113 +95,58 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
           },
         },
       });
-
-      if (error) throw error;
-
-      // Browser usually redirects immediately
-      window.setTimeout(() => setLoading(false), 1500);
     } catch (err: any) {
-      console.error("CRITICAL OAUTH ERROR:", err);
-      setError(`Auth Error: ${err?.message || "OAuth failed."}`);
+      setError(err?.message || "OAuth failed.");
       setLoading(false);
     }
   };
 
   return (
-    <div className="w-full bg-white rounded-[40px] shadow-2xl overflow-hidden p-6 md:p-8 border border-slate-100 max-h-full overflow-y-auto">
-      <div className="text-center mb-6 md:mb-8">
-        <div className="w-12 h-12 md:w-16 md:h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white mx-auto mb-4 md:mb-6 shadow-xl shadow-indigo-100">
-          <i className="fa-solid fa-bolt text-2xl md:text-3xl"></i>
-        </div>
-        <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
-          Cloud Workspace
-        </h1>
-        <p className="text-slate-500 text-[10px] md:text-xs font-medium mt-2">
-          {isSignUp ? "Establish your professional identity" : "Unlock your secure business cloud"}
-        </p>
-      </div>
+    <div className="p-6 bg-white rounded-xl shadow-xl">
+      <button
+        onClick={handleGoogleLogin}
+        disabled={loading}
+        className="w-full mb-4 py-3 bg-white border rounded-xl font-bold"
+      >
+        Continue with Google
+      </button>
 
-      <div className="space-y-4">
+      <form onSubmit={handleAuth} className="space-y-3">
+        <input
+          type="email"
+          placeholder="Email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full p-3 border rounded"
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full p-3 border rounded"
+        />
+
+        {error && <div className="text-red-600 text-sm">{error}</div>}
+
         <button
-          type="button"
-          onClick={handleGoogleLogin}
+          type="submit"
           disabled={loading}
-          className="w-full py-3 md:py-4 bg-white text-slate-700 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-3 shadow-sm disabled:opacity-50"
+          className="w-full py-3 bg-black text-white rounded"
         >
-          {loading ? (
-            <i className="fa-solid fa-spinner animate-spin text-indigo-600"></i>
-          ) : (
-            <img
-              src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-              className="w-4 h-4"
-              alt="Google"
-            />
-          )}
-          {loading ? "Handoff..." : "Continue with Google"}
+          {isSignUp ? "Create Account" : "Sign In"}
         </button>
+      </form>
 
-        <div className="flex items-center gap-4 py-1 md:py-2">
-          <div className="flex-1 h-px bg-slate-100"></div>
-          <span className="text-[8px] md:text-[9px] font-black text-slate-300 uppercase tracking-widest">
-            or email
-          </span>
-          <div className="flex-1 h-px bg-slate-100"></div>
-        </div>
-
-        <form onSubmit={handleAuth} className="space-y-3 md:space-y-4">
-          <div className="space-y-1">
-            <label className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest block px-1">
-              Email
-            </label>
-            <input
-              type="email"
-              required
-              className="w-full px-4 py-2.5 md:px-5 md:py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest block px-1">
-              Password
-            </label>
-            <input
-              type="password"
-              required
-              className="w-full px-4 py-2.5 md:px-5 md:py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-
-          {error && (
-            <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 text-[9px] font-bold flex items-center gap-2 leading-relaxed">
-              <i className="fa-solid fa-circle-exclamation shrink-0"></i>
-              <span>{error}</span>
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 md:py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-black transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-          >
-            {loading && email ? <i className="fa-solid fa-spinner animate-spin"></i> : null}
-            {isSignUp ? "Create Cloud Account" : "Sign Into Cloud"}
-          </button>
-        </form>
-      </div>
-
-      <div className="mt-4 md:mt-6 text-center">
-        <button
-          type="button"
-          onClick={() => setIsSignUp(!isSignUp)}
-          className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors"
-        >
-          {isSignUp ? "Already have a cloud account?" : "Need a new workspace?"}
-        </button>
-      </div>
+      <button
+        className="mt-4 text-xs underline"
+        onClick={() => setIsSignUp(!isSignUp)}
+      >
+        {isSignUp ? "Already have an account?" : "Need an account?"}
+      </button>
     </div>
   );
 };
