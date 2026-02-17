@@ -3,19 +3,31 @@ import { useNavigate } from "react-router-dom";
 import { getSupabase } from "../services/db";
 
 function getCodeFromUrl(): string | null {
-  // Your URL often looks like: /?code=XYZ#/auth/callback
+  // code in query (your current URL style: /?code=...#/auth/callback)
   const direct = new URLSearchParams(window.location.search).get("code");
   if (direct) return direct;
 
-  // Or: #/auth/callback?code=XYZ
+  // fallback: code inside hash query (#/auth/callback?code=...)
   const hash = window.location.hash || "";
   const q = hash.indexOf("?");
   if (q >= 0) {
     const qs = hash.slice(q + 1);
     return new URLSearchParams(qs).get("code");
   }
-
   return null;
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = window.setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    p.then((v) => {
+      clearTimeout(t);
+      resolve(v);
+    }).catch((e) => {
+      clearTimeout(t);
+      reject(e);
+    });
+  });
 }
 
 export default function AuthCallback() {
@@ -27,25 +39,26 @@ export default function AuthCallback() {
     if (ran.current) return;
     ran.current = true;
 
-    const run = async () => {
+    (async () => {
       try {
         const client = getSupabase();
         if (!client) {
-          setStatus("Supabase client not available (getSupabase() returned null/undefined).");
+          setStatus("Supabase client not available.");
           return;
         }
 
-        const code = getCodeFromUrl();
+        console.log("[AuthCallback] href:", window.location.href);
 
-        // Debug info (safe)
-        console.log("[AuthCallback] location.href:", window.location.href);
+        const code = getCodeFromUrl();
         console.log("[AuthCallback] has code?:", !!code, "length:", code?.length || 0);
 
-        // If already signed in, skip exchange
-        const existing = await client.auth.getSession();
+        setStatus("Checking existing session…");
+        console.log("[AuthCallback] calling getSession()");
+        const existing = await withTimeout(client.auth.getSession(), 8000, "getSession");
         console.log("[AuthCallback] existing session?:", !!existing.data.session);
 
         if (existing.data.session) {
+          setStatus("Already signed in. Redirecting…");
           window.history.replaceState({}, document.title, "/#/");
           navigate("/", { replace: true });
           return;
@@ -57,30 +70,26 @@ export default function AuthCallback() {
         }
 
         setStatus("Exchanging code for session…");
-        console.log("[AuthCallback] calling exchangeCodeForSession…");
-
-        const { error } = await client.auth.exchangeCodeForSession(code);
-
-        console.log("[AuthCallback] exchange returned. error?:", !!error);
+        console.log("[AuthCallback] calling exchangeCodeForSession()");
+        const { error } = await withTimeout(client.auth.exchangeCodeForSession(code), 12000, "exchangeCodeForSession");
         if (error) throw error;
+        console.log("[AuthCallback] exchange success");
 
-        const sess = await client.auth.getSession();
-        console.log("[AuthCallback] session after exchange?:", !!sess.data.session);
+        setStatus("Verifying session…");
+        console.log("[AuthCallback] calling getSession() after exchange");
+        const sess = await withTimeout(client.auth.getSession(), 8000, "getSession-after-exchange");
+        console.log("[AuthCallback] session created?:", !!sess.data.session);
 
-        if (!sess.data.session) {
-          throw new Error("Session not created after exchange.");
-        }
+        if (!sess.data.session) throw new Error("Session not created after exchange.");
 
-        window.history.replaceState({}, document.title, "/#/");
         setStatus("Done. Redirecting…");
+        window.history.replaceState({}, document.title, "/#/");
         navigate("/", { replace: true });
       } catch (e: any) {
         console.error("[AuthCallback] FAILED:", e);
         setStatus(`OAuth failed: ${e?.message || "Unknown error"}`);
       }
-    };
-
-    run();
+    })();
   }, [navigate]);
 
   return <div className="p-10">{status}</div>;
