@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { getSupabase } from "../services/db";
 
 interface AuthProps {
@@ -6,17 +6,14 @@ interface AuthProps {
   initialIsSignUp?: boolean;
 }
 
-export const Auth: React.FC<AuthProps> = ({
-  onSuccess,
-  initialIsSignUp = false,
-}) => {
+export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }) => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(initialIsSignUp);
   const [error, setError] = useState<string | null>(null);
 
-  const onSuccessOnce = useRef(false);
+  const client = useMemo(() => getSupabase(), []);
 
   useEffect(() => {
     setIsSignUp(initialIsSignUp);
@@ -24,43 +21,35 @@ export const Auth: React.FC<AuthProps> = ({
 
   // Auto-enter app if session already exists
   useEffect(() => {
-    const client = getSupabase();
     if (!client) return;
 
-    let mounted = true;
+    let unsub: (() => void) | null = null;
 
     (async () => {
       try {
         const { data } = await client.auth.getSession();
-        if (!mounted) return;
-        if (data.session && !onSuccessOnce.current) {
-          onSuccessOnce.current = true;
-          onSuccess();
-        }
+        if (data?.session) onSuccess();
       } catch {
         // ignore
       }
     })();
 
-    const { data } = client.auth.onAuthStateChange((_e, session) => {
-      if (session && !onSuccessOnce.current) {
-        onSuccessOnce.current = true;
-        onSuccess();
-      }
+    const { data } = client.auth.onAuthStateChange((_event, session) => {
+      if (session) onSuccess();
     });
 
+    unsub = () => data.subscription.unsubscribe();
+
     return () => {
-      mounted = false;
-      data.subscription.unsubscribe();
+      if (unsub) unsub();
     };
-  }, [onSuccess]);
+  }, [client, onSuccess]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const client = getSupabase();
     if (!client) {
       setError("Supabase client not available.");
       setLoading(false);
@@ -69,7 +58,7 @@ export const Auth: React.FC<AuthProps> = ({
 
     try {
       if (isSignUp) {
-        // For email signups, this redirect is for confirmation links
+        // For email confirmations, keep hash route callback
         const emailRedirectTo = `${window.location.origin}/#/auth/callback`;
 
         const { error } = await client.auth.signUp({
@@ -87,11 +76,7 @@ export const Auth: React.FC<AuthProps> = ({
         });
 
         if (error) throw error;
-
-        if (!onSuccessOnce.current) {
-          onSuccessOnce.current = true;
-          onSuccess();
-        }
+        onSuccess();
       }
     } catch (err: any) {
       setError(err?.message || "Authentication failed.");
@@ -104,7 +89,6 @@ export const Auth: React.FC<AuthProps> = ({
     setLoading(true);
     setError(null);
 
-    const client = getSupabase();
     if (!client) {
       setError("Supabase client not available.");
       setLoading(false);
@@ -112,7 +96,9 @@ export const Auth: React.FC<AuthProps> = ({
     }
 
     try {
-      // IMPORTANT for HashRouter
+      // IMPORTANT:
+      // Using a hash route is fine — Google will append ?code=... BEFORE the hash,
+      // so you’ll get: https://freelanceos.org/?code=...#/auth/callback
       const redirectTo = `${window.location.origin}/#/auth/callback`;
 
       const { error } = await client.auth.signInWithOAuth({
@@ -130,7 +116,7 @@ export const Auth: React.FC<AuthProps> = ({
 
       if (error) throw error;
 
-      // Do not setLoading(false) here because the browser is about to redirect.
+      // Note: after this call, browser redirects away to Google.
     } catch (err: any) {
       setError(err?.message || "Google sign-in failed.");
       setLoading(false);
@@ -139,34 +125,12 @@ export const Auth: React.FC<AuthProps> = ({
 
   return (
     <div className="p-6 bg-white rounded-xl shadow-xl">
-      {/* Fix: explicit text color + layout so it never renders "blank" */}
       <button
-        type="button"
         onClick={handleGoogleLogin}
         disabled={loading}
-        className="w-full mb-4 py-3 bg-white border rounded-xl font-bold text-slate-900 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-3"
-        aria-label="Continue with Google"
+        className="w-full mb-4 py-3 bg-white border rounded-xl font-bold"
       >
-        {/* Simple Google mark (no dependency) */}
-        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-          <path
-            fill="#FFC107"
-            d="M43.611 20.083H42V20H24v8h11.303C33.747 32.659 29.27 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.047 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
-          />
-          <path
-            fill="#FF3D00"
-            d="M6.306 14.691l6.571 4.819C14.655 16.108 19.01 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.047 6.053 29.268 4 24 4c-7.682 0-14.408 4.33-17.694 10.691z"
-          />
-          <path
-            fill="#4CAF50"
-            d="M24 44c5.166 0 9.86-1.977 13.409-5.197l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.249 0-9.712-3.317-11.267-7.946l-6.523 5.025C9.45 39.556 16.227 44 24 44z"
-          />
-          <path
-            fill="#1976D2"
-            d="M43.611 20.083H42V20H24v8h11.303c-.746 2.198-2.142 4.071-3.984 5.565l.003-.002 6.19 5.238C36.971 39.084 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
-          />
-        </svg>
-        <span>{loading ? "Redirecting…" : "Continue with Google"}</span>
+        Continue with Google
       </button>
 
       <form onSubmit={handleAuth} className="space-y-3">
@@ -193,17 +157,15 @@ export const Auth: React.FC<AuthProps> = ({
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-3 bg-black text-white rounded disabled:opacity-60"
+          className="w-full py-3 bg-black text-white rounded"
         >
-          {isSignUp ? "Create Account" : "Sign In"}
+          {loading ? "Please wait…" : isSignUp ? "Create Account" : "Sign In"}
         </button>
       </form>
 
       <button
-        type="button"
         className="mt-4 text-xs underline"
         onClick={() => setIsSignUp(!isSignUp)}
-        disabled={loading}
       >
         {isSignUp ? "Already have an account?" : "Need an account?"}
       </button>

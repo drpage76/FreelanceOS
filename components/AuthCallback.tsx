@@ -2,95 +2,83 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSupabase } from "../services/db";
 
-function getCodeFromUrl(): string | null {
-  // code in query (your current URL style: /?code=...#/auth/callback)
-  const direct = new URLSearchParams(window.location.search).get("code");
-  if (direct) return direct;
+/**
+ * Robustly read ?code= from either:
+ *  - https://freelanceos.org/?code=XYZ#/auth/callback   (common with hash routing)
+ *  - https://freelanceos.org/#/auth/callback?code=XYZ   (less common)
+ */
+function getOAuthCode(): string | null {
+  // 1) Standard querystring
+  const searchParams = new URLSearchParams(window.location.search);
+  const codeFromSearch = searchParams.get("code");
+  if (codeFromSearch) return codeFromSearch;
 
-  // fallback: code inside hash query (#/auth/callback?code=...)
+  // 2) Querystring inside the hash (/#/auth/callback?code=...)
   const hash = window.location.hash || "";
-  const q = hash.indexOf("?");
-  if (q >= 0) {
-    const qs = hash.slice(q + 1);
-    return new URLSearchParams(qs).get("code");
+  const qIndex = hash.indexOf("?");
+  if (qIndex >= 0) {
+    const hashQuery = hash.slice(qIndex + 1);
+    const hashParams = new URLSearchParams(hashQuery);
+    const codeFromHash = hashParams.get("code");
+    if (codeFromHash) return codeFromHash;
   }
-  return null;
-}
 
-function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const t = window.setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
-    p.then((v) => {
-      clearTimeout(t);
-      resolve(v);
-    }).catch((e) => {
-      clearTimeout(t);
-      reject(e);
-    });
-  });
+  return null;
 }
 
 export default function AuthCallback() {
   const navigate = useNavigate();
-  const ran = useRef(false);
-  const [status, setStatus] = useState("Signing you in…");
+  const [msg, setMsg] = useState("Exchanging code for session…");
+  const ranRef = useRef(false);
 
   useEffect(() => {
-    if (ran.current) return;
-    ran.current = true;
+    if (ranRef.current) return; // prevent double-run in dev/strict mode
+    ranRef.current = true;
 
-    (async () => {
+    const run = async () => {
+      const client = getSupabase();
+      if (!client) {
+        setMsg("Supabase client not available.");
+        return;
+      }
+
       try {
-        const client = getSupabase();
-        if (!client) {
-          setStatus("Supabase client not available.");
-          return;
-        }
-
-        console.log("[AuthCallback] href:", window.location.href);
-
-        const code = getCodeFromUrl();
-        console.log("[AuthCallback] has code?:", !!code, "length:", code?.length || 0);
-
-        setStatus("Checking existing session…");
-        console.log("[AuthCallback] calling getSession()");
-        const existing = await withTimeout(client.auth.getSession(), 8000, "getSession");
-        console.log("[AuthCallback] existing session?:", !!existing.data.session);
-
-        if (existing.data.session) {
-          setStatus("Already signed in. Redirecting…");
-          window.history.replaceState({}, document.title, "/#/");
+        // If session already exists, just go home
+        const existing = await client.auth.getSession();
+        if (existing?.data?.session) {
+          window.history.replaceState({}, "", "/#/");
           navigate("/", { replace: true });
           return;
         }
 
+        const code = getOAuthCode();
         if (!code) {
-          setStatus("No code found in callback URL.");
+          setMsg("No code found in callback URL.");
           return;
         }
 
-        setStatus("Exchanging code for session…");
-        console.log("[AuthCallback] calling exchangeCodeForSession()");
-        const { error } = await withTimeout(client.auth.exchangeCodeForSession(code), 12000, "exchangeCodeForSession");
+        // This should perform the token exchange (PKCE)
+        const { data, error } = await client.auth.exchangeCodeForSession(code);
         if (error) throw error;
-        console.log("[AuthCallback] exchange success");
 
-        setStatus("Verifying session…");
-        console.log("[AuthCallback] calling getSession() after exchange");
-        const sess = await withTimeout(client.auth.getSession(), 8000, "getSession-after-exchange");
-        console.log("[AuthCallback] session created?:", !!sess.data.session);
+        // Prefer the session returned directly (avoids getSession timing issues)
+        if (!data?.session) {
+          // Fallback attempt
+          const { data: s2 } = await client.auth.getSession();
+          if (!s2?.session) throw new Error("Session not created after exchange.");
+        }
 
-        if (!sess.data.session) throw new Error("Session not created after exchange.");
+        // Clean URL so refresh doesn't repeat callback
+        window.history.replaceState({}, "", "/#/");
 
-        setStatus("Done. Redirecting…");
-        window.history.replaceState({}, document.title, "/#/");
         navigate("/", { replace: true });
       } catch (e: any) {
-        console.error("[AuthCallback] FAILED:", e);
-        setStatus(`OAuth failed: ${e?.message || "Unknown error"}`);
+        setMsg(`OAuth failed: ${e?.message || String(e)}`);
       }
-    })();
+    };
+
+    run();
   }, [navigate]);
 
-  return <div className="p-10">{status}</div>;
+  return <div className="p-10">{msg}</div>;
 }
