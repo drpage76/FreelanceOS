@@ -1,24 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+// components/AuthCallback.tsx
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSupabase } from "../services/db";
 
-/**
- * Robustly read ?code= from either:
- *  - https://freelanceos.org/?code=XYZ#/auth/callback   (common with hash routing)
- *  - https://freelanceos.org/#/auth/callback?code=XYZ   (less common)
- */
-function getOAuthCode(): string | null {
-  // 1) Standard querystring
+function getCodeFromUrl(): string | null {
+  // For URLs like: https://freelanceos.org/?code=XXX#/auth/callback
   const searchParams = new URLSearchParams(window.location.search);
   const codeFromSearch = searchParams.get("code");
   if (codeFromSearch) return codeFromSearch;
 
-  // 2) Querystring inside the hash (/#/auth/callback?code=...)
+  // Fallback: sometimes providers stick params in the hash
   const hash = window.location.hash || "";
   const qIndex = hash.indexOf("?");
   if (qIndex >= 0) {
-    const hashQuery = hash.slice(qIndex + 1);
-    const hashParams = new URLSearchParams(hashQuery);
+    const hashParams = new URLSearchParams(hash.slice(qIndex + 1));
     const codeFromHash = hashParams.get("code");
     if (codeFromHash) return codeFromHash;
   }
@@ -28,13 +23,9 @@ function getOAuthCode(): string | null {
 
 export default function AuthCallback() {
   const navigate = useNavigate();
-  const [msg, setMsg] = useState("Exchanging code for session…");
-  const ranRef = useRef(false);
+  const [msg, setMsg] = useState("Signing you in…");
 
   useEffect(() => {
-    if (ranRef.current) return; // prevent double-run in dev/strict mode
-    ranRef.current = true;
-
     const run = async () => {
       const client = getSupabase();
       if (!client) {
@@ -42,38 +33,46 @@ export default function AuthCallback() {
         return;
       }
 
+      const code = getCodeFromUrl();
+      if (!code) {
+        setMsg("No OAuth code found in callback URL.");
+        return;
+      }
+
       try {
-        // If session already exists, just go home
-        const existing = await client.auth.getSession();
-        if (existing?.data?.session) {
+        setMsg("Exchanging code for session…");
+
+        // ✅ This should be enough. No need to call getSession() afterwards.
+        const { data, error } = await client.auth.exchangeCodeForSession(code);
+        if (error) throw error;
+
+        // If we got a session back, we're done.
+        if (data?.session) {
           window.history.replaceState({}, "", "/#/");
           navigate("/", { replace: true });
           return;
         }
 
-        const code = getOAuthCode();
-        if (!code) {
-          setMsg("No code found in callback URL.");
-          return;
-        }
+        // Rare fallback: wait briefly for auth state change
+        setMsg("Finalising session…");
+        await new Promise<void>((resolve, reject) => {
+          const timeout = window.setTimeout(() => {
+            reject(new Error("Timed out waiting for session."));
+          }, 15000);
 
-        // This should perform the token exchange (PKCE)
-        const { data, error } = await client.auth.exchangeCodeForSession(code);
-        if (error) throw error;
+          const { data: sub } = client.auth.onAuthStateChange((_e, session) => {
+            if (session) {
+              window.clearTimeout(timeout);
+              sub.subscription.unsubscribe();
+              resolve();
+            }
+          });
+        });
 
-        // Prefer the session returned directly (avoids getSession timing issues)
-        if (!data?.session) {
-          // Fallback attempt
-          const { data: s2 } = await client.auth.getSession();
-          if (!s2?.session) throw new Error("Session not created after exchange.");
-        }
-
-        // Clean URL so refresh doesn't repeat callback
         window.history.replaceState({}, "", "/#/");
-
         navigate("/", { replace: true });
       } catch (e: any) {
-        setMsg(`OAuth failed: ${e?.message || String(e)}`);
+        setMsg(`OAuth failed: ${e?.message || "Unknown error"}`);
       }
     };
 

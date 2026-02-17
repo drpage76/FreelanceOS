@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+// components/Auth.tsx
+import React, { useEffect, useState } from "react";
 import { getSupabase } from "../services/db";
 
 interface AuthProps {
@@ -13,43 +14,42 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
   const [isSignUp, setIsSignUp] = useState(initialIsSignUp);
   const [error, setError] = useState<string | null>(null);
 
-  const client = useMemo(() => getSupabase(), []);
-
   useEffect(() => {
     setIsSignUp(initialIsSignUp);
   }, [initialIsSignUp]);
 
   // Auto-enter app if session already exists
   useEffect(() => {
+    const client = getSupabase();
     if (!client) return;
 
-    let unsub: (() => void) | null = null;
+    let alive = true;
 
     (async () => {
       try {
         const { data } = await client.auth.getSession();
-        if (data?.session) onSuccess();
+        if (alive && data.session) onSuccess();
       } catch {
         // ignore
       }
     })();
 
-    const { data } = client.auth.onAuthStateChange((_event, session) => {
+    const { data } = client.auth.onAuthStateChange((_e, session) => {
       if (session) onSuccess();
     });
 
-    unsub = () => data.subscription.unsubscribe();
-
     return () => {
-      if (unsub) unsub();
+      alive = false;
+      data.subscription.unsubscribe();
     };
-  }, [client, onSuccess]);
+  }, [onSuccess]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
+    const client = getSupabase();
     if (!client) {
       setError("Supabase client not available.");
       setLoading(false);
@@ -58,7 +58,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
 
     try {
       if (isSignUp) {
-        // For email confirmations, keep hash route callback
+        // Hash-router callback
         const emailRedirectTo = `${window.location.origin}/#/auth/callback`;
 
         const { error } = await client.auth.signUp({
@@ -70,11 +70,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
         if (error) throw error;
         alert("Check your email to confirm signup.");
       } else {
-        const { error } = await client.auth.signInWithPassword({
-          email,
-          password,
-        });
-
+        const { error } = await client.auth.signInWithPassword({ email, password });
         if (error) throw error;
         onSuccess();
       }
@@ -89,6 +85,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
     setLoading(true);
     setError(null);
 
+    const client = getSupabase();
     if (!client) {
       setError("Supabase client not available.");
       setLoading(false);
@@ -96,12 +93,10 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
     }
 
     try {
-      // IMPORTANT:
-      // Using a hash route is fine — Google will append ?code=... BEFORE the hash,
-      // so you’ll get: https://freelanceos.org/?code=...#/auth/callback
+      // Hash-router callback
       const redirectTo = `${window.location.origin}/#/auth/callback`;
 
-      const { error } = await client.auth.signInWithOAuth({
+      await client.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo,
@@ -113,12 +108,9 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
           },
         },
       });
-
-      if (error) throw error;
-
-      // Note: after this call, browser redirects away to Google.
+      // Browser will redirect away, so no further code here
     } catch (err: any) {
-      setError(err?.message || "Google sign-in failed.");
+      setError(err?.message || "OAuth failed.");
       setLoading(false);
     }
   };
@@ -128,9 +120,28 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
       <button
         onClick={handleGoogleLogin}
         disabled={loading}
-        className="w-full mb-4 py-3 bg-white border rounded-xl font-bold"
+        className="w-full mb-4 py-3 bg-white border rounded-xl font-bold text-black flex items-center justify-center gap-2"
       >
-        Continue with Google
+        {/* Simple Google “G” icon so the button never looks empty */}
+        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+          <path
+            fill="#FFC107"
+            d="M43.611 20.083H42V20H24v8h11.303C33.634 32.659 29.268 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.052 6.053 29.269 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
+          />
+          <path
+            fill="#FF3D00"
+            d="M6.306 14.691l6.571 4.819C14.655 16.108 19.01 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.052 6.053 29.269 4 24 4c-7.682 0-14.362 4.337-17.694 10.691z"
+          />
+          <path
+            fill="#4CAF50"
+            d="M24 44c5.166 0 9.86-1.977 13.409-5.197l-6.19-5.238C29.206 35.091 26.715 36 24 36c-5.247 0-9.597-3.318-11.285-7.946l-6.52 5.02C9.49 39.556 16.227 44 24 44z"
+          />
+          <path
+            fill="#1976D2"
+            d="M43.611 20.083H42V20H24v8h11.303c-.803 2.264-2.33 4.17-4.084 5.565l.003-.002 6.19 5.238C36.97 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
+          />
+        </svg>
+        <span>{loading ? "Please wait…" : "Continue with Google"}</span>
       </button>
 
       <form onSubmit={handleAuth} className="space-y-3">
@@ -159,14 +170,11 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
           disabled={loading}
           className="w-full py-3 bg-black text-white rounded"
         >
-          {loading ? "Please wait…" : isSignUp ? "Create Account" : "Sign In"}
+          {isSignUp ? "Create Account" : "Sign In"}
         </button>
       </form>
 
-      <button
-        className="mt-4 text-xs underline"
-        onClick={() => setIsSignUp(!isSignUp)}
-      >
+      <button className="mt-4 text-xs underline" onClick={() => setIsSignUp(!isSignUp)}>
         {isSignUp ? "Already have an account?" : "Need an account?"}
       </button>
     </div>
