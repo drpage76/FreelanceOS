@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { getSupabase } from "../services/db";
 
 interface AuthProps {
@@ -16,38 +16,35 @@ export const Auth: React.FC<AuthProps> = ({
   const [isSignUp, setIsSignUp] = useState(initialIsSignUp);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => setIsSignUp(initialIsSignUp), [initialIsSignUp]);
+  // Use a real path callback (no #) to avoid OAuth fragment issues
+  const redirectTo = useMemo(() => {
+    return `${window.location.origin}/auth/callback`;
+  }, []);
 
-  // If session already exists, enter app
+  useEffect(() => {
+    setIsSignUp(initialIsSignUp);
+  }, [initialIsSignUp]);
+
+  // If a session already exists, enter app immediately
   useEffect(() => {
     const client = getSupabase();
     if (!client) return;
 
-    let unsub: (() => void) | null = null;
-
     (async () => {
       try {
-        const { data } = await client.auth.getSession();
-        if (data.session) onSuccess();
-
-        const { data: sub } = client.auth.onAuthStateChange((_e, session) => {
-          if (session) onSuccess();
-        });
-
-        unsub = () => sub.subscription.unsubscribe();
+        const { data, error } = await client.auth.getSession();
+        if (!error && data?.session) onSuccess();
       } catch {
         // ignore
       }
     })();
 
-    return () => {
-      if (unsub) unsub();
-    };
-  }, [onSuccess]);
+    const { data } = client.auth.onAuthStateChange((_event, session) => {
+      if (session) onSuccess();
+    });
 
-  // IMPORTANT:
-  // Use the NON-hash callback URL (your callback.html forwarder handles pushing it into HashRouter)
-  const redirectTo = `${window.location.origin}/auth/callback`;
+    return () => data.subscription.unsubscribe();
+  }, [onSuccess]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,28 +53,31 @@ export const Auth: React.FC<AuthProps> = ({
 
     const client = getSupabase();
     if (!client) {
-      setError("Supabase client not available (missing URL/anon key).");
+      setError("Supabase client not available.");
       setLoading(false);
       return;
     }
 
     try {
       if (isSignUp) {
+        // If you are using email confirmations, Supabase will send users here:
+        const emailRedirectTo = redirectTo;
+
         const { error } = await client.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: redirectTo },
+          options: { emailRedirectTo },
         });
-        if (error) throw error;
 
+        if (error) throw error;
         alert("Check your email to confirm signup.");
       } else {
         const { error } = await client.auth.signInWithPassword({
           email,
           password,
         });
-        if (error) throw error;
 
+        if (error) throw error;
         onSuccess();
       }
     } catch (err: any) {
@@ -93,7 +93,7 @@ export const Auth: React.FC<AuthProps> = ({
 
     const client = getSupabase();
     if (!client) {
-      setError("Supabase client not available (missing URL/anon key).");
+      setError("Supabase client not available.");
       setLoading(false);
       return;
     }
@@ -106,12 +106,14 @@ export const Auth: React.FC<AuthProps> = ({
           queryParams: {
             prompt: "select_account",
             access_type: "offline",
+            // Keep your scopes if you need Calendar/Drive
             scope:
               "openid email profile https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.file",
           },
         },
       });
-      // Redirect happens immediately after this
+
+      // do NOT setLoading(false) here — browser will redirect away
     } catch (err: any) {
       setError(err?.message || "OAuth failed.");
       setLoading(false);
@@ -119,13 +121,13 @@ export const Auth: React.FC<AuthProps> = ({
   };
 
   return (
-    <div className="p-6 bg-white rounded-xl shadow-xl">
+    <div className="p-6 bg-white rounded-xl shadow-xl w-full max-w-md">
       <button
         onClick={handleGoogleLogin}
         disabled={loading}
         className="w-full mb-4 py-3 bg-white border rounded-xl font-bold"
       >
-        {loading ? "Opening Google…" : "Continue with Google"}
+        {loading ? "Loading…" : "Continue with Google"}
       </button>
 
       <form onSubmit={handleAuth} className="space-y-3">

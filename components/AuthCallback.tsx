@@ -1,19 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSupabase } from "../services/db";
 
-function getParamEverywhere(name: string): string | null {
-  // 1) Normal query string (?code=...)
-  const fromSearch = new URLSearchParams(window.location.search).get(name);
+function getParamFromHashOrSearch(name: string): string | null {
+  // 1) normal query string
+  const s = new URLSearchParams(window.location.search);
+  const fromSearch = s.get(name);
   if (fromSearch) return fromSearch;
 
-  // 2) Hash-router query (/#/auth/callback?code=...)
-  // window.location.hash might be "#/auth/callback?code=XYZ"
+  // 2) query string inside the hash: #/auth/callback?code=...
   const hash = window.location.hash || "";
   const qIndex = hash.indexOf("?");
   if (qIndex >= 0) {
-    const hashQuery = hash.slice(qIndex + 1);
-    const fromHash = new URLSearchParams(hashQuery).get(name);
+    const qs = hash.slice(qIndex + 1);
+    const h = new URLSearchParams(qs);
+    const fromHash = h.get(name);
     if (fromHash) return fromHash;
   }
 
@@ -22,46 +23,55 @@ function getParamEverywhere(name: string): string | null {
 
 export default function AuthCallback() {
   const navigate = useNavigate();
+  const ran = useRef(false);
   const [msg, setMsg] = useState("Signing you in…");
 
   useEffect(() => {
+    if (ran.current) return;
+    ran.current = true;
+
     const run = async () => {
       const client = getSupabase();
       if (!client) {
-        setMsg("OAuth failed: Supabase client missing (URL/anon key).");
+        setMsg("Supabase client not available.");
         return;
       }
 
-      const code = getParamEverywhere("code");
+      // Supabase may return error params too
+      const errorDesc =
+        getParamFromHashOrSearch("error_description") ||
+        getParamFromHashOrSearch("error");
+      if (errorDesc) {
+        setMsg(`OAuth error: ${decodeURIComponent(errorDesc)}`);
+        return;
+      }
+
+      const code = getParamFromHashOrSearch("code");
       if (!code) {
         setMsg("No code found in callback URL.");
         return;
       }
 
       try {
-        // Exchange code -> session (PKCE)
         const { error } = await client.auth.exchangeCodeForSession(code);
         if (error) throw error;
 
-        const { data } = await client.auth.getSession();
+        const { data, error: sessErr } = await client.auth.getSession();
+        if (sessErr) throw sessErr;
         if (!data.session) throw new Error("Session not created");
 
-        // Clean URL (remove ?code=... etc)
-        window.history.replaceState({}, document.title, `${window.location.origin}/#/`);
+        // Clean URL (remove code/state/etc)
+        window.history.replaceState({}, document.title, "/#/");
 
         // Go to app
         navigate("/dashboard", { replace: true });
       } catch (e: any) {
-        setMsg(`OAuth failed: ${e?.message || String(e)}`);
+        setMsg(`OAuth failed: ${e?.message || "Unknown error"}`);
       }
     };
 
     run();
   }, [navigate]);
 
-  return (
-    <div className="p-10">
-      {msg}
-    </div>
-  );
+  return <div className="p-10">{msg}</div>;
 }
