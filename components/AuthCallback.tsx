@@ -2,35 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSupabase } from "../services/db";
 
-/**
- * HashRouter note:
- * OAuth providers often redirect to:
- *   https://site.com/#/auth/callback?code=XYZ
- * In that case, window.location.search is EMPTY
- * because the querystring lives inside window.location.hash.
- */
 function getCodeFromUrl(): string | null {
-  try {
-    const url = new URL(window.location.href);
+  // Your URL often looks like: /?code=XYZ#/auth/callback
+  const direct = new URLSearchParams(window.location.search).get("code");
+  if (direct) return direct;
 
-    // 1) Normal query (?code=) before hash
-    const direct = url.searchParams.get("code");
-    if (direct) return direct;
-
-    // 2) Query inside hash: "#/auth/callback?code=XYZ&state=..."
-    const hash = window.location.hash || "";
-    const qIndex = hash.indexOf("?");
-    if (qIndex >= 0) {
-      const qs = hash.slice(qIndex + 1);
-      const params = new URLSearchParams(qs);
-      const fromHash = params.get("code");
-      if (fromHash) return fromHash;
-    }
-
-    return null;
-  } catch {
-    return null;
+  // Or: #/auth/callback?code=XYZ
+  const hash = window.location.hash || "";
+  const q = hash.indexOf("?");
+  if (q >= 0) {
+    const qs = hash.slice(q + 1);
+    return new URLSearchParams(qs).get("code");
   }
+
+  return null;
 }
 
 export default function AuthCallback() {
@@ -43,34 +28,54 @@ export default function AuthCallback() {
     ran.current = true;
 
     const run = async () => {
-      const client = getSupabase();
-      if (!client) {
-        setStatus("Supabase client not available.");
-        return;
-      }
-
-      const code = getCodeFromUrl();
-      if (!code) {
-        setStatus("No code found in callback URL.");
-        return;
-      }
-
       try {
+        const client = getSupabase();
+        if (!client) {
+          setStatus("Supabase client not available (getSupabase() returned null/undefined).");
+          return;
+        }
+
+        const code = getCodeFromUrl();
+
+        // Debug info (safe)
+        console.log("[AuthCallback] location.href:", window.location.href);
+        console.log("[AuthCallback] has code?:", !!code, "length:", code?.length || 0);
+
+        // If already signed in, skip exchange
+        const existing = await client.auth.getSession();
+        console.log("[AuthCallback] existing session?:", !!existing.data.session);
+
+        if (existing.data.session) {
+          window.history.replaceState({}, document.title, "/#/");
+          navigate("/", { replace: true });
+          return;
+        }
+
+        if (!code) {
+          setStatus("No code found in callback URL.");
+          return;
+        }
+
         setStatus("Exchanging code for session…");
+        console.log("[AuthCallback] calling exchangeCodeForSession…");
 
         const { error } = await client.auth.exchangeCodeForSession(code);
+
+        console.log("[AuthCallback] exchange returned. error?:", !!error);
         if (error) throw error;
 
-        const { data } = await client.auth.getSession();
-        if (!data.session) throw new Error("Session not created");
+        const sess = await client.auth.getSession();
+        console.log("[AuthCallback] session after exchange?:", !!sess.data.session);
 
-        // Clean up URL (removes code/state)
-        // Keep HashRouter root
+        if (!sess.data.session) {
+          throw new Error("Session not created after exchange.");
+        }
+
         window.history.replaceState({}, document.title, "/#/");
-
         setStatus("Done. Redirecting…");
         navigate("/", { replace: true });
       } catch (e: any) {
+        console.error("[AuthCallback] FAILED:", e);
         setStatus(`OAuth failed: ${e?.message || "Unknown error"}`);
       }
     };
