@@ -1,17 +1,8 @@
 // src/App.tsx
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import {
-  HashRouter,
-  Routes,
-  Route,
-  Navigate,
-  Link,
-  Outlet,
-  useLocation,
-} from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate, Link, Outlet, useLocation } from "react-router-dom";
 
 import { Navigation } from "./components/Navigation";
-import AuthCallback from "./components/AuthCallback";
 
 import { Dashboard } from "./pages/Dashboard";
 import { Jobs } from "./pages/Jobs";
@@ -52,12 +43,9 @@ class ErrorBoundary extends React.Component<
           <div className="w-20 h-20 bg-rose-500/10 text-rose-500 rounded-3xl flex items-center justify-center mb-6 border border-rose-500/20">
             <i className="fa-solid fa-triangle-exclamation text-3xl"></i>
           </div>
-          <h1 className="text-white text-2xl font-black mb-2 tracking-tight">
-            Workspace Crash Detected
-          </h1>
+          <h1 className="text-white text-2xl font-black mb-2 tracking-tight">Workspace Crash Detected</h1>
           <p className="text-slate-400 max-w-md mb-8 text-sm font-medium">
-            A technical protocol failure occurred. Your data is safe in the cloud, but the interface
-            needs a hard reset.
+            A technical protocol failure occurred. Your data is safe in the cloud, but the interface needs a hard reset.
           </p>
           <button
             onClick={() => (window.location.href = window.location.origin + window.location.pathname)}
@@ -112,11 +100,7 @@ const MainLayout: React.FC<{
           </Link>
         </div>
       )}
-      <main
-        className={`flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar ${
-          isReadOnly ? "pt-12" : ""
-        }`}
-      >
+      <main className={`flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar ${isReadOnly ? "pt-12" : ""}`}>
         <div className="max-w-7xl mx-auto w-full">
           <Outlet />
         </div>
@@ -211,9 +195,7 @@ const App: React.FC = () => {
           return job;
         });
 
-        const googleEvents = token
-          ? await fetchGoogleEvents(user.email, token).catch(() => [])
-          : [];
+        const googleEvents = token ? await fetchGoogleEvents(user.email, token).catch(() => []) : [];
 
         setCurrentUser(user);
         setAppState({
@@ -268,22 +250,6 @@ const App: React.FC = () => {
   }, [appState.jobs, appState.clients, currentUser, getLatestToken, loadData]);
 
   useEffect(() => {
-    // ✅ DO NOT strip auth params while on the callback route.
-    // With HashRouter, callback can be:
-    // - /?code=...#/auth/callback
-    // - /#/auth/callback?code=...
-    const hash = window.location.hash || "";
-    const isOnCallback =
-      hash.startsWith("#/auth/callback") || hash.includes("/auth/callback");
-
-    if (!isOnCallback) {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("error") || params.get("state")) {
-        const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
-        window.history.replaceState({}, document.title, cleanUrl);
-      }
-    }
-
     if (initializationStarted.current) return;
     initializationStarted.current = true;
 
@@ -309,33 +275,31 @@ const App: React.FC = () => {
 
     const client = getSupabase();
     if (client) {
-      const { data: { subscription } } = (client.auth as any).onAuthStateChange(
-        async (event: string) => {
-          if (event === "SIGNED_IN" && !hasLoadedOnce.current) {
-            const user = await DB.getCurrentUser();
-            if (user) {
-              setCurrentUser(user);
-              loadData(user);
-            }
-          }
-
-          if (event === "SIGNED_OUT") {
-            setCurrentUser(null);
-            hasLoadedOnce.current = false;
-            setAppState({
-              user: null,
-              clients: [],
-              jobs: [],
-              quotes: [],
-              externalEvents: [],
-              jobItems: [],
-              invoices: [],
-              mileage: [],
-            });
-            setIsLoading(false);
+      const { data: { subscription } } = (client.auth as any).onAuthStateChange(async (event: string) => {
+        if (event === "SIGNED_IN" && !hasLoadedOnce.current) {
+          const user = await DB.getCurrentUser();
+          if (user) {
+            setCurrentUser(user);
+            loadData(user);
           }
         }
-      );
+
+        if (event === "SIGNED_OUT") {
+          setCurrentUser(null);
+          hasLoadedOnce.current = false;
+          setAppState({
+            user: null,
+            clients: [],
+            jobs: [],
+            quotes: [],
+            externalEvents: [],
+            jobItems: [],
+            invoices: [],
+            mileage: [],
+          });
+          setIsLoading(false);
+        }
+      });
 
       return () => {
         clearTimeout(safetyTimeout);
@@ -384,17 +348,10 @@ const App: React.FC = () => {
     <ErrorBoundary>
       <HashRouter>
         <Routes>
-          {/* ✅ OAuth callback handler OUTSIDE MainLayout */}
-          <Route path="/auth/callback" element={<AuthCallback />} />
-
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
 
-          {/* Landing */}
-          <Route
-            path="/"
-            element={!currentUser ? <Landing /> : <Navigate to="/dashboard" replace />}
-          />
+          <Route path="/" element={!currentUser ? <Landing /> : <Navigate to="/dashboard" replace />} />
 
           <Route
             element={
@@ -431,22 +388,10 @@ const App: React.FC = () => {
                 />
               }
             />
-            <Route
-              path="jobs/:id"
-              element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />}
-            />
+            <Route path="jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
             <Route path="clients" element={<Clients state={appState} onRefresh={loadData} />} />
             <Route path="quotes" element={<Quotes state={appState} onRefresh={loadData} />} />
-            <Route
-              path="invoices"
-              element={
-                <Invoices
-                  state={appState}
-                  onRefresh={loadData}
-                  googleAccessToken={googleAccessToken}
-                />
-              }
-            />
+            <Route path="invoices" element={<Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
             <Route path="mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
             <Route
               path="settings"

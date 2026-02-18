@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FreelanceOS Auth Callback</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 32px; }
+      .muted { color: #666; }
+      .err { color: #b00020; white-space: pre-wrap; margin-top: 12px; }
+      a { color: #4f46e5; }
+    </style>
+  </head>
+  <body>
+    <h2 id="title">Signing you in…</h2>
+    <p class="muted" id="msg">Preparing session exchange…</p>
+    <pre class="err" id="err"></pre>
+
+    <script type="module">
+      import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+      const elTitle = document.getElementById("title");
+      const elMsg = document.getElementById("msg");
+      const elErr = document.getElementById("err");
+
+      const setTitle = (t) => (elTitle.textContent = t);
+      const setMsg = (t) => (elMsg.textContent = t);
+      const showErr = (t) => (elErr.textContent = t || "");
+
+      // Values must be stored by your app BEFORE redirect (see Auth.tsx below)
+      const url = (localStorage.getItem("FO_SUPABASE_URL") || "").trim();
+      const key = (localStorage.getItem("FO_SUPABASE_ANON_KEY") || "").trim();
+
+      if (!url || !key) {
+        setTitle("Missing configuration");
+        setMsg("Supabase config wasn’t found in localStorage.");
+        showErr(
+          "Fix:\n" +
+          "1) Ensure Auth.tsx stores FO_SUPABASE_URL and FO_SUPABASE_ANON_KEY.\n" +
+          "2) Then try Google login again."
+        );
+        throw new Error("Missing Supabase config in localStorage");
+      }
+
+      const supabase = createClient(url, key, {
+        auth: {
+          flowType: "pkce",
+          persistSession: true,
+          autoRefreshToken: true,
+          storage: window.localStorage,
+          detectSessionInUrl: false
+        }
+      });
+
+      const DASHBOARD_URL = window.location.origin + "/#/dashboard";
+      const CLEAN_HOME_URL = window.location.origin + "/#/";
+
+      // If already signed in, don't exchange again
+      setMsg("Checking existing session…");
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data?.session) {
+          window.history.replaceState({}, document.title, CLEAN_HOME_URL);
+          window.location.replace(DASHBOARD_URL);
+        }
+      } catch {}
+
+      // Get code from querystring
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+
+      if (!code) {
+        setTitle("No login code found");
+        setMsg("Open this page only via Google sign-in redirect.");
+        showErr("Go back and click “Continue with Google” again.");
+        throw new Error("No code found");
+      }
+
+      // Prevent retry loops for same code
+      const RETRY_KEY = "FO_OAUTH_LAST_CODE";
+      const last = sessionStorage.getItem(RETRY_KEY);
+      if (last === code) {
+        setMsg("Code already processed. Redirecting…");
+        setTimeout(() => window.location.replace(DASHBOARD_URL), 400);
+      } else {
+        sessionStorage.setItem(RETRY_KEY, code);
+      }
+
+      setMsg("Exchanging code for session…");
+      try {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) throw error;
+
+        // Clean URL so new tabs / refresh won't re-run exchange
+        window.history.replaceState({}, document.title, CLEAN_HOME_URL);
+
+        setMsg("Done. Redirecting…");
+        window.location.replace(DASHBOARD_URL);
+      } catch (e) {
+        setTitle("OAuth failed");
+        setMsg("Could not complete sign-in.");
+        showErr(String(e?.message || e));
+        const a = document.createElement("a");
+        a.href = CLEAN_HOME_URL;
+        a.textContent = "Return to FreelanceOS";
+        document.body.appendChild(a);
+      }
+    </script>
+  </body>
+</html>

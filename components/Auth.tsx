@@ -1,5 +1,5 @@
 // src/components/Auth.tsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 interface AuthProps {
@@ -14,31 +14,21 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
   const [isSignUp, setIsSignUp] = useState(initialIsSignUp);
   const [error, setError] = useState<string | null>(null);
 
-  const firedSuccess = useRef(false);
-
-  // If already signed in, bounce through (once)
+  // If already signed in, bounce through
   useEffect(() => {
     let cancelled = false;
 
-    const run = async () => {
+    (async () => {
       try {
         const { data } = await supabase.auth.getSession();
-        if (!cancelled && data?.session && !firedSuccess.current) {
-          firedSuccess.current = true;
-          onSuccess();
-        }
+        if (!cancelled && data?.session) onSuccess();
       } catch {
         // ignore
       }
-    };
-
-    run();
+    })();
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session && !firedSuccess.current) {
-        firedSuccess.current = true;
-        onSuccess();
-      }
+      if (session) onSuccess();
     });
 
     return () => {
@@ -50,7 +40,6 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
   const handleEmailAuth = async () => {
     setError(null);
     setLoading(true);
-
     try {
       if (!email || !password) throw new Error("Enter email + password");
 
@@ -61,8 +50,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-
-      // onSuccess fires via onAuthStateChange
+      // onSuccess will be triggered via listener
     } catch (e: any) {
       setError(e?.message || "Authentication failed");
     } finally {
@@ -75,17 +63,19 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
     setLoading(true);
 
     try {
-      // ✅ HashRouter callback route (THIS is the important part)
-      // Must match Supabase Redirect URLs:
-      //   https://freelanceos.org/#/auth/callback
-      //   http://localhost:5173/#/auth/callback
-      const redirectTo = `${window.location.origin}/#/auth/callback`;
+      // Store config for callback.html (GitHub Pages + static callback)
+      const url = (import.meta.env.VITE_SUPABASE_URL || "").trim();
+      const key = (import.meta.env.VITE_SUPABASE_ANON_KEY || "").trim();
+      if (url) localStorage.setItem("FO_SUPABASE_URL", url);
+      if (key) localStorage.setItem("FO_SUPABASE_ANON_KEY", key);
+
+      // ✅ ALWAYS redirect to the static callback file (not the hash route)
+      const redirectTo = `${window.location.origin}/auth/callback.html`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo,
-          // You can remove these if you don't need offline refresh tokens
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -94,7 +84,6 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
       });
 
       if (error) throw error;
-
       // Browser redirects away after this
     } catch (e: any) {
       setError(e?.message || "OAuth failed");
@@ -118,7 +107,6 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email"
           autoComplete="email"
-          disabled={loading}
         />
         <input
           value={password}
@@ -126,7 +114,6 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
           placeholder="Password"
           type="password"
           autoComplete={isSignUp ? "new-password" : "current-password"}
-          disabled={loading}
         />
 
         <button onClick={handleEmailAuth} disabled={loading}>
