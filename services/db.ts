@@ -267,6 +267,23 @@ export const DB = {
     const tenantId = effectiveId || LOCAL_USER_EMAIL;
     const deletedIds = getDeletedIds();
 
+    // Helper: apply same filter logic to LOCAL list (so merges don't leak)
+    const applyLocalFilter = (list: any[]) => {
+      let base = (list || []).filter(
+        (i: any) => i.tenant_id === tenantId || i.email === tenantId
+      );
+
+      if (filter) {
+        Object.entries(filter).forEach(([k, v]) => {
+          const mapped = FIELD_MAP[k] || k;
+          base = base.filter((i: any) => i[k] === v || i[mapped] === v);
+        });
+      }
+
+      const pk = table === "tenants" ? "email" : "id";
+      return base.filter((item: any) => !deletedIds.has(item[pk]));
+    };
+
     // ----- LOCAL FIRST (so you can work offline)
     if (method === "upsert" && payload) {
       const raw = Array.isArray(payload) ? payload : [payload];
@@ -310,8 +327,15 @@ export const DB = {
 
       if (method === "delete") {
         const pk = table === "tenants" ? "email" : "id";
-        if (filter?.id) await query.delete().eq(pk, filter.id);
-        else if (filter?.jobId) await query.delete().eq("job_id", filter.jobId);
+
+        if (filter?.id) {
+          // ✅ safer: scope deletes by tenant when not tenants table
+          if (table === "tenants") await query.delete().eq(pk, filter.id);
+          else await query.delete().eq(pk, filter.id).eq("tenant_id", effectiveId);
+        } else if (filter?.jobId) {
+          // ✅ critical: don't delete other job_items/invoices etc for other tenants
+          await query.delete().eq("job_id", filter.jobId).eq("tenant_id", effectiveId);
+        }
       }
 
       if (method === "select") {
@@ -327,25 +351,24 @@ export const DB = {
           }
 
           const { data, error } = await q;
+
           if (!error && data !== null) {
             const remoteData = data.map(fromDb);
 
-            // Merge local additions that haven't been deleted
+            // ✅ FIX: only merge LOCAL rows that match the SAME filter,
+            // otherwise job_items from other jobs leak into this job.
+            const localFiltered = applyLocalFilter(localList);
+
             const merged = [...remoteData];
-            localList.forEach((localItem: any) => {
-              const pk = table === "tenants" ? "email" : "id";
-              if (
-                !merged.find((r: any) => r[pk] === localItem[pk]) &&
-                !deletedIds.has(localItem[pk])
-              ) {
+            const pk = table === "tenants" ? "email" : "id";
+
+            localFiltered.forEach((localItem: any) => {
+              if (!merged.find((r: any) => r[pk] === localItem[pk]) && !deletedIds.has(localItem[pk])) {
                 merged.push(localItem);
               }
             });
 
-            return merged.filter((item: any) => {
-              const pk = table === "tenants" ? "email" : "id";
-              return !deletedIds.has(item[pk]);
-            });
+            return merged.filter((item: any) => !deletedIds.has(item[pk]));
           }
         } catch (e) {
           console.error(`Select failed (${table}):`, e);
@@ -355,18 +378,7 @@ export const DB = {
 
     // ----- LOCAL SELECT FALLBACK
     if (method === "select") {
-      let base = (localList || []).filter(
-        (i: any) => i.tenant_id === tenantId || i.email === tenantId
-      );
-      if (filter) {
-        Object.entries(filter).forEach(([k, v]) => {
-          base = base.filter((i: any) => i[k] === v || i[FIELD_MAP[k] || k] === v);
-        });
-      }
-      return base.filter((item: any) => {
-        const pk = table === "tenants" ? "email" : "id";
-        return !deletedIds.has(item[pk]);
-      });
+      return applyLocalFilter(localList);
     }
 
     return payload || [];
