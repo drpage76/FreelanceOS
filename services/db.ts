@@ -17,11 +17,12 @@ const LOCAL_STORAGE_KEY = "freelance_os_local_data_v4";
 const DELETED_ITEMS_KEY = "freelance_os_deleted_ids";
 const LOCAL_USER_EMAIL = "local@freelanceos.internal";
 
-// ✅ NEW: cache the signed-in email to prevent auth “blink” -> landing loops
+// ✅ cache the signed-in email to prevent auth “blink” -> landing loops
 const TENANT_CACHE_KEY = "FO_TENANT_ID";
 
 // Keep your map (trim/extend as needed)
 const FIELD_MAP: Record<string, string> = {
+  // Tenant
   email: "email",
   name: "name",
   businessName: "business_name",
@@ -44,6 +45,12 @@ const FIELD_MAP: Record<string, string> = {
   plan: "plan",
   paymentTermsDays: "payment_terms_days",
 
+  // ✅ FIX: bank details (these exist in your tenants table)
+  accountName: "account_name",
+  accountNumber: "account_number",
+  sortCodeIban: "sort_code_iban",
+
+  // Common
   clientId: "client_id",
   startDate: "start_date",
   endDate: "end_date",
@@ -193,12 +200,14 @@ export const getSupabase = (): SupabaseClient => supabase;
 
 export const DB = {
   isCloudConfigured: () =>
-    !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY,
+    !!import.meta.env.VITE_SUPABASE_URL &&
+    !!import.meta.env.VITE_SUPABASE_ANON_KEY,
 
-  // ✅ ADDED: Navigation.tsx expects this to exist
+  // Navigation.tsx expects this to exist
   testConnection: async (): Promise<{ success: boolean; message?: string }> => {
     try {
-      if (!DB.isCloudConfigured()) return { success: false, message: "Not configured" };
+      if (!DB.isCloudConfigured())
+        return { success: false, message: "Not configured" };
 
       const { data } = await getSupabase().auth.getSession();
       const email = data?.session?.user?.email;
@@ -217,7 +226,7 @@ export const DB = {
     }
   },
 
-  // ✅ UPDATED: stable tenant id retrieval (session -> cache -> null)
+  // stable tenant id retrieval (session -> cache -> null)
   getTenantId: async (): Promise<string | null> => {
     try {
       const client = getSupabase();
@@ -244,7 +253,7 @@ export const DB = {
     }
   },
 
-  // ✅ UPDATED: actually caches email when session exists
+  // caches email when session exists
   initializeSession: async () => {
     try {
       const client = getSupabase();
@@ -269,9 +278,11 @@ export const DB = {
 
     // Helper: apply same filter logic to LOCAL list (so merges don't leak)
     const applyLocalFilter = (list: any[]) => {
-      let base = (list || []).filter(
-        (i: any) => i.tenant_id === tenantId || i.email === tenantId
-      );
+      let base = (list || []).filter((i: any) => {
+        // tenants table is keyed by email, not tenant_id
+        if (table === "tenants") return i.email === tenantId;
+        return i.tenant_id === tenantId;
+      });
 
       if (filter) {
         Object.entries(filter).forEach(([k, v]) => {
@@ -284,17 +295,21 @@ export const DB = {
       return base.filter((item: any) => !deletedIds.has(item[pk]));
     };
 
-    // ----- LOCAL FIRST (so you can work offline)
+    // ----- LOCAL FIRST (offline support)
     if (method === "upsert" && payload) {
       const raw = Array.isArray(payload) ? payload : [payload];
       raw.forEach((p) => {
-        const item = { ...p, tenant_id: tenantId };
+        // ✅ do NOT force tenant_id onto tenants rows
+        const item =
+          table === "tenants" ? { ...p } : { ...p, tenant_id: tenantId };
+
         const pk = table === "tenants" ? "email" : "id";
         const idx = localList.findIndex((i: any) => i[pk] === item[pk]);
         if (idx >= 0) localList[idx] = { ...localList[idx], ...item };
         else localList.push(item);
         if (item[pk]) removeFromDeletions(item[pk]);
       });
+
       (localData as any)[table] = localList;
       saveLocalData(localData);
     }
@@ -329,11 +344,11 @@ export const DB = {
         const pk = table === "tenants" ? "email" : "id";
 
         if (filter?.id) {
-          // ✅ safer: scope deletes by tenant when not tenants table
+          // safer: scope deletes by tenant when not tenants table
           if (table === "tenants") await query.delete().eq(pk, filter.id);
           else await query.delete().eq(pk, filter.id).eq("tenant_id", effectiveId);
         } else if (filter?.jobId) {
-          // ✅ critical: don't delete other job_items/invoices etc for other tenants
+          // critical: don't delete other tenants' rows
           await query.delete().eq("job_id", filter.jobId).eq("tenant_id", effectiveId);
         }
       }
@@ -355,15 +370,17 @@ export const DB = {
           if (!error && data !== null) {
             const remoteData = data.map(fromDb);
 
-            // ✅ FIX: only merge LOCAL rows that match the SAME filter,
-            // otherwise job_items from other jobs leak into this job.
+            // FIX: only merge LOCAL rows that match SAME filter
             const localFiltered = applyLocalFilter(localList);
 
             const merged = [...remoteData];
             const pk = table === "tenants" ? "email" : "id";
 
             localFiltered.forEach((localItem: any) => {
-              if (!merged.find((r: any) => r[pk] === localItem[pk]) && !deletedIds.has(localItem[pk])) {
+              if (
+                !merged.find((r: any) => r[pk] === localItem[pk]) &&
+                !deletedIds.has(localItem[pk])
+              ) {
                 merged.push(localItem);
               }
             });
@@ -384,13 +401,11 @@ export const DB = {
     return payload || [];
   },
 
-  // ✅ UPDATED: this is the loop-fix
+  // loop-fix user loader
   getCurrentUser: async (): Promise<Tenant | null> => {
-    // Always prefer real session email (prevents “dashboard then landing”)
     const email = await DB.getTenantId();
     if (!email) return null;
 
-    // Try to load the tenant row (cloud)
     try {
       const { data, error } = await getSupabase()
         .from("tenants")
@@ -402,7 +417,6 @@ export const DB = {
         return fromDb(data) as Tenant;
       }
 
-      // If RLS blocks read, we still want to keep user logged in
       if (error) {
         console.warn("[DB.getCurrentUser] tenants read failed:", error);
       }
@@ -410,7 +424,6 @@ export const DB = {
       console.warn("[DB.getCurrentUser] tenants read threw:", e);
     }
 
-    // Fallback tenant object (keeps app running, and we try to upsert it)
     const fallback: Tenant = {
       email,
       name: email.split("@")[0],
@@ -431,8 +444,6 @@ export const DB = {
       paymentStatus: "TRIALING",
     } as any;
 
-    // Try to create/update the tenant record.
-    // Even if this fails due to RLS, we still return fallback to prevent loops.
     try {
       await DB.updateTenant(fallback);
     } catch (e) {
@@ -493,7 +504,8 @@ export const DB = {
     await DB.call("job_items", "upsert", items);
   },
 
-  deleteJobItem: async (id: string) => DB.call("job_items", "delete", null, { id }),
+  deleteJobItem: async (id: string) =>
+    DB.call("job_items", "delete", null, { id }),
 
   // Quotes
   getQuotes: async () => DB.call("quotes", "select").then((r) => r || []),
@@ -514,7 +526,6 @@ export const DB = {
     try {
       await getSupabase().auth.signOut();
     } catch {}
-    // ✅ also clear cached id so it doesn't “ghost login”
     clearCachedTenantId();
   },
 };
