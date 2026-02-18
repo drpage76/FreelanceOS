@@ -122,7 +122,6 @@ const MainLayout: React.FC<{
         </div>
       </main>
 
-      {/* forces a complete re-mount of the modal when opened (prevents state leakage) */}
       <CreateJobModal
         key={isNewJobModalOpen ? "modal-active" : "modal-idle"}
         isOpen={isNewJobModalOpen}
@@ -168,9 +167,7 @@ const App: React.FC = () => {
     const client = getSupabase();
     if (!client) return undefined;
     try {
-      const {
-        data: { session },
-      } = await (client.auth as any).getSession();
+      const { data: { session } } = await (client.auth as any).getSession();
       return session?.provider_token || undefined;
     } catch {
       return undefined;
@@ -271,11 +268,20 @@ const App: React.FC = () => {
   }, [appState.jobs, appState.clients, currentUser, getLatestToken, loadData]);
 
   useEffect(() => {
-    // Clean up noisy auth params if present on initial load
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("error") || params.get("state")) {
-      const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
-      window.history.replaceState({}, document.title, cleanUrl);
+    // ✅ DO NOT strip auth params while on the callback route.
+    // With HashRouter, callback can be:
+    // - /?code=...#/auth/callback
+    // - /#/auth/callback?code=...
+    const hash = window.location.hash || "";
+    const isOnCallback =
+      hash.startsWith("#/auth/callback") || hash.includes("/auth/callback");
+
+    if (!isOnCallback) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("error") || params.get("state")) {
+        const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
     }
 
     if (initializationStarted.current) return;
@@ -303,33 +309,33 @@ const App: React.FC = () => {
 
     const client = getSupabase();
     if (client) {
-      const {
-        data: { subscription },
-      } = (client.auth as any).onAuthStateChange(async (event: string, _session: any) => {
-        if (event === "SIGNED_IN" && !hasLoadedOnce.current) {
-          const user = await DB.getCurrentUser();
-          if (user) {
-            setCurrentUser(user);
-            loadData(user);
+      const { data: { subscription } } = (client.auth as any).onAuthStateChange(
+        async (event: string) => {
+          if (event === "SIGNED_IN" && !hasLoadedOnce.current) {
+            const user = await DB.getCurrentUser();
+            if (user) {
+              setCurrentUser(user);
+              loadData(user);
+            }
+          }
+
+          if (event === "SIGNED_OUT") {
+            setCurrentUser(null);
+            hasLoadedOnce.current = false;
+            setAppState({
+              user: null,
+              clients: [],
+              jobs: [],
+              quotes: [],
+              externalEvents: [],
+              jobItems: [],
+              invoices: [],
+              mileage: [],
+            });
+            setIsLoading(false);
           }
         }
-
-        if (event === "SIGNED_OUT") {
-          setCurrentUser(null);
-          hasLoadedOnce.current = false;
-          setAppState({
-            user: null,
-            clients: [],
-            jobs: [],
-            quotes: [],
-            externalEvents: [],
-            jobItems: [],
-            invoices: [],
-            mileage: [],
-          });
-          setIsLoading(false);
-        }
-      });
+      );
 
       return () => {
         clearTimeout(safetyTimeout);
@@ -378,7 +384,7 @@ const App: React.FC = () => {
     <ErrorBoundary>
       <HashRouter>
         <Routes>
-          {/* ✅ OAuth callback handler must be OUTSIDE MainLayout */}
+          {/* ✅ OAuth callback handler OUTSIDE MainLayout */}
           <Route path="/auth/callback" element={<AuthCallback />} />
 
           <Route path="/privacy" element={<Privacy />} />
@@ -390,7 +396,6 @@ const App: React.FC = () => {
             element={!currentUser ? <Landing /> : <Navigate to="/dashboard" replace />}
           />
 
-          {/* ✅ Pathless layout route (avoids duplicate "/" matching edge cases) */}
           <Route
             element={
               <MainLayout
@@ -426,7 +431,10 @@ const App: React.FC = () => {
                 />
               }
             />
-            <Route path="jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
+            <Route
+              path="jobs/:id"
+              element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />}
+            />
             <Route path="clients" element={<Clients state={appState} onRefresh={loadData} />} />
             <Route path="quotes" element={<Quotes state={appState} onRefresh={loadData} />} />
             <Route

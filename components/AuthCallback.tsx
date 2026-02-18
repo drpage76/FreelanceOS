@@ -1,51 +1,84 @@
-import { useEffect, useState } from "react";
+// src/components/AuthCallback.tsx
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getSupabase } from "../services/db";
+import { supabase } from "../lib/supabaseClient";
 
-export default function AuthCallback() {
+const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
   const [msg, setMsg] = useState("Signing you in…");
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const clearBrokenAuth = () => {
+      Object.keys(localStorage).forEach((k) => {
+        if (k.startsWith("sb-")) localStorage.removeItem(k);
+      });
+    };
+
     const run = async () => {
-      const supabase = getSupabase();
-
-      // VERY IMPORTANT: code lives BEFORE the hash
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
-
-      console.log("[AuthCallback] code:", code);
-
-      if (!code) {
-        setMsg("Missing OAuth code.");
-        return;
-      }
-
       try {
+        // Works for BOTH:
+        // /#/auth/callback?code=XXX
+        // /?code=XXX#/auth/callback
+        const params =
+          window.location.search ||
+          (window.location.hash.includes("?")
+            ? window.location.hash.split("?")[1]
+            : "");
+
+        const code = new URLSearchParams(params).get("code");
+
+        if (!code) throw new Error("No OAuth code found.");
+
         setMsg("Exchanging code for session…");
 
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
 
         if (error) throw error;
 
-        console.log("[AuthCallback] session:", data?.session);
+        if (cancelled) return;
 
-        if (data?.session) {
-          // clean URL
-          window.history.replaceState({}, "", "/#/");
-          navigate("/", { replace: true });
-          return;
-        }
+        // Clean URL
+        window.history.replaceState({}, "", "/#/dashboard");
 
-        throw new Error("No session returned.");
-      } catch (err: any) {
-        console.error(err);
-        setMsg(`OAuth failed: ${err?.message || "Unknown error"}`);
+        navigate("/dashboard", { replace: true });
+      } catch (e: any) {
+        if (cancelled) return;
+
+        console.error(e);
+
+        // auto recover from PKCE / refresh corruption
+        clearBrokenAuth();
+        await supabase.auth.signOut();
+
+        setErr(e?.message || "Login failed");
+        setMsg("OAuth failed. Please try again.");
       }
     };
 
     run();
+
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
 
-  return <div className="p-10">{msg}</div>;
-}
+  return (
+    <div style={{ padding: 32 }}>
+      <h2>{msg}</h2>
+
+      {err && (
+        <>
+          <pre style={{ color: "#b00020" }}>{err}</pre>
+          <button onClick={() => navigate("/", { replace: true })}>
+            Back to sign in
+          </button>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default AuthCallback;

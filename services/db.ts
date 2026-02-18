@@ -1,4 +1,4 @@
-// services/db.ts
+// src/services/db.ts
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabaseClient";
 import {
@@ -16,6 +16,9 @@ import {
 const LOCAL_STORAGE_KEY = "freelance_os_local_data_v4";
 const DELETED_ITEMS_KEY = "freelance_os_deleted_ids";
 const LOCAL_USER_EMAIL = "local@freelanceos.internal";
+
+// ✅ NEW: cache the signed-in email to prevent auth “blink” -> landing loops
+const TENANT_CACHE_KEY = "FO_TENANT_ID";
 
 // Keep your map (trim/extend as needed)
 const FIELD_MAP: Record<string, string> = {
@@ -164,6 +167,28 @@ const removeFromDeletions = (id: string) => {
   }
 };
 
+// ✅ helpers for cached tenant id
+const getCachedTenantId = (): string | null => {
+  try {
+    const v = (localStorage.getItem(TENANT_CACHE_KEY) || "").trim();
+    return v || null;
+  } catch {
+    return null;
+  }
+};
+
+const setCachedTenantId = (email: string) => {
+  try {
+    if (email) localStorage.setItem(TENANT_CACHE_KEY, email);
+  } catch {}
+};
+
+const clearCachedTenantId = () => {
+  try {
+    localStorage.removeItem(TENANT_CACHE_KEY);
+  } catch {}
+};
+
 export const getSupabase = (): SupabaseClient => supabase;
 
 export const DB = {
@@ -192,18 +217,41 @@ export const DB = {
     }
   },
 
+  // ✅ UPDATED: stable tenant id retrieval (session -> cache -> null)
   getTenantId: async (): Promise<string | null> => {
     try {
       const client = getSupabase();
-      const { data } = await client.auth.getSession();
-      return data?.session?.user?.email || null;
-    } catch {
+
+      // 1) Prefer live session
+      const { data, error } = await client.auth.getSession();
+      if (!error) {
+        const email = data?.session?.user?.email || null;
+        if (email) {
+          setCachedTenantId(email);
+          return email;
+        }
+      }
+
+      // 2) Fallback to cache (prevents “blink” loops)
+      const cached = getCachedTenantId();
+      if (cached) return cached;
+
       return null;
+    } catch {
+      // 3) Cache fallback even if getSession throws
+      const cached = getCachedTenantId();
+      return cached || null;
     }
   },
 
+  // ✅ UPDATED: actually caches email when session exists
   initializeSession: async () => {
-    await DB.getTenantId();
+    try {
+      const client = getSupabase();
+      const { data } = await client.auth.getSession();
+      const email = data?.session?.user?.email || null;
+      if (email) setCachedTenantId(email);
+    } catch {}
   },
 
   async call(
@@ -324,19 +372,33 @@ export const DB = {
     return payload || [];
   },
 
+  // ✅ UPDATED: this is the loop-fix
   getCurrentUser: async (): Promise<Tenant | null> => {
+    // Always prefer real session email (prevents “dashboard then landing”)
     const email = await DB.getTenantId();
     if (!email) return null;
 
+    // Try to load the tenant row (cloud)
     try {
-      const { data } = await getSupabase()
+      const { data, error } = await getSupabase()
         .from("tenants")
         .select("*")
         .eq("email", email)
         .maybeSingle();
-      if (data) return fromDb(data) as Tenant;
-    } catch {}
 
+      if (!error && data) {
+        return fromDb(data) as Tenant;
+      }
+
+      // If RLS blocks read, we still want to keep user logged in
+      if (error) {
+        console.warn("[DB.getCurrentUser] tenants read failed:", error);
+      }
+    } catch (e) {
+      console.warn("[DB.getCurrentUser] tenants read threw:", e);
+    }
+
+    // Fallback tenant object (keeps app running, and we try to upsert it)
     const fallback: Tenant = {
       email,
       name: email.split("@")[0],
@@ -357,7 +419,14 @@ export const DB = {
       paymentStatus: "TRIALING",
     } as any;
 
-    await DB.updateTenant(fallback);
+    // Try to create/update the tenant record.
+    // Even if this fails due to RLS, we still return fallback to prevent loops.
+    try {
+      await DB.updateTenant(fallback);
+    } catch (e) {
+      console.warn("[DB.getCurrentUser] updateTenant failed (RLS?):", e);
+    }
+
     return fallback;
   },
 
@@ -412,8 +481,7 @@ export const DB = {
     await DB.call("job_items", "upsert", items);
   },
 
-  deleteJobItem: async (id: string) =>
-    DB.call("job_items", "delete", null, { id }),
+  deleteJobItem: async (id: string) => DB.call("job_items", "delete", null, { id }),
 
   // Quotes
   getQuotes: async () => DB.call("quotes", "select").then((r) => r || []),
@@ -434,5 +502,7 @@ export const DB = {
     try {
       await getSupabase().auth.signOut();
     } catch {}
+    // ✅ also clear cached id so it doesn't “ghost login”
+    clearCachedTenantId();
   },
 };
