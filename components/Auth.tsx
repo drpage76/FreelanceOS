@@ -21,14 +21,24 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
     (async () => {
       try {
         const { data } = await supabase.auth.getSession();
-        if (!cancelled && data?.session) onSuccess();
+        if (!cancelled && data?.session) {
+          // Clean any lingering auth params (defensive)
+          const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+          window.history.replaceState({}, document.title, cleanUrl);
+          onSuccess();
+        }
       } catch {
         // ignore
       }
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) onSuccess();
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN") {
+        // CRITICAL: remove ?code= / ?error= params so new tabs don't re-trigger exchange
+        const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+        window.history.replaceState({}, document.title, cleanUrl);
+        onSuccess();
+      }
     });
 
     return () => {
@@ -63,14 +73,9 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
     setLoading(true);
 
     try {
-      // Store config for callback.html (GitHub Pages + static callback)
-      const url = (import.meta.env.VITE_SUPABASE_URL || "").trim();
-      const key = (import.meta.env.VITE_SUPABASE_ANON_KEY || "").trim();
-      if (url) localStorage.setItem("FO_SUPABASE_URL", url);
-      if (key) localStorage.setItem("FO_SUPABASE_ANON_KEY", key);
-
-      // ✅ ALWAYS redirect to the static callback file (not the hash route)
-      const redirectTo = `${window.location.origin}/auth/callback.html`;
+      // ✅ SPA flow: redirect back to your app root (works for both localhost and freelanceos.org)
+      // Supabase will append ?code=... and the supabase client will process it.
+      const redirectTo = window.location.origin;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -84,6 +89,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
       });
 
       if (error) throw error;
+
       // Browser redirects away after this
     } catch (e: any) {
       setError(e?.message || "OAuth failed");
