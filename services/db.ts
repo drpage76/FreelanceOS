@@ -45,10 +45,16 @@ const FIELD_MAP: Record<string, string> = {
   plan: "plan",
   paymentTermsDays: "payment_terms_days",
 
-  // ✅ FIX: bank details (these exist in your tenants table)
+  // ✅ Bank details (tenants table)
   accountName: "account_name",
   accountNumber: "account_number",
+
+  // ✅ FIX: your UI uses sortCodeOrIBAN, DB column is sort_code_iban
+  sortCodeOrIBAN: "sort_code_iban",
+
+  // ✅ Backwards compat (if any older code used this key)
   sortCodeIban: "sort_code_iban",
+  sortCodeIbanSwift: "sort_code_iban",
 
   // Common
   clientId: "client_id",
@@ -98,8 +104,12 @@ const toDb = (table: string, obj: any, tenantId: string) => {
     if (key === "__isSeed" || key === "tenant_id" || key === "shifts") continue;
     if (key === "rechargeAmount" || key === "actualCost") continue;
 
+    const val = obj[key];
+    // ✅ don’t push undefined (prevents accidental overwrites / noisy upserts)
+    if (val === undefined) continue;
+
     const dbKey = FIELD_MAP[key] || key;
-    out[dbKey] = obj[key];
+    out[dbKey] = val;
   }
 
   if (obj.id && !out.id) out.id = obj.id;
@@ -113,6 +123,12 @@ const fromDb = (obj: any) => {
     const jsKey = (inverseMap as any)[key] || key;
     out[jsKey] = obj[key];
   }
+
+  // ✅ Ensure UI-facing key exists even if inverseMap chose a different alias
+  if (out.sortCodeOrIBAN == null && obj.sort_code_iban != null) {
+    out.sortCodeOrIBAN = obj.sort_code_iban;
+  }
+
   return out;
 };
 
@@ -279,7 +295,6 @@ export const DB = {
     // Helper: apply same filter logic to LOCAL list (so merges don't leak)
     const applyLocalFilter = (list: any[]) => {
       let base = (list || []).filter((i: any) => {
-        // tenants table is keyed by email, not tenant_id
         if (table === "tenants") return i.email === tenantId;
         return i.tenant_id === tenantId;
       });
@@ -299,7 +314,6 @@ export const DB = {
     if (method === "upsert" && payload) {
       const raw = Array.isArray(payload) ? payload : [payload];
       raw.forEach((p) => {
-        // ✅ do NOT force tenant_id onto tenants rows
         const item =
           table === "tenants" ? { ...p } : { ...p, tenant_id: tenantId };
 
@@ -321,7 +335,9 @@ export const DB = {
       (localData as any)[table] = localList.filter((item: any) => {
         if (filter?.id) return item[pk] !== filter.id;
         if (filter?.jobId)
-          return item["jobId"] !== filter.jobId && item["job_id"] !== filter.jobId;
+          return (
+            item["jobId"] !== filter.jobId && item["job_id"] !== filter.jobId
+          );
         return true;
       });
 
@@ -344,11 +360,9 @@ export const DB = {
         const pk = table === "tenants" ? "email" : "id";
 
         if (filter?.id) {
-          // safer: scope deletes by tenant when not tenants table
           if (table === "tenants") await query.delete().eq(pk, filter.id);
           else await query.delete().eq(pk, filter.id).eq("tenant_id", effectiveId);
         } else if (filter?.jobId) {
-          // critical: don't delete other tenants' rows
           await query.delete().eq("job_id", filter.jobId).eq("tenant_id", effectiveId);
         }
       }
@@ -370,7 +384,6 @@ export const DB = {
           if (!error && data !== null) {
             const remoteData = data.map(fromDb);
 
-            // FIX: only merge LOCAL rows that match SAME filter
             const localFiltered = applyLocalFilter(localList);
 
             const merged = [...remoteData];
