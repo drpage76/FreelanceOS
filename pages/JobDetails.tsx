@@ -50,8 +50,11 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   const [showPaidModal, setShowPaidModal] = useState(false);
   const [paidDate, setPaidDate] = useState<string>(new Date().toISOString().slice(0, 10));
 
-  // NEW: mark unpaid modal
+  // mark unpaid modal
   const [showUnpaidModal, setShowUnpaidModal] = useState(false);
+
+  // calendar warning (non-blocking)
+  const [calendarWarning, setCalendarWarning] = useState<string | null>(null);
 
   const docRef = useRef<HTMLDivElement>(null);
 
@@ -87,7 +90,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       const inv = allInvoices.find((i) => i.jobId === foundJob.id) || null;
       setInvoice(inv);
 
-      // default paid date if already paid
       if (inv?.datePaid) setPaidDate(inv.datePaid);
       else setPaidDate(new Date().toISOString().slice(0, 10));
     } catch (err) {
@@ -135,20 +137,77 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     setItems((prev) => ((prev || []).length <= 1 ? prev : (prev || []).filter((_, i) => i !== idx)));
   };
 
+  const normalizeShift = (s: JobShift): JobShift => {
+    const startDate = (s as any).startDate || (job as any)?.startDate;
+    const endDate = (s as any).endDate || startDate;
+    const isFullDay = (s as any).isFullDay !== false; // default true
+
+    return {
+      ...s,
+      startDate,
+      endDate,
+      isFullDay,
+      startTime: (s as any).startTime || "09:00",
+      endTime: (s as any).endTime || "17:30",
+    } as any;
+  };
+
+  const computeShiftBasedRange = (shiftList: JobShift[]) => {
+    const norm = (shiftList || []).map(normalizeShift);
+
+    const startDates = norm
+      .map((s) => (s as any).startDate)
+      .filter(Boolean)
+      .sort();
+
+    const endDates = norm
+      .map((s) => (s as any).endDate)
+      .filter(Boolean)
+      .sort();
+
+    return {
+      startDate: startDates.length ? startDates[0] : (job as any).startDate,
+      endDate: endDates.length ? endDates[endDates.length - 1] : (job as any).endDate,
+      normalized: norm,
+    };
+  };
+
+  const tryCalendarSync = async (updatedJob: Job) => {
+    if (!googleAccessToken) return;
+
+    try {
+      if (updatedJob.syncToCalendar === false) {
+        await deleteJobFromGoogle(updatedJob.id, googleAccessToken);
+        setCalendarWarning(null);
+        return;
+      }
+
+      await syncJobToGoogle(updatedJob, googleAccessToken, client?.name);
+      setCalendarWarning(null);
+    } catch (e: any) {
+      const msg = e?.message || "Calendar sync failed.";
+      console.warn("[Calendar Sync Failed]", e);
+      setCalendarWarning(msg);
+      // Non-blocking: we do NOT throw
+    }
+  };
+
   const handleUpdateJob = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!job || isSaving) return;
 
     setIsSaving(true);
+    setCalendarWarning(null);
 
     let startDate = job.startDate;
     let endDate = job.endDate;
+    let normalizedShifts = shifts;
 
-    if (job.schedulingType === SchedulingType.SHIFT_BASED && (shifts || []).length > 0) {
-      const startDates = shifts.map((s) => s.startDate).filter(Boolean).sort();
-      const endDates = shifts.map((s) => s.endDate).filter(Boolean).sort();
-      if (startDates.length > 0) startDate = startDates[0]!;
-      if (endDates.length > 0) endDate = endDates[endDates.length - 1]!;
+    if (job.schedulingType === SchedulingType.SHIFT_BASED) {
+      const { startDate: s, endDate: e2, normalized } = computeShiftBasedRange(shifts || []);
+      startDate = s;
+      endDate = e2;
+      normalizedShifts = normalized;
     }
 
     const updatedJob: Job = {
@@ -156,24 +215,25 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       startDate,
       endDate,
       totalRecharge,
-      shifts,
+      shifts: normalizedShifts,
     };
 
     try {
+      // ✅ Always save to DB first (this must not be blocked by Google)
       await DB.saveJob(updatedJob);
       await DB.saveJobItems(job.id, items);
 
-      // ✅ FIX: if sync disabled, remove from google instead of syncing
-      if (googleAccessToken) {
-        if (updatedJob.syncToCalendar === false) {
-          await deleteJobFromGoogle(updatedJob.id, googleAccessToken);
-        } else {
-          await syncJobToGoogle(updatedJob, googleAccessToken, client?.name);
-        }
-      }
+      // ✅ Calendar sync becomes best-effort (non-blocking)
+      await tryCalendarSync(updatedJob);
 
       setJob(updatedJob);
+      setShifts(normalizedShifts);
       await onRefresh();
+
+      // If calendar failed, inform but do not say "Save Error"
+      if (calendarWarning) {
+        alert(`Saved successfully, but calendar sync failed:\n\n${calendarWarning}`);
+      }
     } catch (err: any) {
       alert(`Save Error: ${err?.message || "Unknown error"}`);
     } finally {
@@ -220,7 +280,15 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
     setIsDeleting(true);
     try {
-      if (googleAccessToken) await deleteJobFromGoogle(job.id, googleAccessToken);
+      // delete calendar best-effort; job deletion still happens
+      if (googleAccessToken) {
+        try {
+          await deleteJobFromGoogle(job.id, googleAccessToken);
+        } catch (e) {
+          console.warn("[Calendar delete failed]", e);
+        }
+      }
+
       await DB.deleteJob(job.id);
       await onRefresh();
       navigate("/jobs");
@@ -300,7 +368,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     }
   };
 
-  // ✅ NEW: Mark unpaid -> clear datePaid, set invoice back to SENT, job back to AWAITING_PAYMENT
+  // Mark unpaid -> clear datePaid, set invoice back to SENT, job back to AWAITING_PAYMENT
   const confirmMarkInvoiceUnpaid = async () => {
     if (!invoice || !job) return;
 
@@ -309,7 +377,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       const unpaidInvoice: Invoice = {
         ...invoice,
         status: InvoiceStatus.SENT,
-        datePaid: null as any, // force clear in DB
+        datePaid: null as any,
       };
 
       await DB.saveInvoice(unpaidInvoice);
@@ -342,6 +410,16 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
   return (
     <div className="space-y-6 max-w-full overflow-x-hidden pb-20 px-1 md:px-4">
+      {/* Non-blocking calendar warning */}
+      {calendarWarning && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-[11px] font-bold">
+          Saved successfully, but calendar sync failed: <span className="font-mono">{calendarWarning}</span>
+          <div className="mt-2 text-[10px] text-amber-700">
+            Tip: try “Sync All” from the dashboard after re-authing Google.
+          </div>
+        </div>
+      )}
+
       {/* Issue Invoice Modal */}
       {showInvoiceModal && client && (
         <div className="fixed inset-0 z-[220] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
@@ -437,7 +515,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         </div>
       )}
 
-      {/* ✅ NEW: Mark Unpaid Modal */}
+      {/* Mark Unpaid Modal */}
       {showUnpaidModal && invoice && (
         <div className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
           <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200">
@@ -468,206 +546,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-rotate-left"></i>}
                 {isSaving ? "Saving..." : "Confirm Unpaid"}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Preview Modal */}
-      {showPreview && client && (
-        <div className="fixed inset-0 z-[200] flex items-start justify-center bg-slate-900/80 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-4xl rounded-[40px] shadow-2xl overflow-hidden my-8 border border-slate-200">
-            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 sticky top-0 z-[210] backdrop-blur-md">
-              <span className="px-4 py-2 rounded-xl text-[10px] font-black uppercase border bg-indigo-50 text-indigo-600 border-indigo-100">
-                {showPreview === "invoice" ? "Invoice Preview" : "Quotation Preview"}
-              </span>
-
-              <div className="flex gap-2">
-                {showPreview === "invoice" && invoice && invoice.status !== InvoiceStatus.PAID && (
-                  <button
-                    type="button"
-                    onClick={() => setShowPaidModal(true)}
-                    disabled={isSaving}
-                    className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase shadow-lg flex items-center gap-2"
-                  >
-                    {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-circle-check"></i>}
-                    Mark Paid
-                  </button>
-                )}
-
-                {showPreview === "invoice" && invoice && invoice.status === InvoiceStatus.PAID && (
-                  <button
-                    type="button"
-                    onClick={() => setShowUnpaidModal(true)}
-                    disabled={isSaving}
-                    className="px-6 py-2 bg-rose-600 text-white rounded-xl font-black text-xs uppercase shadow-lg flex items-center gap-2"
-                  >
-                    {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-rotate-left"></i>}
-                    Mark Unpaid
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleDownloadPDF}
-                  disabled={isSaving}
-                  className="px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-xs uppercase shadow-lg flex items-center gap-2"
-                >
-                  {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-file-arrow-down"></i>}
-                  PDF
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowPreview(null)}
-                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-rose-500 border border-slate-200"
-                >
-                  <i className="fa-solid fa-xmark"></i>
-                </button>
-              </div>
-            </div>
-
-            <div className="p-10 bg-slate-50 overflow-x-auto custom-scrollbar">
-              <div
-                ref={docRef}
-                className="bg-white p-12 pb-32 border border-slate-100 min-h-[1120px] w-[800px] mx-auto shadow-sm text-slate-900"
-              >
-                <div className="flex justify-between items-start mb-20">
-                  <div>
-                    {currentUser?.logoUrl ? (
-                      <img src={currentUser.logoUrl} alt="Logo" className="h-24 mb-6 object-contain" />
-                    ) : (
-                      <div className="flex items-center gap-2 mb-6 text-3xl font-black italic">
-                        Freelance<span className="text-indigo-600">OS</span>
-                      </div>
-                    )}
-                    <h1 className="text-5xl font-black uppercase tracking-tight">
-                      {showPreview === "quote" ? "Quotation" : "Invoice"}
-                    </h1>
-                    <p className="text-slate-400 font-bold uppercase text-xs mt-2 tracking-widest">Ref: {job.id}</p>
-
-                    {showPreview === "invoice" && invoice && (
-                      <p className="text-[10px] font-black uppercase mt-2">
-                        <span className={`px-3 py-1 rounded-full border ${STATUS_COLORS[invoice.status]}`}>
-                          {invoice.status}
-                        </span>
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="text-right">
-                    <p className="font-black text-xl">{currentUser?.businessName}</p>
-                    <p className="text-sm text-slate-500 whitespace-pre-line leading-relaxed mt-2">
-                      {currentUser?.businessAddress}
-                    </p>
-                    {currentUser?.vatNumber && (
-                      <p className="text-[10px] font-black uppercase text-slate-400 mt-2">
-                        {currentUser?.taxName || "VAT"}: {currentUser.vatNumber}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-10 mb-20">
-                  <div>
-                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-2">
-                      {showPreview === "quote" ? "Recipient" : "Billed To"}
-                    </p>
-                    <p className="font-black text-xl">{client.name}</p>
-                    <p className="text-sm text-slate-500 whitespace-pre-line leading-relaxed mt-2">{client.address}</p>
-                  </div>
-
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-2">Document Details</p>
-                    <div className="space-y-1">
-                      {showPreview === "invoice" && invoice ? (
-                        <>
-                          <p className="text-sm font-bold text-slate-700">Issued: {formatDate(invoice.date)}</p>
-                          <p className="text-sm font-black text-indigo-600">Due Date: {formatDate(invoice.dueDate)}</p>
-                          {invoice.datePaid && (
-                            <p className="text-[11px] font-black text-emerald-600">Paid: {formatDate(invoice.datePaid)}</p>
-                          )}
-                        </>
-                      ) : (
-                        <p className="text-sm font-bold text-slate-700">Issued: {formatDate(new Date().toISOString())}</p>
-                      )}
-
-                      <div className="mt-4 pt-4 border-t border-slate-50 space-y-1 text-right">
-                        <p className="text-sm font-black text-slate-900 leading-tight">Project: {job.description}</p>
-                        <p className="text-[11px] font-bold text-slate-500 italic">Location: {job.location || "TBD"}</p>
-                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-                          Period: {formatDate(job.startDate)} — {formatDate(job.endDate)}
-                        </p>
-                        {job.poNumber && (
-                          <p className="text-[11px] font-black text-indigo-600 uppercase tracking-widest mt-2">PO Ref: {job.poNumber}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <table className="w-full mb-12">
-                  <thead>
-                    <tr className="border-b-2 border-slate-900">
-                      <th className="py-4 text-left text-[10px] font-black uppercase tracking-widest">Description</th>
-                      <th className="py-4 text-center text-[10px] font-black uppercase tracking-widest">Qty</th>
-                      <th className="py-4 text-right text-[10px] font-black uppercase tracking-widest">Rate</th>
-                      <th className="py-4 text-right text-[10px] font-black uppercase tracking-widest">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {(items || []).map((it) => (
-                      <tr key={it.id}>
-                        <td className="py-5 font-bold text-slate-700 text-sm">{it.description}</td>
-                        <td className="py-5 text-center text-slate-600 font-black text-xs">{it.qty}</td>
-                        <td className="py-5 text-right text-slate-600 font-black text-xs">{formatCurrency(it.unitPrice, currentUser)}</td>
-                        <td className="py-5 text-right font-black text-slate-900 text-sm">
-                          {formatCurrency(Number(it.qty) * Number(it.unitPrice), currentUser)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                <div className="flex justify-end pt-10 border-t-2 border-slate-900">
-                  <div className="w-64 space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subtotal</span>
-                      <span className="text-xl font-bold text-slate-700">{formatCurrency(totalRecharge, currentUser)}</span>
-                    </div>
-
-                    {currentUser?.isVatRegistered && (
-                      <div className="flex justify-between items-center pt-2 border-t border-slate-50">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                          {currentUser?.taxName || "VAT"} ({currentUser?.taxRate || 20}%)
-                        </span>
-                        <span className="text-xl font-bold text-slate-700">
-                          {formatCurrency(totalRecharge * ((currentUser?.taxRate || 20) / 100), currentUser)}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex justify-between items-center pt-4 border-t-2 border-slate-900">
-                      <span className="text-xs font-black uppercase tracking-widest">Total</span>
-                      <span className="text-3xl font-black text-indigo-600">
-                        {formatCurrency(
-                          totalRecharge * (currentUser?.isVatRegistered ? 1 + ((currentUser.taxRate || 20) / 100) : 1),
-                          currentUser
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-20 pt-10 border-t border-slate-100">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Terms & Conditions</p>
-                  <p className="text-[11px] text-slate-500 leading-relaxed font-medium italic">
-                    This {showPreview === "quote" ? "quotation" : "invoice"} is subject to standard service terms.{" "}
-                    {showPreview === "quote" ? "Valid for 30 days." : ""} Payment is required within{" "}
-                    {client?.paymentTermsDays || 30} days of issue.
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -813,7 +691,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                   <button
                     type="button"
                     onClick={() =>
-                      setJob((prev) => (prev ? { ...prev, schedulingType: SchedulingType.CONTINUOUS, syncToCalendar: true } : prev))
+                      setJob((prev) =>
+                        prev ? { ...prev, schedulingType: SchedulingType.CONTINUOUS, syncToCalendar: true } : prev
+                      )
                     }
                     className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
                       job.syncToCalendar && job.schedulingType === SchedulingType.CONTINUOUS
@@ -827,7 +707,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                   <button
                     type="button"
                     onClick={() =>
-                      setJob((prev) => (prev ? { ...prev, schedulingType: SchedulingType.SHIFT_BASED, syncToCalendar: true } : prev))
+                      setJob((prev) =>
+                        prev ? { ...prev, schedulingType: SchedulingType.SHIFT_BASED, syncToCalendar: true } : prev
+                      )
                     }
                     className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
                       job.syncToCalendar && job.schedulingType === SchedulingType.SHIFT_BASED
@@ -852,37 +734,127 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
               {job.schedulingType === SchedulingType.SHIFT_BASED ? (
                 <div className="space-y-4">
-                  {(shifts || []).map((s, idx) => (
-                    <div key={s.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col md:flex-row gap-4 items-center">
-                      <input
-                        className="bg-white px-4 py-2 rounded-xl text-xs font-black w-full md:flex-1"
-                        placeholder="Shift Title"
-                        value={s.title}
-                        onChange={(e) => {
-                          const n = [...shifts];
-                          n[idx].title = e.target.value;
-                          setShifts(n);
-                        }}
-                      />
-                      <input
-                        type="date"
-                        value={s.startDate}
-                        className="bg-white px-4 py-2 rounded-xl text-xs font-bold"
-                        onChange={(e) => {
-                          const n = [...shifts];
-                          n[idx].startDate = e.target.value;
-                          setShifts(n);
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShifts((prev) => (prev || []).filter((_, i) => i !== idx))}
-                        className="text-slate-300 hover:text-rose-500"
+                  {(shifts || []).map((s, idx) => {
+                    const isFullDay = (s as any).isFullDay !== false;
+
+                    return (
+                      <div
+                        key={s.id}
+                        className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col gap-3"
                       >
-                        <i className="fa-solid fa-trash-can text-xs"></i>
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex flex-col md:flex-row gap-3 items-center">
+                          <input
+                            className="bg-white px-4 py-2 rounded-xl text-xs font-black w-full md:flex-1"
+                            placeholder="Shift Title"
+                            value={(s as any).title || ""}
+                            onChange={(e) => {
+                              const n = [...shifts];
+                              (n[idx] as any).title = e.target.value;
+                              setShifts(n);
+                            }}
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => setShifts((prev) => (prev || []).filter((_, i) => i !== idx))}
+                            className="text-slate-300 hover:text-rose-500"
+                            title="Remove shift"
+                          >
+                            <i className="fa-solid fa-trash-can text-xs"></i>
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black text-slate-400 uppercase px-1">Start Date</label>
+                            <input
+                              type="date"
+                              value={(s as any).startDate || ""}
+                              className="bg-white px-4 py-2 rounded-xl text-xs font-bold w-full"
+                              onChange={(e) => {
+                                const n = [...shifts];
+                                (n[idx] as any).startDate = e.target.value;
+                                // keep endDate >= startDate
+                                if (!(n[idx] as any).endDate) (n[idx] as any).endDate = e.target.value;
+                                setShifts(n);
+                              }}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black text-slate-400 uppercase px-1">End Date</label>
+                            <input
+                              type="date"
+                              value={(s as any).endDate || ""}
+                              className="bg-white px-4 py-2 rounded-xl text-xs font-bold w-full"
+                              onChange={(e) => {
+                                const n = [...shifts];
+                                (n[idx] as any).endDate = e.target.value;
+                                setShifts(n);
+                              }}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-black text-slate-400 uppercase px-1">Full Day</label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const n = [...shifts];
+                                const cur = (n[idx] as any).isFullDay;
+                                (n[idx] as any).isFullDay = cur === false ? true : false; // default true
+                                setShifts(n);
+                              }}
+                              className={`w-full px-4 py-2 rounded-xl text-[10px] font-black uppercase border ${
+                                isFullDay
+                                  ? "bg-white text-indigo-600 border-indigo-200"
+                                  : "bg-white text-slate-500 border-slate-200"
+                              }`}
+                            >
+                              {isFullDay ? "Yes" : "No (Timed)"}
+                            </button>
+                          </div>
+
+                          {!isFullDay ? (
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-black text-slate-400 uppercase px-1">Start</label>
+                                <input
+                                  type="time"
+                                  value={(s as any).startTime || "09:00"}
+                                  className="bg-white px-3 py-2 rounded-xl text-xs font-bold w-full"
+                                  onChange={(e) => {
+                                    const n = [...shifts];
+                                    (n[idx] as any).startTime = e.target.value;
+                                    setShifts(n);
+                                  }}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-black text-slate-400 uppercase px-1">End</label>
+                                <input
+                                  type="time"
+                                  value={(s as any).endTime || "17:30"}
+                                  className="bg-white px-3 py-2 rounded-xl text-xs font-bold w-full"
+                                  onChange={(e) => {
+                                    const n = [...shifts];
+                                    (n[idx] as any).endTime = e.target.value;
+                                    setShifts(n);
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-end">
+                              <div className="text-[10px] text-slate-400 font-bold px-1">
+                                Timed fields hidden for full-day shifts.
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
 
                   <button
                     type="button"
@@ -899,7 +871,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                           endTime: "17:30",
                           isFullDay: true,
                           tenant_id: job.tenant_id,
-                        },
+                        } as any,
                       ])
                     }
                     className="w-full py-4 border-2 border-dashed border-indigo-100 rounded-3xl text-[10px] font-black text-indigo-400 uppercase"
@@ -933,7 +905,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
               {job.syncToCalendar === false && (
                 <div className="mt-6 p-4 bg-rose-50/50 border border-rose-100 rounded-2xl text-center">
                   <p className="text-[9px] font-black text-rose-400 uppercase italic">
-                    Synchronization disabled. Job will be removed from all external and internal calendars on save.
+                    Synchronization disabled. Job will be removed from external calendar on save.
                   </p>
                 </div>
               )}

@@ -1,14 +1,6 @@
 // src/App.tsx
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import {
-  HashRouter,
-  Routes,
-  Route,
-  Navigate,
-  Link,
-  Outlet,
-  useLocation,
-} from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate, Link, Outlet, useLocation } from "react-router-dom";
 
 import { Navigation } from "./components/Navigation";
 
@@ -24,17 +16,9 @@ import { Privacy } from "./pages/Privacy";
 import { Terms } from "./pages/Terms";
 
 import { CreateJobModal } from "./components/CreateJobModal";
-import {
-  AppState,
-  Tenant,
-  JobStatus,
-  InvoiceStatus,
-  UserPlan,
-  Job,
-  JobItem,
-} from "./types";
+import { AppState, Tenant, JobStatus, InvoiceStatus, UserPlan, Job, JobItem } from "./types";
 import { DB, getSupabase } from "./services/db";
-import { syncJobToGoogle, deleteJobFromGoogle } from "./services/googleCalendar";
+import { fetchGoogleEvents, syncJobToGoogle, deleteJobFromGoogle } from "./services/googleCalendar";
 import { checkSubscriptionStatus } from "./utils";
 
 /**
@@ -58,18 +42,12 @@ class ErrorBoundary extends React.Component<
           <div className="w-20 h-20 bg-rose-500/10 text-rose-500 rounded-3xl flex items-center justify-center mb-6 border border-rose-500/20">
             <i className="fa-solid fa-triangle-exclamation text-3xl"></i>
           </div>
-          <h1 className="text-white text-2xl font-black mb-2 tracking-tight">
-            Workspace Crash Detected
-          </h1>
+          <h1 className="text-white text-2xl font-black mb-2 tracking-tight">Workspace Crash Detected</h1>
           <p className="text-slate-400 max-w-md mb-8 text-sm font-medium">
-            A technical protocol failure occurred. Your data is safe in the cloud,
-            but the interface needs a hard reset.
+            A technical protocol failure occurred. Your data is safe in the cloud, but the interface needs a hard reset.
           </p>
           <button
-            onClick={() =>
-              (window.location.href =
-                window.location.origin + window.location.pathname)
-            }
+            onClick={() => (window.location.href = window.location.origin + window.location.pathname)}
             className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 transition-all"
           >
             Re-Initialize Workspace
@@ -116,19 +94,12 @@ const MainLayout: React.FC<{
       {isReadOnly && (
         <div className="fixed top-0 left-0 right-0 bg-rose-600 text-white py-2 text-center z-[200] text-[10px] font-black uppercase tracking-[0.2em] shadow-lg">
           Trial Period Expired. Access is currently Read-Only.{" "}
-          <Link
-            to="/settings"
-            className="underline ml-2 hover:text-rose-100 transition-colors"
-          >
+          <Link to="/settings" className="underline ml-2 hover:text-rose-100 transition-colors">
             Reactivate Elite Plan
           </Link>
         </div>
       )}
-      <main
-        className={`flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar ${
-          isReadOnly ? "pt-12" : ""
-        }`}
-      >
+      <main className={`flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar ${isReadOnly ? "pt-12" : ""}`}>
         <div className="max-w-7xl mx-auto w-full">
           <Outlet />
         </div>
@@ -149,9 +120,7 @@ const MainLayout: React.FC<{
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<Tenant | null>(null);
-  const [googleAccessToken, setGoogleAccessToken] = useState<string | undefined>(
-    undefined
-  );
+  const [googleAccessToken, setGoogleAccessToken] = useState<string | undefined>(undefined);
   const [isNewJobModalOpen, setIsNewJobModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -164,18 +133,14 @@ const App: React.FC = () => {
     user: null,
     clients: [],
     jobs: [],
-    quotes: [], // kept for type compatibility, but no longer used
+    quotes: [], // keep field for compatibility with your types, but we won't load quotes
     externalEvents: [],
     jobItems: [],
     invoices: [],
     mileage: [],
   });
 
-  const subStatus = useMemo(
-    () => checkSubscriptionStatus(currentUser),
-    [currentUser]
-  );
-
+  const subStatus = useMemo(() => checkSubscriptionStatus(currentUser), [currentUser]);
   const isReadOnly = useMemo(
     () => subStatus.isTrialExpired && currentUser?.plan !== UserPlan.ACTIVE,
     [subStatus, currentUser]
@@ -185,9 +150,7 @@ const App: React.FC = () => {
     const client = getSupabase();
     if (!client) return undefined;
     try {
-      const {
-        data: { session },
-      } = await (client.auth as any).getSession();
+      const { data: { session } } = await (client.auth as any).getSession();
       return session?.provider_token || undefined;
     } catch {
       return undefined;
@@ -220,8 +183,7 @@ const App: React.FC = () => {
           DB.getMileage(),
         ]);
 
-        const getVal = (res: any) =>
-          res.status === "fulfilled" ? res.value : [];
+        const getVal = (res: any) => (res.status === "fulfilled" ? res.value : []);
 
         const reconciledJobs = (getVal(jobs) || []).map((job: Job) => {
           const inv = (getVal(invoices) || []).find((i: any) => i.jobId === job.id);
@@ -231,17 +193,20 @@ const App: React.FC = () => {
           return job;
         });
 
-        // Quotes/Estimates removed; externalEvents fetch removed (build-safe).
-        // Calendar sync still works via JobDetails + Sync All buttons.
+        const googleEvents =
+          token
+            ? await fetchGoogleEvents(user.email, token).catch(() => [])
+            : [];
+
         setCurrentUser(user);
         setAppState({
           user,
           clients: getVal(clients) || [],
           jobs: reconciledJobs,
-          quotes: [],
+          quotes: [], // quotes removed from UI flow for now
           invoices: getVal(invoices) || [],
           mileage: getVal(mileage) || [],
-          externalEvents: [],
+          externalEvents: googleEvents || [],
           jobItems: [],
         });
 
@@ -264,13 +229,15 @@ const App: React.FC = () => {
     try {
       const token = await getLatestToken();
       if (!token) {
-        alert("Google Authentication required.");
+        alert("Google Authentication required (calendar sync).");
         setIsSyncing(false);
         return;
       }
 
       for (const job of appState.jobs) {
         const client = appState.clients.find((c) => c.id === job.clientId);
+
+        // Cancelled OR explicitly not syncing: delete from Google
         if (job.syncToCalendar === false || job.status === JobStatus.CANCELLED) {
           await deleteJobFromGoogle(job.id, token);
         } else {
@@ -281,7 +248,7 @@ const App: React.FC = () => {
       syncInProgress.current = false;
       await loadData(currentUser);
     } catch (e) {
-      console.error("Sync All failed:", e);
+      console.error("Sync all failed:", e);
       setIsSyncing(false);
     }
   }, [appState.jobs, appState.clients, currentUser, getLatestToken, loadData]);
@@ -312,9 +279,7 @@ const App: React.FC = () => {
 
     const client = getSupabase();
     if (client) {
-      const {
-        data: { subscription },
-      } = (client.auth as any).onAuthStateChange(async (event: string) => {
+      const { data: { subscription } } = (client.auth as any).onAuthStateChange(async (event: string) => {
         if (event === "SIGNED_IN" && !hasLoadedOnce.current) {
           const user = await DB.getCurrentUser();
           if (user) {
@@ -365,7 +330,11 @@ const App: React.FC = () => {
 
     const token = await getLatestToken();
     if (token) {
-      await syncJobToGoogle(job, token, clientName);
+      try {
+        await syncJobToGoogle(job, token, clientName);
+      } catch (e: any) {
+        console.warn("Calendar sync failed:", e?.message || e);
+      }
     }
 
     await loadData();
@@ -390,10 +359,7 @@ const App: React.FC = () => {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
 
-          <Route
-            path="/"
-            element={!currentUser ? <Landing /> : <Navigate to="/dashboard" replace />}
-          />
+          <Route path="/" element={!currentUser ? <Landing /> : <Navigate to="/dashboard" replace />} />
 
           <Route
             element={
@@ -420,6 +386,7 @@ const App: React.FC = () => {
                 />
               }
             />
+
             <Route
               path="jobs"
               element={
@@ -430,22 +397,21 @@ const App: React.FC = () => {
                 />
               }
             />
+
             <Route
               path="jobs/:id"
               element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />}
             />
+
             <Route path="clients" element={<Clients state={appState} onRefresh={loadData} />} />
+
             <Route
               path="invoices"
-              element={
-                <Invoices
-                  state={appState}
-                  onRefresh={loadData}
-                  googleAccessToken={googleAccessToken}
-                />
-              }
+              element={<Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} />}
             />
+
             <Route path="mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
+
             <Route
               path="settings"
               element={
