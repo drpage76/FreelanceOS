@@ -1,5 +1,5 @@
 // src/services/db.ts
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient, PostgrestError } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabaseClient";
 import {
   Client,
@@ -96,6 +96,40 @@ const inverseMap = Object.fromEntries(
   Object.entries(FIELD_MAP).map(([k, v]) => [v, k])
 );
 
+// ---- Better Supabase error printing + throwing
+const formatPgError = (err: any) => {
+  if (!err) return "Unknown error";
+  const e = err as PostgrestError & { code?: string; hint?: string; details?: string };
+  return [
+    e.message ? `message: ${e.message}` : null,
+    e.code ? `code: ${e.code}` : null,
+    e.details ? `details: ${e.details}` : null,
+    e.hint ? `hint: ${e.hint}` : null,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+};
+
+const logAndThrow = (context: string, err: any) => {
+  // Make sure it never just prints "Object"
+  console.error(`[Supabase] ${context} FAILED ->`, {
+    message: err?.message,
+    code: err?.code,
+    details: err?.details,
+    hint: err?.hint,
+    raw: err,
+    rawString: (() => {
+      try {
+        return JSON.stringify(err);
+      } catch {
+        return String(err);
+      }
+    })(),
+  });
+
+  throw new Error(`${context} failed: ${formatPgError(err)}`);
+};
+
 const toDb = (table: string, obj: any, tenantId: string) => {
   const out: any = {};
   if (table !== "tenants") out.tenant_id = tenantId;
@@ -105,6 +139,7 @@ const toDb = (table: string, obj: any, tenantId: string) => {
     if (key === "rechargeAmount" || key === "actualCost") continue;
 
     const val = obj[key];
+
     // ✅ don’t push undefined (prevents accidental overwrites / noisy upserts)
     if (val === undefined) continue;
 
@@ -352,19 +387,40 @@ export const DB = {
       if (method === "upsert" && payload) {
         const raw = Array.isArray(payload) ? payload : [payload];
         const mapped = raw.map((p) => toDb(table, p, effectiveId));
-        const { error } = await query.upsert(mapped);
-        if (error) console.error(`Supabase upsert error (${table}):`, error);
+
+        // 🧠 upsert needs a unique key; select forces detailed response
+        const conflictKey = table === "tenants" ? "email" : "id";
+
+        const { data, error } = await query
+          .upsert(mapped, { onConflict: conflictKey })
+          .select("*");
+
+        if (error) logAndThrow(`upsert:${table}`, error);
+
+        // return mapped objects back if useful
+        return (data || []).map(fromDb);
       }
 
       if (method === "delete") {
         const pk = table === "tenants" ? "email" : "id";
 
         if (filter?.id) {
-          if (table === "tenants") await query.delete().eq(pk, filter.id);
-          else await query.delete().eq(pk, filter.id).eq("tenant_id", effectiveId);
+          const q = table === "tenants"
+            ? query.delete().eq(pk, filter.id)
+            : query.delete().eq(pk, filter.id).eq("tenant_id", effectiveId);
+
+          const { error } = await q;
+          if (error) logAndThrow(`delete:${table}`, error);
         } else if (filter?.jobId) {
-          await query.delete().eq("job_id", filter.jobId).eq("tenant_id", effectiveId);
+          const { error } = await query
+            .delete()
+            .eq("job_id", filter.jobId)
+            .eq("tenant_id", effectiveId);
+
+          if (error) logAndThrow(`delete:${table}`, error);
         }
+
+        return true;
       }
 
       if (method === "select") {
@@ -381,7 +437,10 @@ export const DB = {
 
           const { data, error } = await q;
 
-          if (!error && data !== null) {
+          if (error) {
+            // Don’t throw on select; fall back to local cache for offline friendliness
+            console.warn(`[Supabase] select:${table} failed -> ${formatPgError(error)}`);
+          } else if (data !== null) {
             const remoteData = data.map(fromDb);
 
             const localFiltered = applyLocalFilter(localList);
@@ -431,7 +490,7 @@ export const DB = {
       }
 
       if (error) {
-        console.warn("[DB.getCurrentUser] tenants read failed:", error);
+        console.warn("[DB.getCurrentUser] tenants read failed:", formatPgError(error));
       }
     } catch (e) {
       console.warn("[DB.getCurrentUser] tenants read threw:", e);
@@ -485,8 +544,17 @@ export const DB = {
   },
 
   saveJob: async (j: Job) => {
+    // Make sure we always have a tenant id in cloud mode
+    const tenantId = (await DB.getTenantId()) || LOCAL_USER_EMAIL;
+
+    // Save shifts first (keeps your current behaviour)
     await DB.saveShifts(j.id, (j as any).shifts || []);
-    await DB.call("jobs", "upsert", j);
+
+    // Force tenant_id into job object for local + cloud consistency
+    const prepared: Job = { ...j, tenant_id: (j as any).tenant_id || tenantId } as any;
+
+    // IMPORTANT: if supabase upsert fails, DB.call will now THROW.
+    return DB.call("jobs", "upsert", prepared);
   },
 
   deleteJob: async (id: string) => {

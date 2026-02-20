@@ -46,9 +46,12 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   const [showPreview, setShowPreview] = useState<"invoice" | "quote" | null>(null);
   const [selectedInvoiceDate, setSelectedInvoiceDate] = useState("");
 
-  // NEW: paid date picker
+  // paid date picker
   const [showPaidModal, setShowPaidModal] = useState(false);
   const [paidDate, setPaidDate] = useState<string>(new Date().toISOString().slice(0, 10));
+
+  // NEW: mark unpaid modal
+  const [showUnpaidModal, setShowUnpaidModal] = useState(false);
 
   const docRef = useRef<HTMLDivElement>(null);
 
@@ -160,8 +163,13 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       await DB.saveJob(updatedJob);
       await DB.saveJobItems(job.id, items);
 
+      // ✅ FIX: if sync disabled, remove from google instead of syncing
       if (googleAccessToken) {
-        await syncJobToGoogle(updatedJob, googleAccessToken, client?.name);
+        if (updatedJob.syncToCalendar === false) {
+          await deleteJobFromGoogle(updatedJob.id, googleAccessToken);
+        } else {
+          await syncJobToGoogle(updatedJob, googleAccessToken, client?.name);
+        }
       }
 
       setJob(updatedJob);
@@ -292,6 +300,37 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     }
   };
 
+  // ✅ NEW: Mark unpaid -> clear datePaid, set invoice back to SENT, job back to AWAITING_PAYMENT
+  const confirmMarkInvoiceUnpaid = async () => {
+    if (!invoice || !job) return;
+
+    setIsSaving(true);
+    try {
+      const unpaidInvoice: Invoice = {
+        ...invoice,
+        status: InvoiceStatus.SENT,
+        datePaid: null as any, // force clear in DB
+      };
+
+      await DB.saveInvoice(unpaidInvoice);
+
+      if (job.status !== JobStatus.CANCELLED) {
+        const updatedJob: Job = { ...job, status: JobStatus.AWAITING_PAYMENT };
+        await DB.saveJob(updatedJob);
+        setJob(updatedJob);
+      }
+
+      setInvoice(unpaidInvoice);
+      setShowUnpaidModal(false);
+      await onRefresh();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to mark invoice as unpaid.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="p-20 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -348,7 +387,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         </div>
       )}
 
-      {/* NEW: Mark Paid Modal */}
+      {/* Mark Paid Modal */}
       {showPaidModal && invoice && (
         <div className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
           <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200">
@@ -398,6 +437,42 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         </div>
       )}
 
+      {/* ✅ NEW: Mark Unpaid Modal */}
+      {showUnpaidModal && invoice && (
+        <div className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+          <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200">
+            <h3 className="text-xl font-black text-slate-900 mb-2">Mark Invoice as Unpaid</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">
+              Invoice Ref: {invoice.id}
+            </p>
+
+            <p className="text-[11px] text-slate-500 font-bold leading-relaxed">
+              This will remove the paid date and return the invoice to Outstanding.
+              The job will revert to Awaiting Payment.
+            </p>
+
+            <div className="flex gap-3 pt-6">
+              <button
+                type="button"
+                onClick={() => setShowUnpaidModal(false)}
+                className="flex-1 py-4 bg-slate-50 text-slate-400 rounded-2xl font-black text-[10px] uppercase border border-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmMarkInvoiceUnpaid}
+                disabled={isSaving}
+                className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2"
+              >
+                {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-rotate-left"></i>}
+                {isSaving ? "Saving..." : "Confirm Unpaid"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Preview Modal */}
       {showPreview && client && (
         <div className="fixed inset-0 z-[200] flex items-start justify-center bg-slate-900/80 backdrop-blur-sm p-4 overflow-y-auto">
@@ -417,6 +492,18 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                   >
                     {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-circle-check"></i>}
                     Mark Paid
+                  </button>
+                )}
+
+                {showPreview === "invoice" && invoice && invoice.status === InvoiceStatus.PAID && (
+                  <button
+                    type="button"
+                    onClick={() => setShowUnpaidModal(true)}
+                    disabled={isSaving}
+                    className="px-6 py-2 bg-rose-600 text-white rounded-xl font-black text-xs uppercase shadow-lg flex items-center gap-2"
+                  >
+                    {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-rotate-left"></i>}
+                    Mark Unpaid
                   </button>
                 )}
 
@@ -628,7 +715,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 View Invoice
               </button>
 
-              {invoice.status !== InvoiceStatus.PAID && (
+              {invoice.status !== InvoiceStatus.PAID ? (
                 <button
                   type="button"
                   onClick={() => setShowPaidModal(true)}
@@ -636,6 +723,15 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                   className="px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg"
                 >
                   Mark Paid
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowUnpaidModal(true)}
+                  disabled={isSaving}
+                  className="px-4 py-2.5 bg-rose-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg"
+                >
+                  Mark Unpaid
                 </button>
               )}
             </>
