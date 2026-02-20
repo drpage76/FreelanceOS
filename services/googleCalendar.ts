@@ -32,6 +32,63 @@ async function gcalFetch(url: string, accessToken: string, init?: RequestInit) {
   return res.json();
 }
 
+/**
+ * ✅ Exported because App.tsx imports it.
+ * Fetch events from the user's primary calendar.
+ * If you pass timeMin/timeMax (ISO strings), it will filter by range.
+ */
+export async function fetchGoogleEvents(
+  accessToken: string,
+  opts?: {
+    timeMin?: string; // ISO
+    timeMax?: string; // ISO
+    q?: string;
+    maxResults?: number;
+    showDeleted?: boolean;
+    singleEvents?: boolean;
+    orderBy?: "startTime" | "updated";
+  }
+) {
+  if (!accessToken) throw new Error("Missing Google access token.");
+
+  const params = new URLSearchParams({
+    singleEvents: String(opts?.singleEvents ?? true),
+    showDeleted: String(opts?.showDeleted ?? false),
+    orderBy: opts?.orderBy ?? "startTime",
+    maxResults: String(opts?.maxResults ?? 2500),
+  });
+
+  if (opts?.timeMin) params.set("timeMin", opts.timeMin);
+  if (opts?.timeMax) params.set("timeMax", opts.timeMax);
+  if (opts?.q) params.set("q", opts.q);
+
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CAL_ID)}/events?${params.toString()}`;
+  const data = await gcalFetch(url, accessToken);
+  return (data?.items || []) as any[];
+}
+
+/**
+ * Optional helper: fetch ONLY FreelanceOS-tagged events (those with private extended property key).
+ * Handy for debugging why deletes aren’t finding events.
+ */
+export async function fetchFOEvents(
+  accessToken: string,
+  opts?: { maxResults?: number; showDeleted?: boolean }
+) {
+  if (!accessToken) throw new Error("Missing Google access token.");
+
+  // Note: Google doesn't support "exists" query for privateExtendedProperty,
+  // so this fetches all events and filters client-side.
+  const items = await fetchGoogleEvents(accessToken, {
+    maxResults: opts?.maxResults ?? 2500,
+    showDeleted: opts?.showDeleted ?? false,
+    singleEvents: true,
+    orderBy: "updated",
+  });
+
+  return items.filter((ev: any) => ev?.extendedProperties?.private?.[FO_JOB_KEY]);
+}
+
 async function listEventsByJobId(jobId: string, accessToken: string) {
   const params = new URLSearchParams({
     singleEvents: "true",
@@ -77,10 +134,11 @@ function buildContinuousEvent(job: Job, clientName?: string) {
 }
 
 function buildShiftEvent(job: Job, shift: any, clientName?: string) {
-  const summary = clientName ? `${clientName} — ${shift.title || job.description}` : (shift.title || job.description);
+  const summary = clientName
+    ? `${clientName} — ${shift.title || job.description}`
+    : (shift.title || job.description);
 
-  // Your shifts are currently date-only in UI (no times enforced here).
-  // If you later store startTime/endTime, we can switch to dateTime events.
+  // Date-only events. (If you later add times, we can switch to dateTime.)
   const start = { date: shift.startDate || job.startDate };
   const end = { date: addDays(shift.endDate || shift.startDate || job.startDate, 1) };
 
@@ -103,7 +161,7 @@ function buildShiftEvent(job: Job, shift: any, clientName?: string) {
  * Upserts job into Google Calendar.
  * - If syncToCalendar is false, caller should call deleteJobFromGoogle instead.
  * - Continuous jobs: update existing first match, else create new.
- * - Shift-based: we delete and recreate shifts to keep it consistent and simple.
+ * - Shift-based: delete and recreate shifts (simple + reliable).
  */
 export async function syncJobToGoogle(job: Job, accessToken: string, clientName?: string) {
   if (!accessToken) throw new Error("Missing Google access token.");
