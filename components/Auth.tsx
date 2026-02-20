@@ -1,6 +1,7 @@
 // src/components/Auth.tsx
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { DB } from "../services/db";
 
 interface AuthProps {
   onSuccess: () => void;
@@ -14,6 +15,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
   const [isSignUp, setIsSignUp] = useState(initialIsSignUp);
   const [error, setError] = useState<string | null>(null);
 
+  // If already signed in, bounce through
   useEffect(() => {
     let cancelled = false;
 
@@ -21,8 +23,17 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
       try {
         const { data } = await supabase.auth.getSession();
         if (!cancelled && data?.session) {
-          const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+          // Cache tenant id early to avoid "blink" loops
+          try {
+            const em = data.session.user?.email;
+            if (em) localStorage.setItem("FO_TENANT_ID", em);
+          } catch {}
+
+          // Clean any lingering auth params (defensive)
+          const cleanUrl =
+            window.location.origin + window.location.pathname + window.location.hash;
           window.history.replaceState({}, document.title, cleanUrl);
+
           onSuccess();
         }
       } catch {
@@ -30,10 +41,24 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
       }
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN") {
-        const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+        // Cache tenant id immediately
+        try {
+          const em = session?.user?.email;
+          if (em) localStorage.setItem("FO_TENANT_ID", em);
+        } catch {}
+
+        // Ensure DB session cache is initialized (your db.ts supports this)
+        try {
+          await DB.initializeSession();
+        } catch {}
+
+        // CRITICAL: remove ?code= / ?error= params so new tabs don't re-trigger exchange
+        const cleanUrl =
+          window.location.origin + window.location.pathname + window.location.hash;
         window.history.replaceState({}, document.title, cleanUrl);
+
         onSuccess();
       }
     });
@@ -57,6 +82,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
+      // onSuccess will be triggered via listener
     } catch (e: any) {
       setError(e?.message || "Authentication failed");
     } finally {
@@ -69,15 +95,24 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
     setLoading(true);
 
     try {
-      // HashRouter safe redirect (brings user back into the SPA)
-      const redirectTo = `${window.location.origin}/#/dashboard`;
+      // ✅ With HashRouter, keep redirectTo as origin (no hash)
+      const redirectTo = window.location.origin;
+
+      // ✅ Request Calendar scopes so provider_token can call Calendar API
+      // These are the key ones for create/update/delete events:
+      const scopes = [
+        "openid",
+        "email",
+        "profile",
+        "https://www.googleapis.com/auth/calendar.events",
+        "https://www.googleapis.com/auth/calendar.readonly",
+      ].join(" ");
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo,
-          // ✅ THIS is the fix: request calendar permissions (read/write events)
-          scopes: "openid email profile https://www.googleapis.com/auth/calendar.events",
+          scopes,
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -86,7 +121,8 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
       });
 
       if (error) throw error;
-      // Browser will redirect away
+
+      // Browser redirects away after this
     } catch (e: any) {
       setError(e?.message || "OAuth failed");
       setLoading(false);
@@ -104,7 +140,12 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
       )}
 
       <div style={{ display: "grid", gap: 10 }}>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" autoComplete="email" />
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+          autoComplete="email"
+        />
         <input
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -123,7 +164,11 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
           <div style={{ flex: 1, height: 1, background: "#ddd" }} />
         </div>
 
-        <button onClick={handleGoogleLogin} disabled={loading} style={{ display: "flex", justifyContent: "center" }}>
+        <button
+          onClick={handleGoogleLogin}
+          disabled={loading}
+          style={{ display: "flex", justifyContent: "center" }}
+        >
           Continue with Google
         </button>
 
@@ -131,7 +176,12 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
           type="button"
           onClick={() => setIsSignUp((s) => !s)}
           disabled={loading}
-          style={{ background: "transparent", border: "none", color: "#4f46e5", cursor: "pointer" }}
+          style={{
+            background: "transparent",
+            border: "none",
+            color: "#4f46e5",
+            cursor: "pointer",
+          }}
         >
           {isSignUp ? "Already have an account? Sign in" : "No account? Register"}
         </button>

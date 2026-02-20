@@ -1,9 +1,9 @@
+// src/components/Navigation.tsx
+import React, { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 
-import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router';
-
-import { Tenant, UserPlan } from '../types';
-import { DB } from '../services/db';
+import { Tenant, UserPlan } from "../types";
+import { DB } from "../services/db";
 
 interface NavItemProps {
   to: string;
@@ -13,10 +13,12 @@ interface NavItemProps {
 }
 
 const NavItem: React.FC<NavItemProps> = ({ to, icon, label, active }) => (
-  <Link 
-    to={to} 
+  <Link
+    to={to}
     className={`flex flex-col md:flex-row items-center p-3 md:px-4 md:py-2.5 rounded-xl transition-all relative ${
-      active ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-100'
+      active
+        ? "bg-indigo-600 text-white shadow-lg"
+        : "text-slate-500 hover:bg-slate-100"
     }`}
   >
     <i className={`fa-solid ${icon} md:mr-3 text-lg`}></i>
@@ -24,7 +26,10 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, active }) => (
   </Link>
 );
 
-export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }> = ({ isSyncing, user }) => {
+export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }> = ({
+  isSyncing,
+  user,
+}) => {
   const location = useLocation();
   const [cloudActive, setCloudActive] = useState(false);
 
@@ -45,6 +50,10 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
 
   const isPro = user?.plan === UserPlan.ACTIVE;
 
+  // HashRouter paths look like "/dashboard", "/jobs", etc.
+  const path = location.pathname || "/";
+  const isDashboard = path === "/dashboard" || path === "/";
+
   return (
     <nav className="no-print fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 md:relative md:border-t-0 md:h-screen md:w-64 md:border-r p-2 md:p-4 z-50 flex flex-col">
       <div className="hidden md:flex flex-col mb-8 px-2">
@@ -53,33 +62,57 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
             <i className="fa-solid fa-bolt text-2xl"></i>
           </div>
           <div>
-            <h1 className="font-black text-xl tracking-tight leading-none text-slate-900">Freelance<br/><span className="text-indigo-600">OS</span></h1>
+            <h1 className="font-black text-xl tracking-tight leading-none text-slate-900">
+              Freelance
+              <br />
+              <span className="text-indigo-600">OS</span>
+            </h1>
             {isPro ? (
-              <span className="inline-block mt-2 bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest italic">Elite Pro</span>
+              <span className="inline-block mt-2 bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest italic">
+                Elite Pro
+              </span>
             ) : (
-              <span className="inline-block mt-2 bg-slate-100 text-slate-400 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest italic">Trial Mode</span>
+              <span className="inline-block mt-2 bg-slate-100 text-slate-400 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest italic">
+                Trial Mode
+              </span>
             )}
           </div>
         </div>
       </div>
 
       <div className="flex justify-around md:flex-col md:space-y-1 flex-1 overflow-y-auto custom-scrollbar">
-        <NavItem to="/" icon="fa-chart-pie" label="Dashboard" active={location.pathname === '/'} />
-        <NavItem to="/jobs" icon="fa-briefcase" label="Jobs" active={location.pathname.startsWith('/jobs')} />
-        <NavItem to="/clients" icon="fa-users" label="Clients" active={location.pathname.startsWith('/clients')} />
-        <NavItem to="/quotes" icon="fa-file-signature" label="Estimates" active={location.pathname.startsWith('/quotes')} />
-        <NavItem to="/invoices" icon="fa-file-invoice-dollar" label="Financials" active={location.pathname.startsWith('/invoices')} />
-        <NavItem to="/mileage" icon="fa-car-side" label="Mileage" active={location.pathname === '/mileage'} />
-        <NavItem to="/settings" icon="fa-gear" label="Settings" active={location.pathname === '/settings'} />
+        <NavItem to="/dashboard" icon="fa-chart-pie" label="Dashboard" active={isDashboard} />
+        <NavItem to="/jobs" icon="fa-briefcase" label="Jobs" active={path.startsWith("/jobs")} />
+        <NavItem to="/clients" icon="fa-users" label="Clients" active={path.startsWith("/clients")} />
+        <NavItem
+          to="/invoices"
+          icon="fa-file-invoice-dollar"
+          label="Financials"
+          active={path.startsWith("/invoices")}
+        />
+        <NavItem to="/mileage" icon="fa-car-side" label="Mileage" active={path === "/mileage"} />
+        <NavItem to="/settings" icon="fa-gear" label="Settings" active={path.startsWith("/settings")} />
       </div>
 
       <div className="hidden md:block p-4 mt-auto">
         <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
           <div className="relative">
-            <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-indigo-500 animate-pulse' : cloudActive ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+            <div
+              className={`w-2 h-2 rounded-full ${
+                isSyncing
+                  ? "bg-indigo-500 animate-pulse"
+                  : cloudActive
+                  ? "bg-emerald-500"
+                  : "bg-rose-500"
+              }`}
+            ></div>
           </div>
-          <span className={`text-[10px] font-black uppercase tracking-widest ${cloudActive ? 'text-slate-400' : 'text-rose-500'}`}>
-            {isSyncing ? 'Syncing...' : cloudActive ? 'Cloud Active' : 'Offline'}
+          <span
+            className={`text-[10px] font-black uppercase tracking-widest ${
+              cloudActive ? "text-slate-400" : "text-rose-500"
+            }`}
+          >
+            {isSyncing ? "Syncing..." : cloudActive ? "Cloud Active" : "Offline"}
           </span>
         </div>
       </div>
