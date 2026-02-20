@@ -78,8 +78,15 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
         provider: "google",
         options: {
           redirectTo,
-          // ✅ IMPORTANT: request calendar permissions so your Calendar API calls work
-          scopes: "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly",
+          // ✅ MUST request scopes or Calendar will 401/403
+          scopes: [
+            "openid",
+            "email",
+            "profile",
+            "https://www.googleapis.com/auth/calendar.events",
+            "https://www.googleapis.com/auth/calendar.readonly",
+            "https://www.googleapis.com/auth/drive.file",
+          ].join(" "),
           queryParams: {
             access_type: "offline",
             prompt: "consent",

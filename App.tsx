@@ -133,7 +133,8 @@ const App: React.FC = () => {
     user: null,
     clients: [],
     jobs: [],
-    quotes: [], // keep field for compatibility with your types, but we won't load quotes
+    // keep this property if AppState expects it, but we won't load it anymore
+    quotes: [],
     externalEvents: [],
     jobItems: [],
     invoices: [],
@@ -181,6 +182,7 @@ const App: React.FC = () => {
           DB.getJobs(),
           DB.getInvoices(),
           DB.getMileage(),
+          // ✅ removed DB.getQuotes()
         ]);
 
         const getVal = (res: any) => (res.status === "fulfilled" ? res.value : []);
@@ -193,17 +195,14 @@ const App: React.FC = () => {
           return job;
         });
 
-        const googleEvents =
-          token
-            ? await fetchGoogleEvents(user.email, token).catch(() => [])
-            : [];
+        const googleEvents = token ? await fetchGoogleEvents(user.email, token).catch(() => []) : [];
 
         setCurrentUser(user);
         setAppState({
           user,
           clients: getVal(clients) || [],
           jobs: reconciledJobs,
-          quotes: [], // quotes removed from UI flow for now
+          quotes: [], // ✅ now always empty
           invoices: getVal(invoices) || [],
           mileage: getVal(mileage) || [],
           externalEvents: googleEvents || [],
@@ -229,15 +228,13 @@ const App: React.FC = () => {
     try {
       const token = await getLatestToken();
       if (!token) {
-        alert("Google Authentication required (calendar sync).");
+        alert("Google Authentication required.");
         setIsSyncing(false);
         return;
       }
 
       for (const job of appState.jobs) {
         const client = appState.clients.find((c) => c.id === job.clientId);
-
-        // Cancelled OR explicitly not syncing: delete from Google
         if (job.syncToCalendar === false || job.status === JobStatus.CANCELLED) {
           await deleteJobFromGoogle(job.id, token);
         } else {
@@ -248,7 +245,7 @@ const App: React.FC = () => {
       syncInProgress.current = false;
       await loadData(currentUser);
     } catch (e) {
-      console.error("Sync all failed:", e);
+      console.error(e);
       setIsSyncing(false);
     }
   }, [appState.jobs, appState.clients, currentUser, getLatestToken, loadData]);
@@ -330,10 +327,10 @@ const App: React.FC = () => {
 
     const token = await getLatestToken();
     if (token) {
-      try {
+      if (job.syncToCalendar === false || job.status === JobStatus.CANCELLED) {
+        await deleteJobFromGoogle(job.id, token);
+      } else {
         await syncJobToGoogle(job, token, clientName);
-      } catch (e: any) {
-        console.warn("Calendar sync failed:", e?.message || e);
       }
     }
 
@@ -386,7 +383,6 @@ const App: React.FC = () => {
                 />
               }
             />
-
             <Route
               path="jobs"
               element={
@@ -397,21 +393,11 @@ const App: React.FC = () => {
                 />
               }
             />
-
-            <Route
-              path="jobs/:id"
-              element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />}
-            />
-
+            <Route path="jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
             <Route path="clients" element={<Clients state={appState} onRefresh={loadData} />} />
-
-            <Route
-              path="invoices"
-              element={<Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} />}
-            />
-
+            {/* ✅ Removed quotes route */}
+            <Route path="invoices" element={<Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
             <Route path="mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
-
             <Route
               path="settings"
               element={

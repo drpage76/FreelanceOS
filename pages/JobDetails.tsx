@@ -1,6 +1,6 @@
 // src/pages/JobDetails.tsx
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { useParams, useNavigate, Link } from "react-router";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -173,22 +173,20 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   };
 
   const tryCalendarSync = async (updatedJob: Job) => {
-    if (!googleAccessToken) return;
+    if (!googleAccessToken) return { ok: true as const, warning: null as string | null };
 
     try {
       if (updatedJob.syncToCalendar === false) {
         await deleteJobFromGoogle(updatedJob.id, googleAccessToken);
-        setCalendarWarning(null);
-        return;
+        return { ok: true as const, warning: null };
       }
 
       await syncJobToGoogle(updatedJob, googleAccessToken, client?.name);
-      setCalendarWarning(null);
+      return { ok: true as const, warning: null };
     } catch (e: any) {
       const msg = e?.message || "Calendar sync failed.";
       console.warn("[Calendar Sync Failed]", e);
-      setCalendarWarning(msg);
-      // Non-blocking: we do NOT throw
+      return { ok: false as const, warning: msg };
     }
   };
 
@@ -219,20 +217,21 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     };
 
     try {
-      // ✅ Always save to DB first (this must not be blocked by Google)
+      // ✅ Save to DB first (must not be blocked by Google)
       await DB.saveJob(updatedJob);
       await DB.saveJobItems(job.id, items);
 
-      // ✅ Calendar sync becomes best-effort (non-blocking)
-      await tryCalendarSync(updatedJob);
+      // ✅ Calendar sync is best-effort
+      const syncResult = await tryCalendarSync(updatedJob);
+      if (!syncResult.ok) setCalendarWarning(syncResult.warning);
 
       setJob(updatedJob);
       setShifts(normalizedShifts);
       await onRefresh();
 
-      // If calendar failed, inform but do not say "Save Error"
-      if (calendarWarning) {
-        alert(`Saved successfully, but calendar sync failed:\n\n${calendarWarning}`);
+      if (!syncResult.ok && syncResult.warning) {
+        // Optional: you can remove this alert if you prefer only the banner
+        // alert(`Saved successfully, but calendar sync failed:\n\n${syncResult.warning}`);
       }
     } catch (err: any) {
       alert(`Save Error: ${err?.message || "Unknown error"}`);
@@ -280,7 +279,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
     setIsDeleting(true);
     try {
-      // delete calendar best-effort; job deletion still happens
       if (googleAccessToken) {
         try {
           await deleteJobFromGoogle(job.id, googleAccessToken);
@@ -414,9 +412,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       {calendarWarning && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-[11px] font-bold">
           Saved successfully, but calendar sync failed: <span className="font-mono">{calendarWarning}</span>
-          <div className="mt-2 text-[10px] text-amber-700">
-            Tip: try “Sync All” from the dashboard after re-authing Google.
-          </div>
+          <div className="mt-2 text-[10px] text-amber-700">Tip: try “Sync All” from the dashboard after re-authing Google.</div>
         </div>
       )}
 
@@ -470,15 +466,11 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         <div className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
           <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200">
             <h3 className="text-xl font-black text-slate-900 mb-2">Mark Invoice as Paid</h3>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">
-              Invoice Ref: {invoice.id}
-            </p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">Invoice Ref: {invoice.id}</p>
 
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">
-                  Payment Date
-                </label>
+                <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Payment Date</label>
                 <input
                   type="date"
                   value={paidDate}
@@ -520,13 +512,10 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         <div className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
           <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200">
             <h3 className="text-xl font-black text-slate-900 mb-2">Mark Invoice as Unpaid</h3>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">
-              Invoice Ref: {invoice.id}
-            </p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">Invoice Ref: {invoice.id}</p>
 
             <p className="text-[11px] text-slate-500 font-bold leading-relaxed">
-              This will remove the paid date and return the invoice to Outstanding.
-              The job will revert to Awaiting Payment.
+              This will remove the paid date and return the invoice to Outstanding. The job will revert to Awaiting Payment.
             </p>
 
             <div className="flex gap-3 pt-6">
@@ -554,10 +543,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       {/* Header */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Link
-            to="/jobs"
-            className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center shadow-sm"
-          >
+          <Link to="/jobs" className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center shadow-sm">
             <i className="fa-solid fa-arrow-left"></i>
           </Link>
           <div className="min-w-0">
@@ -691,9 +677,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                   <button
                     type="button"
                     onClick={() =>
-                      setJob((prev) =>
-                        prev ? { ...prev, schedulingType: SchedulingType.CONTINUOUS, syncToCalendar: true } : prev
-                      )
+                      setJob((prev) => (prev ? { ...prev, schedulingType: SchedulingType.CONTINUOUS, syncToCalendar: true } : prev))
                     }
                     className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
                       job.syncToCalendar && job.schedulingType === SchedulingType.CONTINUOUS
@@ -707,9 +691,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                   <button
                     type="button"
                     onClick={() =>
-                      setJob((prev) =>
-                        prev ? { ...prev, schedulingType: SchedulingType.SHIFT_BASED, syncToCalendar: true } : prev
-                      )
+                      setJob((prev) => (prev ? { ...prev, schedulingType: SchedulingType.SHIFT_BASED, syncToCalendar: true } : prev))
                     }
                     className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
                       job.syncToCalendar && job.schedulingType === SchedulingType.SHIFT_BASED
@@ -738,10 +720,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                     const isFullDay = (s as any).isFullDay !== false;
 
                     return (
-                      <div
-                        key={s.id}
-                        className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col gap-3"
-                      >
+                      <div key={s.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col gap-3">
                         <div className="flex flex-col md:flex-row gap-3 items-center">
                           <input
                             className="bg-white px-4 py-2 rounded-xl text-xs font-black w-full md:flex-1"
@@ -774,7 +753,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                               onChange={(e) => {
                                 const n = [...shifts];
                                 (n[idx] as any).startDate = e.target.value;
-                                // keep endDate >= startDate
                                 if (!(n[idx] as any).endDate) (n[idx] as any).endDate = e.target.value;
                                 setShifts(n);
                               }}
@@ -802,7 +780,13 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                               onClick={() => {
                                 const n = [...shifts];
                                 const cur = (n[idx] as any).isFullDay;
-                                (n[idx] as any).isFullDay = cur === false ? true : false; // default true
+                                const nextIsFullDay = cur === false ? true : false;
+                                (n[idx] as any).isFullDay = nextIsFullDay;
+
+                                // ensure times exist even if hidden
+                                if (!(n[idx] as any).startTime) (n[idx] as any).startTime = "09:00";
+                                if (!(n[idx] as any).endTime) (n[idx] as any).endTime = "17:30";
+
                                 setShifts(n);
                               }}
                               className={`w-full px-4 py-2 rounded-xl text-[10px] font-black uppercase border ${
@@ -816,39 +800,39 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                           </div>
 
                           {!isFullDay ? (
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-1">
-                                <label className="text-[9px] font-black text-slate-400 uppercase px-1">Start</label>
-                                <input
-                                  type="time"
-                                  value={(s as any).startTime || "09:00"}
-                                  className="bg-white px-3 py-2 rounded-xl text-xs font-bold w-full"
-                                  onChange={(e) => {
-                                    const n = [...shifts];
-                                    (n[idx] as any).startTime = e.target.value;
-                                    setShifts(n);
-                                  }}
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-[9px] font-black text-slate-400 uppercase px-1">End</label>
-                                <input
-                                  type="time"
-                                  value={(s as any).endTime || "17:30"}
-                                  className="bg-white px-3 py-2 rounded-xl text-xs font-bold w-full"
-                                  onChange={(e) => {
-                                    const n = [...shifts];
-                                    (n[idx] as any).endTime = e.target.value;
-                                    setShifts(n);
-                                  }}
-                                />
+                            <div className="md:col-span-1">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-black text-slate-400 uppercase px-1">Start</label>
+                                  <input
+                                    type="time"
+                                    value={(s as any).startTime || "09:00"}
+                                    className="bg-white px-4 py-2.5 rounded-xl text-sm font-black w-full min-w-[130px] md:min-w-[150px] border border-slate-200"
+                                    onChange={(e) => {
+                                      const n = [...shifts];
+                                      (n[idx] as any).startTime = e.target.value;
+                                      setShifts(n);
+                                    }}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-black text-slate-400 uppercase px-1">End</label>
+                                  <input
+                                    type="time"
+                                    value={(s as any).endTime || "17:30"}
+                                    className="bg-white px-4 py-2.5 rounded-xl text-sm font-black w-full min-w-[130px] md:min-w-[150px] border border-slate-200"
+                                    onChange={(e) => {
+                                      const n = [...shifts];
+                                      (n[idx] as any).endTime = e.target.value;
+                                      setShifts(n);
+                                    }}
+                                  />
+                                </div>
                               </div>
                             </div>
                           ) : (
                             <div className="flex items-end">
-                              <div className="text-[10px] text-slate-400 font-bold px-1">
-                                Timed fields hidden for full-day shifts.
-                              </div>
+                              <div className="text-[10px] text-slate-400 font-bold px-1">Timed fields hidden for full-day shifts.</div>
                             </div>
                           )}
                         </div>
@@ -916,14 +900,21 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           <div className="bg-white p-6 md:p-8 rounded-[40px] border border-slate-200 shadow-sm space-y-6">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-xs font-black uppercase tracking-widest italic">Entries & Deliverables</h4>
-              <button type="button" onClick={handleAddItem} className="text-[10px] font-black text-indigo-600 uppercase hover:underline">
+              <button
+                type="button"
+                onClick={handleAddItem}
+                className="text-[10px] font-black text-indigo-600 uppercase hover:underline"
+              >
                 + Add Entry
               </button>
             </div>
 
             <div className="space-y-3">
               {(items || []).map((item, idx) => (
-                <div key={item.id} className="grid grid-cols-12 gap-3 items-end bg-slate-50 p-4 rounded-2xl border border-slate-100 group">
+                <div
+                  key={item.id}
+                  className="grid grid-cols-12 gap-3 items-end bg-slate-50 p-4 rounded-2xl border border-slate-100 group"
+                >
                   <div className="col-span-6 space-y-1">
                     <span className="text-[7px] font-black text-slate-400 uppercase px-1">Description</span>
                     <input
@@ -957,7 +948,11 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                   </div>
 
                   <div className="col-span-1 flex justify-center pb-2">
-                    <button type="button" onClick={() => handleRemoveItem(idx)} className="text-slate-300 hover:text-rose-500 transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveItem(idx)}
+                      className="text-slate-300 hover:text-rose-500 transition-colors"
+                    >
                       <i className="fa-solid fa-trash-can text-[10px]"></i>
                     </button>
                   </div>
