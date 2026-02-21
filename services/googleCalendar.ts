@@ -37,31 +37,36 @@ function clampRangeEnd(dateStr: string, daysForward = 7): string {
 }
 
 /**
- * Map your statuses to Google colorIds (string "1".."11")
- * Feel free to tweak these.
+ * ✅ Map your statuses to Google colorIds (string "1".."11")
+ * Your requested scheme:
+ * - Potential = red
+ * - Pencilled = amber
+ * - Confirmed = green
+ * - Awaiting Payment = blue
+ * - Complete = black (Google doesn't have pure black; "8" is graphite/near-black)
+ * - Cancelled = SHOULD NOT SHOW AT ALL (handled by hard delete + return)
  */
 function statusToColorId(status: JobStatus): string {
   switch (status) {
+    case JobStatus.POTENTIAL:
+      return "11"; // red
+    case JobStatus.PENCILED:
+      return "5"; // amber/yellow
     case JobStatus.CONFIRMED:
       return "10"; // green
-    case JobStatus.POTENTIAL:
-      return "5"; // yellow
-    case JobStatus.PENCILED:
-      return "6"; // orange
-    case JobStatus.CANCELLED:
-      return "11"; // red
     case JobStatus.AWAITING_PAYMENT:
-      return "4"; // bold-ish red/orange
-    case JobStatus.COMPLETED:
       return "9"; // blue
+    case JobStatus.COMPLETED:
+      return "8"; // graphite (closest to black)
     default:
-      return "1"; // default
+      return "8"; // safe default
   }
 }
 
 function buildSummary(job: Job, clientName?: string): string {
   const c = (clientName || "Client").trim();
   const j = (job.description || "Job").trim();
+  // ✅ Your preference: "Company — Job Name (JOB ID)"
   return `${c} — ${j} (${job.id})`;
 }
 
@@ -151,7 +156,14 @@ async function listEventsByJobId(accessToken: string, jobId: string, timeMin: st
  *
  * We never send `id` on insert. We PATCH by Google’s real event.id.
  */
-async function upsertEvent(accessToken: string, body: any, jobId: string, shiftId?: string, timeMin?: string, timeMax?: string) {
+async function upsertEvent(
+  accessToken: string,
+  body: any,
+  jobId: string,
+  shiftId?: string,
+  timeMin?: string,
+  timeMax?: string
+) {
   const safeMin = timeMin || new Date(Date.now() - 1000 * 60 * 60 * 24 * 365).toISOString();
   const safeMax = timeMax || new Date(Date.now() + 1000 * 60 * 60 * 24 * 365).toISOString();
 
@@ -170,9 +182,11 @@ async function upsertEvent(accessToken: string, body: any, jobId: string, shiftI
     const extras = matching.slice(1);
     await Promise.allSettled(
       extras.map((ev: any) =>
-        gcalFetch(accessToken, `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`, {
-          method: "DELETE",
-        })
+        gcalFetch(
+          accessToken,
+          `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`,
+          { method: "DELETE" }
+        )
       )
     );
   }
@@ -199,8 +213,15 @@ async function upsertEvent(accessToken: string, body: any, jobId: string, shiftI
 export async function syncJobToGoogle(job: Job, accessToken: string, clientName?: string) {
   if (!accessToken) return;
   if (!job?.id) throw new Error("Calendar: missing job id");
+
+  // ✅ CANCELLED should not show in calendar at all
   if (job.status === JobStatus.CANCELLED) {
-    // optional: if cancelled, ensure removed
+    await deleteJobFromGoogle(job.id, accessToken);
+    return;
+  }
+
+  // ✅ If sync disabled, ensure removed and exit
+  if ((job as any).syncToCalendar === false) {
     await deleteJobFromGoogle(job.id, accessToken);
     return;
   }
@@ -212,8 +233,11 @@ export async function syncJobToGoogle(job: Job, accessToken: string, clientName?
   const shifts: JobShift[] = Array.isArray((job as any).shifts) ? ((job as any).shifts as JobShift[]) : [];
 
   if (job.schedulingType === SchedulingType.SHIFT_BASED && shifts.length) {
-    const starts = shifts.map((s) => s.startDate).filter(Boolean).sort();
-    const ends = shifts.map((s) => (s as any).endDate || s.startDate).filter(Boolean).sort();
+    const starts = shifts.map((s) => (s as any).startDate || s.startDate).filter(Boolean).sort();
+    const ends = shifts
+      .map((s) => (s as any).endDate || (s as any).startDate || s.startDate)
+      .filter(Boolean)
+      .sort();
     rangeStart = starts[0] || rangeStart;
     rangeEnd = ends[ends.length - 1] || rangeEnd;
   }
@@ -247,8 +271,7 @@ export async function syncJobToGoogle(job: Job, accessToken: string, clientName?
   };
 
   if (job.schedulingType === SchedulingType.SHIFT_BASED && shifts.length) {
-    // Create/update per shift
-    // Also clean up any old "continuous" event for this job (no shift id)
+    // Clean up any old "continuous" event for this job (no shift id)
     const allExisting = await listEventsByJobId(accessToken, String(job.id), timeMin, timeMax);
     const continuous = allExisting.filter((ev: any) => {
       const priv = ev?.extendedProperties?.private || {};
@@ -257,9 +280,11 @@ export async function syncJobToGoogle(job: Job, accessToken: string, clientName?
 
     await Promise.allSettled(
       continuous.map((ev: any) =>
-        gcalFetch(accessToken, `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`, {
-          method: "DELETE",
-        })
+        gcalFetch(
+          accessToken,
+          `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`,
+          { method: "DELETE" }
+        )
       )
     );
 
@@ -285,7 +310,7 @@ export async function syncJobToGoogle(job: Job, accessToken: string, clientName?
       await upsertEvent(accessToken, body, String(job.id), shiftId, timeMin, timeMax);
     }
 
-    // Remove any events for shifts that no longer exist (cleanup duplicates / stale shifts)
+    // Remove any events for shifts that no longer exist (cleanup stale shifts)
     const refreshed = await listEventsByJobId(accessToken, String(job.id), timeMin, timeMax);
     const validShiftIds = new Set(shifts.map((s: any) => String(s.id)));
     const stale = refreshed.filter((ev: any) => {
@@ -296,9 +321,11 @@ export async function syncJobToGoogle(job: Job, accessToken: string, clientName?
 
     await Promise.allSettled(
       stale.map((ev: any) =>
-        gcalFetch(accessToken, `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`, {
-          method: "DELETE",
-        })
+        gcalFetch(
+          accessToken,
+          `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`,
+          { method: "DELETE" }
+        )
       )
     );
 
@@ -329,9 +356,11 @@ export async function deleteJobFromGoogle(jobId: string, accessToken: string) {
   const events = await listEventsByJobId(accessToken, String(jobId), min, max);
   await Promise.allSettled(
     events.map((ev: any) =>
-      gcalFetch(accessToken, `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`, {
-        method: "DELETE",
-      })
+      gcalFetch(
+        accessToken,
+        `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`,
+        { method: "DELETE" }
+      )
     )
   );
 }
