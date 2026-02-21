@@ -48,7 +48,7 @@ function statusToColorId(status: JobStatus): string {
   switch (status) {
     case JobStatus.POTENTIAL:
       return "11"; // red
-    case JobStatus.PENCILED:
+    case JobStatus.PENCILLED:
       return "5"; // yellow  ✅ FIXED
     case JobStatus.CONFIRMED:
       return "10"; // green

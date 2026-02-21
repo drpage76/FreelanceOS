@@ -252,17 +252,40 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
     try {
       const element = docRef.current;
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        scrollY: -window.scrollY,
+      });
+
       const imgData = canvas.toDataURL("image/png");
 
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const imgWidth = 210;
+
+      const pageWidth = 210;
+      const pageHeight = 297;
+
+      const imgWidth = pageWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = position - pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
 
       const titleLabel = showPreview === "invoice" ? "Invoice" : "Quotation";
-      const fileName = `${titleLabel} ${job.id} ${client.name}.pdf`;
+      const safeClient = (client.name || "Client").replace(/[\/\\:*?"<>|]/g, "-");
+      const fileName = `${titleLabel} ${job.id} ${safeClient}.pdf`;
       pdf.save(fileName);
 
       if (googleAccessToken && currentUser?.businessName) {
@@ -440,6 +463,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
   const invoiceDateForDisplay =
     (invoice?.date || selectedInvoiceDate || job?.endDate || job?.startDate || "").trim();
+
   const invoiceDueDateForDisplay =
     invoice?.dueDate ||
     (client ? calculateDueDate(invoiceDateForDisplay, Number((client as any).paymentTermsDays) || 30) : "");
@@ -466,57 +490,179 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       )}
 
       {/* Preview Modal (Quotation / Invoice) */}
-      {showPreview && (
-  <div className="fixed inset-0 z-[240] bg-slate-900/60 backdrop-blur-md overflow-y-auto">
-    <div className="min-h-full w-full flex items-start justify-center p-4 md:p-8">
-      <div className="w-full max-w-4xl bg-white rounded-[32px] shadow-2xl border border-slate-200 overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <div className="font-black text-slate-900">
-            {showPreview === "invoice" ? "Invoice Preview" : "Quotation Preview"}
+      {showPreview && client && job && (
+        <div className="fixed inset-0 z-[240] bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+          <div className="min-h-full w-full flex items-start justify-center p-4 md:p-8">
+            <div className="w-full max-w-4xl bg-white rounded-[32px] shadow-2xl border border-slate-200 overflow-hidden max-h-[88vh] flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    {showPreview === "invoice" ? "Invoice Preview" : "Quotation Preview"}
+                  </div>
+                  <div className="text-lg font-black text-slate-900 truncate">{job.description}</div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowPreview(null)}
+                  className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center"
+                  title="Close"
+                >
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+
+              {/* Scrollable content */}
+              <div className="flex-1 overflow-y-auto bg-white">
+                <div className="px-4 md:px-6 py-6 bg-white">
+                  {/* Printable area */}
+                  <div ref={docRef} className="bg-white">
+                    <div className="flex items-start justify-between gap-8">
+                      <div>
+                        <div className="text-2xl font-black text-slate-900">
+                          {showPreview === "invoice" ? "INVOICE" : "QUOTATION"}
+                        </div>
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                          Protocol {job.id}
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                          {showPreview === "invoice" ? "Invoice Date" : "Quote Date"}
+                        </div>
+                        <div className="text-sm font-black text-slate-900">
+                          {formatDate(invoiceDateForDisplay)}
+                        </div>
+
+                        {showPreview === "invoice" && (
+                          <>
+                            <div className="mt-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                              Due Date
+                            </div>
+                            <div className="text-sm font-black text-slate-900">
+                              {formatDate(invoiceDueDateForDisplay)}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="p-4 rounded-2xl border border-slate-200">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                          Bill To
+                        </div>
+                        <div className="font-black text-slate-900">{client.name}</div>
+                        <div className="text-xs font-bold text-slate-500">{client.email}</div>
+                        <div className="text-[10px] text-slate-400 leading-relaxed mt-2 whitespace-pre-wrap">
+                          {client.address}
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-2xl border border-slate-200">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                          Job Details
+                        </div>
+                        <div className="text-xs font-black text-slate-900">{job.location || "—"}</div>
+                        <div className="text-xs font-bold text-slate-500 mt-1">
+                          {formatDate(job.startDate)} → {formatDate(job.endDate)}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-2">
+                          PO: <span className="font-black text-slate-900">{job.poNumber || "—"}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-1">
+                          Status: <span className="font-black text-slate-900">{job.status}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-8">
+                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
+                        Line Items
+                      </div>
+
+                      <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                        <div className="grid grid-cols-12 gap-2 bg-slate-50 p-3 text-[10px] font-black uppercase text-slate-500">
+                          <div className="col-span-7">Description</div>
+                          <div className="col-span-2 text-right">Qty</div>
+                          <div className="col-span-3 text-right">Amount</div>
+                        </div>
+
+                        {(items || []).map((it) => {
+                          const amt = Number(it.qty) * Number(it.unitPrice) || 0;
+                          return (
+                            <div key={it.id} className="grid grid-cols-12 gap-2 p-3 border-t border-slate-100 text-sm">
+                              <div className="col-span-7 font-bold text-slate-900">{it.description || "—"}</div>
+                              <div className="col-span-2 text-right font-black text-slate-700">{it.qty}</div>
+                              <div className="col-span-3 text-right font-black text-slate-900">
+                                {formatCurrency(amt, currentUser)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="mt-6 flex justify-end">
+                        <div className="w-full max-w-sm space-y-2">
+                          <div className="flex justify-between text-sm font-bold text-slate-500">
+                            <span>Subtotal</span>
+                            <span className="font-black text-slate-900">
+                              {formatCurrency(totalRecharge, currentUser)}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between text-sm font-bold text-slate-500">
+                            <span>Gross</span>
+                            <span className="font-black text-slate-900">
+                              {formatCurrency(
+                                totalRecharge *
+                                  (currentUser?.isVatRegistered
+                                    ? 1 + ((currentUser.taxRate || 20) / 100)
+                                    : 1),
+                                currentUser
+                              )}
+                            </span>
+                          </div>
+
+                          {showPreview === "invoice" && (
+                            <div className="pt-3 border-t border-slate-100 text-[10px] text-slate-400 font-bold">
+                              Terms: Payment upon receipt of invoice.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sticky footer buttons */}
+              <div className="border-t border-slate-100 px-6 py-4 flex gap-3 justify-end bg-white">
+                <button
+                  type="button"
+                  onClick={() => setShowPreview(null)}
+                  className="px-5 py-3 bg-slate-50 text-slate-500 rounded-2xl font-black text-[10px] uppercase border border-slate-200"
+                >
+                  Close
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadPDF}
+                  disabled={isSaving}
+                  className="px-5 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center gap-2"
+                >
+                  {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-print"></i>}
+                  {isSaving ? "Preparing..." : "Print / Download"}
+                </button>
+              </div>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowPreview(null)}
-            className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center"
-            title="Close"
-          >
-            <i className="fa-solid fa-xmark"></i>
-          </button>
         </div>
+      )}
 
-        {/* Scrollable content */}
-        <div className="max-h-[calc(100vh-180px)] overflow-y-auto px-4 md:px-6 py-6">
-          <div ref={docRef}>
-            {/* ✅ KEEP your existing quote/invoice JSX exactly as it is here */}
-            {/* (Whatever you currently render as the document preview) */}
-          </div>
-        </div>
-
-        {/* Sticky footer buttons */}
-        <div className="sticky bottom-0 bg-white border-t border-slate-100 px-6 py-4 flex gap-3 justify-end">
-          <button
-            type="button"
-            onClick={() => setShowPreview(null)}
-            className="px-5 py-3 bg-slate-50 text-slate-500 rounded-2xl font-black text-[10px] uppercase border border-slate-200"
-          >
-            Close
-          </button>
-
-          <button
-            type="button"
-            onClick={handleDownloadPDF}
-            disabled={isSaving}
-            className="px-5 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center gap-2"
-          >
-            {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-print"></i>}
-            {isSaving ? "Preparing..." : "Print / Download"}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
       {/* Edit Invoice Date Modal */}
       {showEditInvoiceDateModal && invoice && client && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
