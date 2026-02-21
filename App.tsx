@@ -18,7 +18,7 @@ import { Terms } from "./pages/Terms";
 import { CreateJobModal } from "./components/CreateJobModal";
 import { AppState, Tenant, JobStatus, InvoiceStatus, UserPlan, Job, JobItem } from "./types";
 import { DB, getSupabase } from "./services/db";
-import { fetchGoogleEvents, syncJobToGoogle, deleteJobFromGoogle } from "./services/googleCalendar";
+import { syncJobToGoogle, deleteJobFromGoogle } from "./services/googleCalendar";
 import { checkSubscriptionStatus } from "./utils";
 
 /**
@@ -195,17 +195,15 @@ const App: React.FC = () => {
           return job;
         });
 
-        const googleEvents = token ? await fetchGoogleEvents(user.email, token).catch(() => []) : [];
-
         setCurrentUser(user);
         setAppState({
           user,
           clients: getVal(clients) || [],
           jobs: reconciledJobs,
-          quotes: [], // ✅ now always empty
+          quotes: [],          // ✅ now always empty
           invoices: getVal(invoices) || [],
           mileage: getVal(mileage) || [],
-          externalEvents: googleEvents || [],
+          externalEvents: [],  // ✅ removed Google event fetching to avoid build/runtime issues
           jobItems: [],
         });
 
