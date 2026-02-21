@@ -466,181 +466,57 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       )}
 
       {/* Preview Modal (Quotation / Invoice) */}
-      {showPreview && client && (
-        <div className="fixed inset-0 z-[240] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
-          <div className="bg-white rounded-[32px] w-full max-w-3xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
-              <div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  {showPreview === "invoice" ? "Invoice Preview" : "Quotation Preview"}
-                </div>
-                <div className="text-lg font-black text-slate-900">{job.description}</div>
-              </div>
+      {showPreview && (
+  <div className="fixed inset-0 z-[240] bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+    <div className="min-h-full w-full flex items-start justify-center p-4 md:p-8">
+      <div className="w-full max-w-4xl bg-white rounded-[32px] shadow-2xl border border-slate-200 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className="font-black text-slate-900">
+            {showPreview === "invoice" ? "Invoice Preview" : "Quotation Preview"}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowPreview(null)}
+            className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center"
+            title="Close"
+          >
+            <i className="fa-solid fa-xmark"></i>
+          </button>
+        </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleDownloadPDF}
-                  disabled={isSaving}
-                  className="px-4 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase shadow-xl"
-                >
-                  {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : "Download PDF"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowPreview(null)}
-                  className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-black text-[10px] uppercase shadow-sm"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-
-            {/* Printable Area */}
-            <div className="p-8 bg-white">
-              <div ref={docRef} className="bg-white">
-                <div className="flex items-start justify-between gap-8">
-                  <div>
-                    <div className="text-2xl font-black text-slate-900">
-                      {showPreview === "invoice" ? "INVOICE" : "QUOTATION"}
-                    </div>
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Protocol {job.id}
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      {showPreview === "invoice" ? "Invoice Date" : "Quote Date"}
-                    </div>
-                    <div className="text-sm font-black text-slate-900">{formatDate(invoiceDateForDisplay)}</div>
-
-                    {showPreview === "invoice" && (
-                      <>
-                        <div className="mt-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                          Due Date
-                        </div>
-                        <div className="text-sm font-black text-slate-900">{formatDate(invoiceDueDateForDisplay)}</div>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-6 grid grid-cols-2 gap-6">
-                  <div className="p-4 rounded-2xl border border-slate-200">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                      Bill To
-                    </div>
-                    <div className="font-black text-slate-900">{client.name}</div>
-                    <div className="text-xs font-bold text-slate-500">{client.email}</div>
-                    <div className="text-[10px] text-slate-400 leading-relaxed mt-2 whitespace-pre-wrap">
-                      {client.address}
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-2xl border border-slate-200">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                      Job Details
-                    </div>
-                    <div className="text-xs font-black text-slate-900">{job.location || "—"}</div>
-                    <div className="text-xs font-bold text-slate-500 mt-1">
-                      {formatDate(job.startDate)} → {formatDate(job.endDate)}
-                    </div>
-                    <div className="text-[10px] text-slate-400 mt-2">
-                      PO: <span className="font-black text-slate-900">{job.poNumber || "—"}</span>
-                    </div>
-                    <div className="text-[10px] text-slate-400 mt-1">
-                      Status: <span className="font-black text-slate-900">{job.status}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-8">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
-                    Line Items
-                  </div>
-
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                    <div className="grid grid-cols-12 gap-2 bg-slate-50 p-3 text-[10px] font-black uppercase text-slate-500">
-                      <div className="col-span-7">Description</div>
-                      <div className="col-span-2 text-right">Qty</div>
-                      <div className="col-span-3 text-right">Amount</div>
-                    </div>
-
-                    {(items || []).map((it) => {
-                      const amt = (Number(it.qty) * Number(it.unitPrice) || 0);
-                      return (
-                        <div key={it.id} className="grid grid-cols-12 gap-2 p-3 border-t border-slate-100 text-sm">
-                          <div className="col-span-7 font-bold text-slate-900">{it.description || "—"}</div>
-                          <div className="col-span-2 text-right font-black text-slate-700">{it.qty}</div>
-                          <div className="col-span-3 text-right font-black text-slate-900">
-                            {formatCurrency(amt, currentUser)}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="mt-6 flex justify-end">
-                    <div className="w-full max-w-sm space-y-2">
-                      <div className="flex justify-between text-sm font-bold text-slate-500">
-                        <span>Subtotal</span>
-                        <span className="font-black text-slate-900">{formatCurrency(totalRecharge, currentUser)}</span>
-                      </div>
-
-                      <div className="flex justify-between text-sm font-bold text-slate-500">
-                        <span>Gross</span>
-                        <span className="font-black text-slate-900">
-                          {formatCurrency(
-                            totalRecharge * (currentUser?.isVatRegistered ? 1 + ((currentUser.taxRate || 20) / 100) : 1),
-                            currentUser
-                          )}
-                        </span>
-                      </div>
-
-                      {showPreview === "invoice" && (
-                        <div className="pt-3 border-t border-slate-100 text-[10px] text-slate-400 font-bold">
-                          Terms: Payment upon receipt of invoice.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer quick actions */}
-            <div className="p-5 border-t border-slate-100 flex flex-wrap gap-2 justify-between items-center">
-              <div className="text-[10px] font-bold text-slate-400">
-                {showPreview === "invoice" && invoice ? `Invoice Ref: ${invoice.id}` : " "}
-              </div>
-
-              <div className="flex gap-2">
-                {showPreview === "invoice" && invoice && invoice.status !== InvoiceStatus.PAID && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditInvoiceDate(invoice.date || selectedInvoiceDate || job.endDate);
-                      setShowEditInvoiceDateModal(true);
-                    }}
-                    className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-black text-[10px] uppercase shadow-sm"
-                  >
-                    Edit Invoice Date
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowPreview(null)}
-                  className="px-4 py-2.5 bg-slate-50 text-slate-600 rounded-xl font-black text-[10px] uppercase border border-slate-100"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
+        {/* Scrollable content */}
+        <div className="max-h-[calc(100vh-180px)] overflow-y-auto px-4 md:px-6 py-6">
+          <div ref={docRef}>
+            {/* ✅ KEEP your existing quote/invoice JSX exactly as it is here */}
+            {/* (Whatever you currently render as the document preview) */}
           </div>
         </div>
-      )}
 
+        {/* Sticky footer buttons */}
+        <div className="sticky bottom-0 bg-white border-t border-slate-100 px-6 py-4 flex gap-3 justify-end">
+          <button
+            type="button"
+            onClick={() => setShowPreview(null)}
+            className="px-5 py-3 bg-slate-50 text-slate-500 rounded-2xl font-black text-[10px] uppercase border border-slate-200"
+          >
+            Close
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownloadPDF}
+            disabled={isSaving}
+            className="px-5 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center gap-2"
+          >
+            {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-print"></i>}
+            {isSaving ? "Preparing..." : "Print / Download"}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
       {/* Edit Invoice Date Modal */}
       {showEditInvoiceDateModal && invoice && client && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
