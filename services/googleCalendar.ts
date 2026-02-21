@@ -1,37 +1,80 @@
 // src/services/googleCalendar.ts
-import { Job, JobStatus, SchedulingType } from "../types";
 
-const CAL_ID = "primary";
-const FO_JOB_KEY = "foJobId";
-const FO_APP_MARKER = "FreelanceOS";
+import { Job, JobShift, SchedulingType, JobStatus } from "../types";
 
-function addDays(dateISO: string, days: number) {
-  const d = new Date(dateISO + "T00:00:00");
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+// ---- helpers ----
+
+const GCAL_BASE = "https://www.googleapis.com/calendar/v3";
+const DEFAULT_CALENDAR_ID = "primary";
+
+// Google event IDs must match: [a-zA-Z0-9_-]{5,1024}
+function safeId(raw: string): string {
+  const cleaned = (raw || "")
+    .toString()
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, "_");
+
+  // ensure length and minimum size
+  const padded = cleaned.length >= 5 ? cleaned : `${cleaned}_____`.slice(0, 5);
+  return padded.slice(0, 250); // keep comfortably under limits
 }
 
-function sanitizeEventId(id: string) {
-  // Google event id rules: use a-z0-9 and underscores, keep reasonable length
-  return ("fo_" + String(id || ""))
-    .toLowerCase()
-    .replace(/[^a-z0-9_]/g, "_")
-    .slice(0, 100);
+function addDays(dateStr: string, days: number): string {
+  // dateStr is YYYY-MM-DD
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
 }
 
-function statusToColorId(status?: JobStatus | string) {
-  // Google Calendar colorId values 1-11 (varies by account theme, but ids are stable)
-  // We'll use: red=11, yellow/orange=6/5, green=10, blue=9
-  const s = String(status || "").toUpperCase();
-  if (s === "POTENTIAL") return "11";     // red
-  if (s === "PENCILLED") return "6";      // orange/yellow
-  if (s === "CONFIRMED") return "10";     // green
-  if (s === "COMPLETED") return "9";      // blue
-  if (s === "CANCELLED") return "8";      // grey-ish
-  return "9";
+function getTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/London";
+  } catch {
+    return "Europe/London";
+  }
 }
 
-async function gcalFetch(url: string, accessToken: string, init?: RequestInit) {
+function buildJobEventId(jobId: string) {
+  return safeId(`fo_job_${jobId}`);
+}
+
+function buildShiftEventId(jobId: string, shiftId: string) {
+  return safeId(`fo_job_${jobId}_shift_${shiftId}`);
+}
+
+function statusColorId(status: any): string | undefined {
+  // Optional: map to Google Calendar colorId (1-11). Adjust to taste.
+  // If you already handle colors via calendar UI, you can return undefined.
+  switch (status) {
+    case "CONFIRMED":
+    case JobStatus?.CONFIRMED:
+      return "10"; // green-ish
+    case "COMPLETED":
+    case JobStatus?.COMPLETED:
+      return "2"; // darker green
+    case "POTENTIAL":
+    case JobStatus?.POTENTIAL:
+      return "5"; // yellow
+    case "PENCILED":
+    case JobStatus?.PENCILED:
+      return "6"; // orange
+    case "CANCELLED":
+    case JobStatus?.CANCELLED:
+      return "11"; // red
+    default:
+      return undefined;
+  }
+}
+
+async function gcalFetch(
+  url: string,
+  accessToken: string,
+  init?: RequestInit
+): Promise<any> {
   const res = await fetch(url, {
     ...init,
     headers: {
@@ -41,221 +84,266 @@ async function gcalFetch(url: string, accessToken: string, init?: RequestInit) {
     },
   });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    const err = new Error(`Google Calendar API ${res.status}: ${text || res.statusText}`);
-    (err as any).status = res.status;
-    throw err;
-  }
-
-  if (res.status === 204) return null;
-  return res.json();
-}
-
-function hasOurMarker(ev: any, jobId: string) {
-  const desc = String(ev?.description || "");
-  const hasJobIdText =
-    desc.includes(`ID: ${jobId}`) ||
-    desc.includes(`Job ID: ${jobId}`) ||
-    desc.includes(`${FO_JOB_KEY}: ${jobId}`) ||
-    desc.includes(`(${jobId})`) ||
-    desc.includes(jobId);
-
-  const hasAppMarker = desc.includes(FO_APP_MARKER);
-  const hasProp = ev?.extendedProperties?.private?.[FO_JOB_KEY] === jobId;
-  return hasProp || (hasAppMarker && hasJobIdText);
-}
-
-async function listLikelyJobEvents(jobId: string, accessToken: string) {
-  // Try the strongest filter first (extended property)
-  const params1 = new URLSearchParams({
-    singleEvents: "true",
-    showDeleted: "false",
-    maxResults: "2500",
-    privateExtendedProperty: `${FO_JOB_KEY}=${jobId}`,
-  });
-
-  const url1 = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CAL_ID)}/events?${params1.toString()}`;
-  const d1 = await gcalFetch(url1, accessToken);
-  const items1 = (d1?.items || []) as any[];
-
-  // Also search by jobId text to find legacy events (duplicates) created before we tagged them
-  const params2 = new URLSearchParams({
-    singleEvents: "true",
-    showDeleted: "false",
-    maxResults: "2500",
-    q: jobId,
-  });
-
-  const url2 = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CAL_ID)}/events?${params2.toString()}`;
-  const d2 = await gcalFetch(url2, accessToken);
-  const items2 = (d2?.items || []) as any[];
-
-  // Merge + filter safely
-  const map = new Map<string, any>();
-  [...items1, ...items2].forEach((ev) => {
-    if (ev?.id) map.set(ev.id, ev);
-  });
-
-  return Array.from(map.values()).filter((ev) => hasOurMarker(ev, jobId));
-}
-
-async function deleteEvents(events: any[], accessToken: string) {
-  for (const ev of events) {
-    const eid = ev?.id;
-    if (!eid) continue;
-    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CAL_ID)}/events/${encodeURIComponent(eid)}`;
-    await gcalFetch(url, accessToken, { method: "DELETE" });
-  }
-}
-
-function buildContinuousEvent(job: Job, clientName?: string) {
-  // Google all-day: end is exclusive -> add 1 day to inclusive endDate
-  const start = { date: job.startDate };
-  const end = { date: addDays(job.endDate, 1) };
-
-  const base = clientName ? `${clientName} — ${job.description}` : job.description;
-  const summary = `${base} (${job.id})`;
-
-  return {
-    summary,
-    colorId: statusToColorId(job.status as any),
-    description:
-      `${FO_APP_MARKER} Job\n` +
-      `ID: ${job.id}\n` +
-      `Status: ${job.status}\n` +
-      `Location: ${job.location || ""}\n` +
-      `PO: ${job.poNumber || ""}`,
-    location: job.location || undefined,
-    start,
-    end,
-    extendedProperties: {
-      private: {
-        [FO_JOB_KEY]: job.id,
-      },
-    },
-  };
-}
-
-function buildShiftEvent(job: Job, shift: any, clientName?: string) {
-  const base = clientName ? `${clientName} — ${shift.title || job.description}` : shift.title || job.description;
-  const summary = `${base} (${job.id})`;
-
-  // If later you store times, you can switch to dateTime.
-  // For now we keep all-day for shifts too, inclusive end -> +1 day
-  const startDate = shift.startDate || job.startDate;
-  const endDate = shift.endDate || shift.startDate || job.startDate;
-
-  return {
-    summary,
-    colorId: statusToColorId(job.status as any),
-    description:
-      `${FO_APP_MARKER} Job Shift\n` +
-      `Job ID: ${job.id}\n` +
-      `Shift: ${shift.title || ""}\n` +
-      `Status: ${job.status}\n` +
-      `Location: ${job.location || ""}\n` +
-      `PO: ${job.poNumber || ""}`,
-    location: job.location || undefined,
-    start: { date: startDate },
-    end: { date: addDays(endDate, 1) },
-    extendedProperties: {
-      private: {
-        [FO_JOB_KEY]: job.id,
-        foShiftId: shift.id || "",
-      },
-    },
-  };
-}
-
-/**
- * ✅ Public: fetch events for dashboard overlay (safe range, prevents timeRangeEmpty)
- */
-export async function fetchGoogleEvents(_tenantId: string, accessToken: string) {
-  if (!accessToken) return [];
-
-  const now = new Date();
-  const timeMin = new Date(now.getFullYear() - 1, 0, 1).toISOString();
-  const timeMax = new Date(now.getFullYear() + 2, 11, 31, 23, 59, 59).toISOString();
-
-  const params = new URLSearchParams({
-    singleEvents: "true",
-    showDeleted: "false",
-    maxResults: "2500",
-    timeMin,
-    timeMax,
-    orderBy: "startTime",
-  });
-
-  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CAL_ID)}/events?${params.toString()}`;
-  const data = await gcalFetch(url, accessToken);
-  return (data?.items || []) as any[];
-}
-
-/**
- * ✅ Upsert job into Google Calendar, and remove duplicates from legacy sync.
- */
-export async function syncJobToGoogle(job: Job, accessToken: string, clientName?: string) {
-  if (!accessToken) throw new Error("Missing Google access token.");
-  if (!job?.id) throw new Error("Missing job id.");
-
-  const jobEventId = sanitizeEventId(job.id);
-
-  // 1) Clean up legacy duplicates for this job (events we previously created but can’t “update” reliably)
-  // We keep the deterministic id event and remove other matching ones.
-  const likely = await listLikelyJobEvents(job.id, accessToken);
-  const legacyDuplicates = likely.filter((ev) => ev?.id && ev.id !== jobEventId && !String(ev.id).includes("_" + sanitizeEventId(job.id)));
-  if (legacyDuplicates.length) {
-    await deleteEvents(legacyDuplicates, accessToken);
-  }
-
-  // 2) Shift-based: delete all shift events for this job, then recreate deterministically per shift
-  if (job.schedulingType === SchedulingType.SHIFT_BASED) {
-    // delete any existing for this job (including deterministic continuous event)
-    const existing = await listLikelyJobEvents(job.id, accessToken);
-    await deleteEvents(existing, accessToken);
-
-    const shifts = (job.shifts || []).length ? (job.shifts || []) : [];
-    for (const s of shifts) {
-      const shiftEventId = sanitizeEventId(`${job.id}_${s.id || "shift"}`);
-      const body = { id: shiftEventId, ...buildShiftEvent(job, s, clientName) };
-      const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CAL_ID)}/events`;
-      await gcalFetch(url, accessToken, { method: "POST", body: JSON.stringify(body) });
-    }
-    return;
-  }
-
-  // 3) Continuous: create/update one stable event id
-  const body = { id: jobEventId, ...buildContinuousEvent(job, clientName) };
-
-  // Try create first. If it already exists, PATCH it.
-  const insertUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CAL_ID)}/events`;
+  const text = await res.text();
+  let json: any = null;
   try {
-    await gcalFetch(insertUrl, accessToken, { method: "POST", body: JSON.stringify(body) });
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = { raw: text };
+  }
+
+  if (!res.ok) {
+    const msg =
+      json?.error?.message ||
+      json?.message ||
+      `Google Calendar API error (${res.status})`;
+    throw new Error(msg);
+  }
+
+  return json;
+}
+
+// Find existing events by our private extended property
+async function listEventsByPrivateProp(
+  accessToken: string,
+  key: string,
+  value: string
+): Promise<any[]> {
+  const calendarId = DEFAULT_CALENDAR_ID;
+  const q = encodeURIComponent(`${key}=${value}`);
+  // NOTE: Calendar API uses privateExtendedProperty param (can be repeated)
+  const url = `${GCAL_BASE}/calendars/${encodeURIComponent(
+    calendarId
+  )}/events?privateExtendedProperty=${q}&maxResults=2500&singleEvents=true`;
+
+  const data = await gcalFetch(url, accessToken);
+  return data?.items || [];
+}
+
+async function upsertEventById(
+  accessToken: string,
+  eventId: string,
+  eventBody: any
+): Promise<void> {
+  const calendarId = DEFAULT_CALENDAR_ID;
+
+  // Try update first; if 404 then insert.
+  const updateUrl = `${GCAL_BASE}/calendars/${encodeURIComponent(
+    calendarId
+  )}/events/${encodeURIComponent(eventId)}`;
+
+  try {
+    await gcalFetch(updateUrl, accessToken, {
+      method: "PUT",
+      body: JSON.stringify(eventBody),
+    });
   } catch (e: any) {
-    // 409 = already exists
-    if (String(e?.message || "").includes("409")) {
-      const patchUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CAL_ID)}/events/${encodeURIComponent(jobEventId)}`;
-      await gcalFetch(patchUrl, accessToken, { method: "PATCH", body: JSON.stringify(body) });
-    } else {
-      throw e;
+    // If not found, insert with explicit ID
+    const msg = (e?.message || "").toLowerCase();
+    if (msg.includes("not found") || msg.includes("notFound".toLowerCase())) {
+      const insertUrl = `${GCAL_BASE}/calendars/${encodeURIComponent(
+        calendarId
+      )}/events`;
+      await gcalFetch(insertUrl, accessToken, {
+        method: "POST",
+        body: JSON.stringify({ ...eventBody, id: eventId }),
+      });
+      return;
     }
+    throw e;
   }
 }
 
-export async function deleteJobFromGoogle(jobId: string, accessToken: string) {
-  if (!accessToken) throw new Error("Missing Google access token.");
-  if (!jobId) throw new Error("Missing job id.");
-
-  const existing = await listLikelyJobEvents(jobId, accessToken);
-  await deleteEvents(existing, accessToken);
-
-  // Also attempt deterministic delete in case it exists but didn't match our filters
-  const deterministic = sanitizeEventId(jobId);
-  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CAL_ID)}/events/${encodeURIComponent(deterministic)}`;
+async function deleteEventSafe(accessToken: string, eventId: string): Promise<void> {
+  const calendarId = DEFAULT_CALENDAR_ID;
+  if (!eventId || eventId.trim().length < 5) return; // guard
+  const url = `${GCAL_BASE}/calendars/${encodeURIComponent(
+    calendarId
+  )}/events/${encodeURIComponent(eventId)}`;
   try {
     await gcalFetch(url, accessToken, { method: "DELETE" });
   } catch {
-    // ignore
+    // ignore if already gone
   }
+}
+
+function buildSummary(clientName: string | undefined, jobTitle: string, jobId: string) {
+  // you said: show company + job name, and add (JOB ID) at end
+  const left = clientName ? `${clientName} — ${jobTitle}` : jobTitle;
+  return `${left} (${jobId})`;
+}
+
+// Build event payloads
+function buildAllDayEventPayload(opts: {
+  summary: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD inclusive in your app
+  description?: string;
+  location?: string;
+  status?: any;
+  privateProps: Record<string, string>;
+}) {
+  const tz = getTimeZone();
+  return {
+    summary: opts.summary,
+    location: opts.location || undefined,
+    description: opts.description || undefined,
+    start: { date: opts.startDate, timeZone: tz },
+    // IMPORTANT: Google all-day end date is EXCLUSIVE, so +1 day
+    end: { date: addDays(opts.endDate, 1), timeZone: tz },
+    colorId: statusColorId(opts.status),
+    extendedProperties: {
+      private: opts.privateProps,
+    },
+  };
+}
+
+function buildTimedEventPayload(opts: {
+  summary: string;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  description?: string;
+  location?: string;
+  status?: any;
+  privateProps: Record<string, string>;
+}) {
+  const tz = getTimeZone();
+  return {
+    summary: opts.summary,
+    location: opts.location || undefined,
+    description: opts.description || undefined,
+    start: { dateTime: `${opts.date}T${opts.startTime}:00`, timeZone: tz },
+    end: { dateTime: `${opts.date}T${opts.endTime}:00`, timeZone: tz },
+    colorId: statusColorId(opts.status),
+    extendedProperties: {
+      private: opts.privateProps,
+    },
+  };
+}
+
+// ---- public API ----
+
+export async function syncJobToGoogle(
+  job: Job,
+  accessToken: string,
+  clientName?: string
+): Promise<void> {
+  if (!accessToken) return;
+
+  const jobId = (job as any)?.id?.toString?.() || "";
+  if (!jobId) throw new Error("Job ID missing (cannot sync).");
+
+  const summary = buildSummary(clientName, (job as any).description || "Job", jobId);
+
+  // SHIFT-BASED: create/update one event per shift
+  if ((job as any).schedulingType === SchedulingType.SHIFT_BASED) {
+    const shifts: JobShift[] = (job as any).shifts || [];
+
+    // 1) Upsert each shift event
+    for (const s of shifts) {
+      const shiftId = (s as any)?.id?.toString?.() || "";
+      if (!shiftId) continue; // guard
+
+      const eventId = buildShiftEventId(jobId, shiftId);
+
+      const startDate = (s as any).startDate || (job as any).startDate;
+      const endDate = (s as any).endDate || startDate;
+
+      const isFullDay = (s as any).isFullDay !== false;
+
+      const privateProps = {
+        fo_job_id: jobId,
+        fo_shift_id: shiftId,
+        fo_type: "shift",
+      };
+
+      const payload = isFullDay
+        ? buildAllDayEventPayload({
+            summary,
+            startDate,
+            endDate,
+            location: (job as any).location || "",
+            status: (job as any).status,
+            privateProps,
+          })
+        : buildTimedEventPayload({
+            summary,
+            date: startDate,
+            startTime: (s as any).startTime || "09:00",
+            endTime: (s as any).endTime || "17:30",
+            location: (job as any).location || "",
+            status: (job as any).status,
+            privateProps,
+          });
+
+      await upsertEventById(accessToken, eventId, payload);
+
+      // 2) Dedupe: if any extra events exist with same fo_shift_id, delete them
+      const found = await listEventsByPrivateProp(accessToken, "fo_shift_id", shiftId);
+      const keep = eventId;
+      for (const ev of found) {
+        const id = ev?.id;
+        if (id && id !== keep) await deleteEventSafe(accessToken, id);
+      }
+    }
+
+    // 3) Remove any old “job-level” event if it exists (from earlier versions)
+    const jobLevelEvents = await listEventsByPrivateProp(accessToken, "fo_job_id", jobId);
+    for (const ev of jobLevelEvents) {
+      const isShift = ev?.extendedProperties?.private?.fo_type === "shift";
+      if (!isShift && ev?.id) await deleteEventSafe(accessToken, ev.id);
+    }
+
+    return;
+  }
+
+  // CONTINUOUS (or default): one all-day event for the job
+  const eventId = buildJobEventId(jobId);
+
+  const privateProps = {
+    fo_job_id: jobId,
+    fo_type: "job",
+  };
+
+  const payload = buildAllDayEventPayload({
+    summary,
+    startDate: (job as any).startDate,
+    endDate: (job as any).endDate,
+    location: (job as any).location || "",
+    status: (job as any).status,
+    privateProps,
+  });
+
+  await upsertEventById(accessToken, eventId, payload);
+
+  // Dedupe: delete any other job-level events for this job
+  const found = await listEventsByPrivateProp(accessToken, "fo_job_id", jobId);
+  for (const ev of found) {
+    const isJob = ev?.extendedProperties?.private?.fo_type === "job";
+    if (!isJob) continue;
+    const id = ev?.id;
+    if (id && id !== eventId) await deleteEventSafe(accessToken, id);
+  }
+
+  // Also remove any shift events if user switched back to continuous
+  for (const ev of found) {
+    const isShift = ev?.extendedProperties?.private?.fo_type === "shift";
+    if (isShift && ev?.id) await deleteEventSafe(accessToken, ev.id);
+  }
+}
+
+export async function deleteJobFromGoogle(jobIdRaw: string, accessToken: string): Promise<void> {
+  if (!accessToken) return;
+  const jobId = (jobIdRaw || "").toString();
+  if (!jobId) return;
+
+  // delete any events tagged with this job id
+  const found = await listEventsByPrivateProp(accessToken, "fo_job_id", jobId);
+  for (const ev of found) {
+    if (ev?.id) await deleteEventSafe(accessToken, ev.id);
+  }
+
+  // also attempt deterministic ids (in case extended props missing)
+  await deleteEventSafe(accessToken, buildJobEventId(jobId));
 }
