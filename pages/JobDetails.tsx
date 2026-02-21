@@ -94,9 +94,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       const inv = allInvoices.find((i) => i.jobId === foundJob.id) || null;
       setInvoice(inv);
 
-      // ✅ Invoice date defaults:
-      // - if invoice exists: use invoice.date
-      // - else: use job.endDate
+      // invoice date defaults:
       const defaultInvoiceDate = inv?.date || foundJob.endDate || foundJob.startDate || "";
       setSelectedInvoiceDate(defaultInvoiceDate);
       setEditInvoiceDate(inv?.date || defaultInvoiceDate);
@@ -248,7 +246,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     if (!docRef.current || !job || !client) return;
 
     setIsSaving(true);
-    await new Promise((r) => setTimeout(r, 100));
+
+    // give logo/images a moment to load before canvas snapshot
+    await new Promise((r) => setTimeout(r, 200));
 
     try {
       const element = docRef.current;
@@ -468,6 +468,16 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     invoice?.dueDate ||
     (client ? calculateDueDate(invoiceDateForDisplay, Number((client as any).paymentTermsDays) || 30) : "");
 
+  const fromName = (currentUser?.businessName || "Your Business").trim();
+  const fromAddress = (currentUser?.businessAddress || "").trim();
+  const fromReg = (currentUser as any)?.companyRegNumber || "";
+  const fromVat = (currentUser as any)?.vatNumber || "";
+  const logoUrl = (currentUser as any)?.logoUrl || "";
+
+  const bankAccountName = (currentUser as any)?.accountName || "";
+  const bankAccountNumber = (currentUser as any)?.accountNumber || "";
+  const bankSortOrIban = (currentUser as any)?.sortCodeOrIBAN || "";
+
   if (isLoading) {
     return (
       <div className="p-20 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -479,7 +489,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
   return (
     <div className="space-y-6 max-w-full overflow-x-hidden pb-20 px-1 md:px-4">
-      {/* Non-blocking calendar warning */}
       {calendarWarning && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-[11px] font-bold">
           Saved successfully, but calendar sync failed: <span className="font-mono">{calendarWarning}</span>
@@ -489,7 +498,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         </div>
       )}
 
-      {/* Preview Modal (Quotation / Invoice) */}
+      {/* Preview Modal */}
       {showPreview && client && job && (
         <div className="fixed inset-0 z-[240] bg-slate-900/60 backdrop-blur-md overflow-y-auto">
           <div className="min-h-full w-full flex items-start justify-center p-4 md:p-8">
@@ -518,37 +527,73 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 <div className="px-4 md:px-6 py-6 bg-white">
                   {/* Printable area */}
                   <div ref={docRef} className="bg-white">
-                    <div className="flex items-start justify-between gap-8">
-                      <div>
+                    {/* Top band: logo + FROM */}
+                    <div className="flex items-start justify-between gap-6">
+                      <div className="flex items-start gap-4">
+                        {logoUrl ? (
+                          <img
+                            src={logoUrl}
+                            alt="Logo"
+                            className="w-14 h-14 rounded-2xl object-contain border border-slate-200 bg-white"
+                            crossOrigin="anonymous"
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400 text-xs font-black">
+                            LOGO
+                          </div>
+                        )}
+
+                        <div>
+                          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            From
+                          </div>
+                          <div className="text-base font-black text-slate-900">{fromName}</div>
+
+                          {fromAddress ? (
+                            <div className="text-[10px] text-slate-500 leading-relaxed whitespace-pre-wrap mt-1">
+                              {fromAddress}
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-slate-400 mt-1">
+                              (Add your business address in Settings)
+                            </div>
+                          )}
+
+                          {(fromReg || fromVat) && (
+                            <div className="mt-2 text-[10px] text-slate-500 font-bold space-y-1">
+                              {fromReg && <div>Company Reg: <span className="font-black text-slate-900">{fromReg}</span></div>}
+                              {fromVat && <div>VAT: <span className="font-black text-slate-900">{fromVat}</span></div>}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Document title + dates */}
+                      <div className="text-right">
                         <div className="text-2xl font-black text-slate-900">
                           {showPreview === "invoice" ? "INVOICE" : "QUOTATION"}
                         </div>
                         <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                           Protocol {job.id}
                         </div>
-                      </div>
 
-                      <div className="text-right">
-                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        <div className="mt-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
                           {showPreview === "invoice" ? "Invoice Date" : "Quote Date"}
                         </div>
-                        <div className="text-sm font-black text-slate-900">
-                          {formatDate(invoiceDateForDisplay)}
-                        </div>
+                        <div className="text-sm font-black text-slate-900">{formatDate(invoiceDateForDisplay)}</div>
 
                         {showPreview === "invoice" && (
                           <>
                             <div className="mt-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
                               Due Date
                             </div>
-                            <div className="text-sm font-black text-slate-900">
-                              {formatDate(invoiceDueDateForDisplay)}
-                            </div>
+                            <div className="text-sm font-black text-slate-900">{formatDate(invoiceDueDateForDisplay)}</div>
                           </>
                         )}
                       </div>
                     </div>
 
+                    {/* BILL TO + JOB DETAILS */}
                     <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="p-4 rounded-2xl border border-slate-200">
                         <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
@@ -578,6 +623,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                       </div>
                     </div>
 
+                    {/* LINE ITEMS */}
                     <div className="mt-8">
                       <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
                         Line Items
@@ -608,19 +654,14 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                         <div className="w-full max-w-sm space-y-2">
                           <div className="flex justify-between text-sm font-bold text-slate-500">
                             <span>Subtotal</span>
-                            <span className="font-black text-slate-900">
-                              {formatCurrency(totalRecharge, currentUser)}
-                            </span>
+                            <span className="font-black text-slate-900">{formatCurrency(totalRecharge, currentUser)}</span>
                           </div>
 
                           <div className="flex justify-between text-sm font-bold text-slate-500">
                             <span>Gross</span>
                             <span className="font-black text-slate-900">
                               {formatCurrency(
-                                totalRecharge *
-                                  (currentUser?.isVatRegistered
-                                    ? 1 + ((currentUser.taxRate || 20) / 100)
-                                    : 1),
+                                totalRecharge * (currentUser?.isVatRegistered ? 1 + ((currentUser.taxRate || 20) / 100) : 1),
                                 currentUser
                               )}
                             </span>
@@ -634,11 +675,43 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                         </div>
                       </div>
                     </div>
+
+                    {/* PAYMENT / BANK DETAILS */}
+                    <div className="mt-10 p-4 rounded-2xl border border-slate-200 bg-slate-50">
+                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                        Payment Details
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px]">
+                        <div>
+                          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Account Name</div>
+                          <div className="font-black text-slate-900">{bankAccountName || "—"}</div>
+                        </div>
+
+                        <div>
+                          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Account Number</div>
+                          <div className="font-black text-slate-900">{bankAccountNumber || "—"}</div>
+                        </div>
+
+                        <div>
+                          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            Sort Code / IBAN
+                          </div>
+                          <div className="font-black text-slate-900">{bankSortOrIban || "—"}</div>
+                        </div>
+                      </div>
+
+                      {!bankAccountName && !bankAccountNumber && !bankSortOrIban && (
+                        <div className="mt-3 text-[10px] text-slate-400 font-bold">
+                          Add your bank details in Settings to show them here automatically.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Sticky footer buttons */}
+              {/* Footer buttons */}
               <div className="border-t border-slate-100 px-6 py-4 flex gap-3 justify-end bg-white">
                 <button
                   type="button"
@@ -662,6 +735,8 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           </div>
         </div>
       )}
+
+      {/* --- the rest of your component (modals + main page) remains unchanged below --- */}
 
       {/* Edit Invoice Date Modal */}
       {showEditInvoiceDateModal && invoice && client && (
@@ -1279,7 +1354,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         {/* Sidebar */}
         <div className="space-y-6">
           <div className="bg-slate-900 rounded-[40px] p-8 text-white shadow-2xl">
-            <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest italic mb-2">Project Valuation</p>
+            <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest italic mb-2">
+              Project Valuation
+            </p>
             <h4 className="text-4xl font-black tracking-tighter mb-8">{formatCurrency(totalRecharge, currentUser)}</h4>
 
             <div className="space-y-3">
