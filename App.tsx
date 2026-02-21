@@ -22,12 +22,59 @@ import { syncJobToGoogle, deleteJobFromGoogle } from "./services/googleCalendar"
 import { checkSubscriptionStatus } from "./utils";
 
 /**
+ * Google Calendar fetch (local helper)
+ * - Prevents "timeRangeEmpty" by always sending a valid timeMin/timeMax
+ * - Uses calendarId=primary
+ */
+async function fetchGoogleEvents(
+  accessToken: string,
+  opts?: { timeMin?: string; timeMax?: string; calendarId?: string }
+): Promise<any[]> {
+  if (!accessToken) return [];
+  const calendarId = opts?.calendarId || "primary";
+
+  // Default range: last 6 months to next 12 months
+  const now = new Date();
+  const defaultMin = new Date(now);
+  defaultMin.setMonth(defaultMin.getMonth() - 6);
+  const defaultMax = new Date(now);
+  defaultMax.setMonth(defaultMax.getMonth() + 12);
+
+  const timeMin = (opts?.timeMin || defaultMin.toISOString()).trim();
+  const timeMax = (opts?.timeMax || defaultMax.toISOString()).trim();
+
+  // Guard: never allow empty range
+  if (!timeMin || !timeMax) return [];
+
+  const params = new URLSearchParams({
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: "2500",
+    timeMin,
+    timeMax,
+  });
+
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params.toString()}`;
+
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Google Calendar fetch failed (${res.status}): ${text || res.statusText}`);
+  }
+
+  const data = await res.json();
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+/**
  * Error Boundary Component to prevent Blank Screens
  */
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean; error: any }
-> {
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: any }> {
   constructor(props: any) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -72,16 +119,7 @@ const MainLayout: React.FC<{
   clients: any[];
   existingJobs: Job[];
   onSaveJob: (job: Job, items: JobItem[], clientName: string) => Promise<void>;
-}> = ({
-  isSyncing,
-  currentUser,
-  isReadOnly,
-  isNewJobModalOpen,
-  setIsNewJobModalOpen,
-  clients,
-  existingJobs,
-  onSaveJob,
-}) => {
+}> = ({ isSyncing, currentUser, isReadOnly, isNewJobModalOpen, setIsNewJobModalOpen, clients, existingJobs, onSaveJob }) => {
   const location = useLocation();
 
   if (!currentUser) {
@@ -91,6 +129,7 @@ const MainLayout: React.FC<{
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-slate-50 overflow-hidden relative">
       <Navigation isSyncing={isSyncing} user={currentUser} />
+
       {isReadOnly && (
         <div className="fixed top-0 left-0 right-0 bg-rose-600 text-white py-2 text-center z-[200] text-[10px] font-black uppercase tracking-[0.2em] shadow-lg">
           Trial Period Expired. Access is currently Read-Only.{" "}
@@ -99,6 +138,7 @@ const MainLayout: React.FC<{
           </Link>
         </div>
       )}
+
       <main className={`flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar ${isReadOnly ? "pt-12" : ""}`}>
         <div className="max-w-7xl mx-auto w-full">
           <Outlet />
@@ -133,8 +173,7 @@ const App: React.FC = () => {
     user: null,
     clients: [],
     jobs: [],
-    // keep this property if AppState expects it, but we won't load it anymore
-    quotes: [],
+    quotes: [], // kept for type compatibility (not used)
     externalEvents: [],
     jobItems: [],
     invoices: [],
@@ -142,16 +181,15 @@ const App: React.FC = () => {
   });
 
   const subStatus = useMemo(() => checkSubscriptionStatus(currentUser), [currentUser]);
-  const isReadOnly = useMemo(
-    () => subStatus.isTrialExpired && currentUser?.plan !== UserPlan.ACTIVE,
-    [subStatus, currentUser]
-  );
+  const isReadOnly = useMemo(() => subStatus.isTrialExpired && currentUser?.plan !== UserPlan.ACTIVE, [subStatus, currentUser]);
 
   const getLatestToken = useCallback(async () => {
     const client = getSupabase();
     if (!client) return undefined;
     try {
-      const { data: { session } } = await (client.auth as any).getSession();
+      const {
+        data: { session },
+      } = await (client.auth as any).getSession();
       return session?.provider_token || undefined;
     } catch {
       return undefined;
@@ -177,33 +215,47 @@ const App: React.FC = () => {
         const token = await getLatestToken();
         setGoogleAccessToken(token);
 
-        const [clients, jobs, invoices, mileage] = await Promise.allSettled([
+        const [clientsRes, jobsRes, invoicesRes, mileageRes] = await Promise.allSettled([
           DB.getClients(),
           DB.getJobs(),
           DB.getInvoices(),
           DB.getMileage(),
-          // ✅ removed DB.getQuotes()
         ]);
 
         const getVal = (res: any) => (res.status === "fulfilled" ? res.value : []);
 
-        const reconciledJobs = (getVal(jobs) || []).map((job: Job) => {
-          const inv = (getVal(invoices) || []).find((i: any) => i.jobId === job.id);
+        const clients = getVal(clientsRes) || [];
+        const invoices = getVal(invoicesRes) || [];
+        const mileage = getVal(mileageRes) || [];
+
+        const reconciledJobs = (getVal(jobsRes) || []).map((job: Job) => {
+          const inv = (invoices || []).find((i: any) => i.jobId === job.id);
           if (inv?.status === InvoiceStatus.PAID && job.status !== JobStatus.COMPLETED) {
             return { ...job, status: JobStatus.COMPLETED };
           }
           return job;
         });
 
+        // Best-effort: external events for dashboard (don’t crash load if Google fails)
+        let googleEvents: any[] = [];
+        if (token) {
+          try {
+            googleEvents = await fetchGoogleEvents(token);
+          } catch (e) {
+            console.warn("[Google Events Fetch Failed]", e);
+            googleEvents = [];
+          }
+        }
+
         setCurrentUser(user);
         setAppState({
           user,
-          clients: getVal(clients) || [],
+          clients,
           jobs: reconciledJobs,
-          quotes: [],          // ✅ now always empty
-          invoices: getVal(invoices) || [],
-          mileage: getVal(mileage) || [],
-          externalEvents: [],  // ✅ removed Google event fetching to avoid build/runtime issues
+          quotes: [],
+          invoices,
+          mileage,
+          externalEvents: googleEvents,
           jobItems: [],
         });
 
@@ -233,6 +285,8 @@ const App: React.FC = () => {
 
       for (const job of appState.jobs) {
         const client = appState.clients.find((c) => c.id === job.clientId);
+
+        // If disabled or cancelled, ensure deletion
         if (job.syncToCalendar === false || job.status === JobStatus.CANCELLED) {
           await deleteJobFromGoogle(job.id, token);
         } else {
@@ -274,7 +328,9 @@ const App: React.FC = () => {
 
     const client = getSupabase();
     if (client) {
-      const { data: { subscription } } = (client.auth as any).onAuthStateChange(async (event: string) => {
+      const {
+        data: { subscription },
+      } = (client.auth as any).onAuthStateChange(async (event: string) => {
         if (event === "SIGNED_IN" && !hasLoadedOnce.current) {
           const user = await DB.getCurrentUser();
           if (user) {
@@ -335,17 +391,16 @@ const App: React.FC = () => {
     await loadData();
   };
 
-  if (isLoading)
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-6 p-4">
         <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
         <div className="text-center">
-          <p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">
-            Establishing Secure Workspace
-          </p>
+          <p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Establishing Secure Workspace</p>
         </div>
       </div>
     );
+  }
 
   return (
     <ErrorBoundary>
@@ -383,28 +438,15 @@ const App: React.FC = () => {
             />
             <Route
               path="jobs"
-              element={
-                <Jobs
-                  state={appState}
-                  onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)}
-                  onRefresh={loadData}
-                />
-              }
+              element={<Jobs state={appState} onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)} onRefresh={loadData} />}
             />
             <Route path="jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
             <Route path="clients" element={<Clients state={appState} onRefresh={loadData} />} />
-            {/* ✅ Removed quotes route */}
             <Route path="invoices" element={<Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
             <Route path="mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
             <Route
               path="settings"
-              element={
-                <Settings
-                  user={currentUser}
-                  onLogout={() => DB.signOut().then(() => window.location.reload())}
-                  onRefresh={loadData}
-                />
-              }
+              element={<Settings user={currentUser} onLogout={() => DB.signOut().then(() => window.location.reload())} onRefresh={loadData} />}
             />
           </Route>
 
