@@ -20,6 +20,9 @@ const LOCAL_USER_EMAIL = "local@freelanceos.internal";
 // ✅ cache the signed-in email to prevent auth “blink” -> landing loops
 const TENANT_CACHE_KEY = "FO_TENANT_ID";
 
+// ✅ cache last good Google provider token (helps when session “blinks”)
+const GOOGLE_TOKEN_CACHE_KEY = "FO_GOOGLE_PROVIDER_TOKEN";
+
 // Keep your map (trim/extend as needed)
 const FIELD_MAP: Record<string, string> = {
   // Tenant
@@ -111,7 +114,6 @@ const formatPgError = (err: any) => {
 };
 
 const logAndThrow = (context: string, err: any) => {
-  // Make sure it never just prints "Object"
   console.error(`[Supabase] ${context} FAILED ->`, {
     message: err?.message,
     code: err?.code,
@@ -139,8 +141,6 @@ const toDb = (table: string, obj: any, tenantId: string) => {
     if (key === "rechargeAmount" || key === "actualCost") continue;
 
     const val = obj[key];
-
-    // ✅ don’t push undefined (prevents accidental overwrites / noisy upserts)
     if (val === undefined) continue;
 
     const dbKey = FIELD_MAP[key] || key;
@@ -159,7 +159,6 @@ const fromDb = (obj: any) => {
     out[jsKey] = obj[key];
   }
 
-  // ✅ Ensure UI-facing key exists even if inverseMap chose a different alias
   if (out.sortCodeOrIBAN == null && obj.sort_code_iban != null) {
     out.sortCodeOrIBAN = obj.sort_code_iban;
   }
@@ -247,6 +246,28 @@ const clearCachedTenantId = () => {
   } catch {}
 };
 
+// ✅ helpers for cached google provider token
+const getCachedGoogleToken = (): string | null => {
+  try {
+    const v = (localStorage.getItem(GOOGLE_TOKEN_CACHE_KEY) || "").trim();
+    return v || null;
+  } catch {
+    return null;
+  }
+};
+
+const setCachedGoogleToken = (token: string) => {
+  try {
+    if (token) localStorage.setItem(GOOGLE_TOKEN_CACHE_KEY, token);
+  } catch {}
+};
+
+const clearCachedGoogleToken = () => {
+  try {
+    localStorage.removeItem(GOOGLE_TOKEN_CACHE_KEY);
+  } catch {}
+};
+
 export const getSupabase = (): SupabaseClient => supabase;
 
 export const DB = {
@@ -277,12 +298,66 @@ export const DB = {
     }
   },
 
+  /**
+   * ✅ Refresh session best-effort (prevents stale provider_token issues)
+   */
+  refreshAuthSession: async (): Promise<void> => {
+    try {
+      const client = getSupabase();
+      // refreshSession may throw depending on auth state — keep it safe
+      await (client.auth as any).refreshSession?.();
+    } catch {}
+  },
+
+  /**
+   * ✅ Bulletproof Google access token retrieval.
+   * - Uses current session.provider_token if present
+   * - Tries refreshSession() if missing
+   * - Falls back to cached provider token to avoid “blink” failures
+   */
+  getGoogleAccessToken: async (): Promise<string | null> => {
+    try {
+      const client = getSupabase();
+
+      // 1) try existing session
+      const s1 = await client.auth.getSession();
+      const token1 = (s1?.data?.session as any)?.provider_token as string | undefined;
+      const email1 = s1?.data?.session?.user?.email || null;
+
+      if (email1) setCachedTenantId(email1);
+      if (token1) {
+        setCachedGoogleToken(token1);
+        return token1;
+      }
+
+      // 2) try refresh session (often fixes “works in incognito only”)
+      await DB.refreshAuthSession();
+      const s2 = await client.auth.getSession();
+      const token2 = (s2?.data?.session as any)?.provider_token as string | undefined;
+      const email2 = s2?.data?.session?.user?.email || null;
+
+      if (email2) setCachedTenantId(email2);
+      if (token2) {
+        setCachedGoogleToken(token2);
+        return token2;
+      }
+
+      // 3) fallback to cached token (last known good)
+      return getCachedGoogleToken();
+    } catch {
+      return getCachedGoogleToken();
+    }
+  },
+
+  clearGoogleTokenCache: () => {
+    clearCachedGoogleToken();
+  },
+
   // stable tenant id retrieval (session -> cache -> null)
   getTenantId: async (): Promise<string | null> => {
     try {
       const client = getSupabase();
 
-      // 1) Prefer live session
       const { data, error } = await client.auth.getSession();
       if (!error) {
         const email = data?.session?.user?.email || null;
@@ -292,13 +367,11 @@ export const DB = {
         }
       }
 
-      // 2) Fallback to cache (prevents “blink” loops)
       const cached = getCachedTenantId();
       if (cached) return cached;
 
       return null;
     } catch {
-      // 3) Cache fallback even if getSession throws
       const cached = getCachedTenantId();
       return cached || null;
     }
@@ -311,6 +384,9 @@ export const DB = {
       const { data } = await client.auth.getSession();
       const email = data?.session?.user?.email || null;
       if (email) setCachedTenantId(email);
+
+      const token = (data?.session as any)?.provider_token as string | undefined;
+      if (token) setCachedGoogleToken(token);
     } catch {}
   },
 
@@ -327,7 +403,6 @@ export const DB = {
     const tenantId = effectiveId || LOCAL_USER_EMAIL;
     const deletedIds = getDeletedIds();
 
-    // Helper: apply same filter logic to LOCAL list (so merges don't leak)
     const applyLocalFilter = (list: any[]) => {
       let base = (list || []).filter((i: any) => {
         if (table === "tenants") return i.email === tenantId;
@@ -387,8 +462,6 @@ export const DB = {
       if (method === "upsert" && payload) {
         const raw = Array.isArray(payload) ? payload : [payload];
         const mapped = raw.map((p) => toDb(table, p, effectiveId));
-
-        // 🧠 upsert needs a unique key; select forces detailed response
         const conflictKey = table === "tenants" ? "email" : "id";
 
         const { data, error } = await query
@@ -396,8 +469,6 @@ export const DB = {
           .select("*");
 
         if (error) logAndThrow(`upsert:${table}`, error);
-
-        // return mapped objects back if useful
         return (data || []).map(fromDb);
       }
 
@@ -405,9 +476,10 @@ export const DB = {
         const pk = table === "tenants" ? "email" : "id";
 
         if (filter?.id) {
-          const q = table === "tenants"
-            ? query.delete().eq(pk, filter.id)
-            : query.delete().eq(pk, filter.id).eq("tenant_id", effectiveId);
+          const q =
+            table === "tenants"
+              ? query.delete().eq(pk, filter.id)
+              : query.delete().eq(pk, filter.id).eq("tenant_id", effectiveId);
 
           const { error } = await q;
           if (error) logAndThrow(`delete:${table}`, error);
@@ -438,7 +510,6 @@ export const DB = {
           const { data, error } = await q;
 
           if (error) {
-            // Don’t throw on select; fall back to local cache for offline friendliness
             console.warn(`[Supabase] select:${table} failed -> ${formatPgError(error)}`);
           } else if (data !== null) {
             const remoteData = data.map(fromDb);
@@ -544,16 +615,12 @@ export const DB = {
   },
 
   saveJob: async (j: Job) => {
-    // Make sure we always have a tenant id in cloud mode
     const tenantId = (await DB.getTenantId()) || LOCAL_USER_EMAIL;
 
-    // Save shifts first (keeps your current behaviour)
     await DB.saveShifts(j.id, (j as any).shifts || []);
 
-    // Force tenant_id into job object for local + cloud consistency
     const prepared: Job = { ...j, tenant_id: (j as any).tenant_id || tenantId } as any;
 
-    // IMPORTANT: if supabase upsert fails, DB.call will now THROW.
     return DB.call("jobs", "upsert", prepared);
   },
 
@@ -608,5 +675,6 @@ export const DB = {
       await getSupabase().auth.signOut();
     } catch {}
     clearCachedTenantId();
+    clearCachedGoogleToken();
   },
 };
