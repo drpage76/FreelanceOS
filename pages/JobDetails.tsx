@@ -17,7 +17,7 @@ import {
 } from "../types";
 
 import { DB, generateId } from "../services/db";
-import { formatCurrency, formatDate, calculateDueDate } from "../utils";
+import { formatCurrency, calculateDueDate } from "../utils";
 import { STATUS_COLORS } from "../constants";
 import { syncJobToGoogle, deleteJobFromGoogle } from "../services/googleCalendar";
 import { uploadToGoogleDrive } from "../services/googleDrive";
@@ -45,6 +45,10 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showPreview, setShowPreview] = useState<"invoice" | "quote" | null>(null);
   const [selectedInvoiceDate, setSelectedInvoiceDate] = useState("");
+
+  // Change invoice date modal (for existing invoice)
+  const [showEditInvoiceDateModal, setShowEditInvoiceDateModal] = useState(false);
+  const [editInvoiceDate, setEditInvoiceDate] = useState("");
 
   // paid date picker
   const [showPaidModal, setShowPaidModal] = useState(false);
@@ -75,7 +79,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       }
 
       setJob(foundJob);
-      if (!selectedInvoiceDate) setSelectedInvoiceDate(foundJob.endDate);
+
+      // default invoice date should be job endDate (for creating invoice)
+      setSelectedInvoiceDate((prev) => prev || foundJob.endDate);
 
       setShifts(foundJob.shifts || []);
 
@@ -92,6 +98,10 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
       if (inv?.datePaid) setPaidDate(inv.datePaid);
       else setPaidDate(new Date().toISOString().slice(0, 10));
+
+      // prep edit invoice date modal
+      if (inv?.date) setEditInvoiceDate(inv.date);
+      else setEditInvoiceDate(foundJob.endDate);
     } catch (err) {
       console.error("Fetch Data Protocol Error:", err);
     } finally {
@@ -155,15 +165,8 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   const computeShiftBasedRange = (shiftList: JobShift[]) => {
     const norm = (shiftList || []).map(normalizeShift);
 
-    const startDates = norm
-      .map((s) => (s as any).startDate)
-      .filter(Boolean)
-      .sort();
-
-    const endDates = norm
-      .map((s) => (s as any).endDate)
-      .filter(Boolean)
-      .sort();
+    const startDates = norm.map((s) => (s as any).startDate).filter(Boolean).sort();
+    const endDates = norm.map((s) => (s as any).endDate).filter(Boolean).sort();
 
     return {
       startDate: startDates.length ? startDates[0] : (job as any).startDate,
@@ -221,6 +224,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       await DB.saveJob(updatedJob);
       await DB.saveJobItems(job.id, items);
 
+      // Keep the invoice-create default date aligned to job end date (but only if user hasn't set their own)
+      setSelectedInvoiceDate((prev) => (prev ? prev : updatedJob.endDate));
+
       // ✅ Calendar sync is best-effort
       const syncResult = await tryCalendarSync(updatedJob);
       if (!syncResult.ok) setCalendarWarning(syncResult.warning);
@@ -228,11 +234,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       setJob(updatedJob);
       setShifts(normalizedShifts);
       await onRefresh();
-
-      if (!syncResult.ok && syncResult.warning) {
-        // Optional: you can remove this alert if you prefer only the banner
-        // alert(`Saved successfully, but calendar sync failed:\n\n${syncResult.warning}`);
-      }
     } catch (err: any) {
       alert(`Save Error: ${err?.message || "Unknown error"}`);
     } finally {
@@ -298,7 +299,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     }
   };
 
-  // Create draft invoice
+  // Create draft invoice (date defaults to job endDate but can be changed in modal)
   const handleCreateInvoice = async () => {
     if (!job || !client || !selectedInvoiceDate) return;
 
@@ -324,11 +325,39 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       }
 
       setInvoice(newInvoice);
+      setEditInvoiceDate(newInvoice.date); // keep edit modal in sync
       setShowInvoiceModal(false);
       await onRefresh();
     } catch (err) {
       console.error(err);
       alert("Failed to generate invoice.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Edit invoice date (existing invoice)
+  const confirmChangeInvoiceDate = async () => {
+    if (!invoice || !job || !client) return;
+    if (!editInvoiceDate) return alert("Please select an invoice date.");
+
+    setIsSaving(true);
+    try {
+      const terms = Number((client as any).paymentTermsDays) || 30;
+
+      const updated: Invoice = {
+        ...invoice,
+        date: editInvoiceDate,
+        dueDate: calculateDueDate(editInvoiceDate, terms),
+      };
+
+      await DB.saveInvoice(updated);
+      setInvoice(updated);
+      setShowEditInvoiceDateModal(false);
+      await onRefresh();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update invoice date.");
     } finally {
       setIsSaving(false);
     }
@@ -412,7 +441,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       {calendarWarning && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-[11px] font-bold">
           Saved successfully, but calendar sync failed: <span className="font-mono">{calendarWarning}</span>
-          <div className="mt-2 text-[10px] text-amber-700">Tip: try “Sync All” from the dashboard after re-authing Google.</div>
+          <div className="mt-2 text-[10px] text-amber-700">
+            Tip: try “Sync All” from the dashboard after re-authing Google.
+          </div>
         </div>
       )}
 
@@ -432,10 +463,13 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 </label>
                 <input
                   type="date"
-                  value={selectedInvoiceDate}
+                  value={selectedInvoiceDate || job.endDate}
                   onChange={(e) => setSelectedInvoiceDate(e.target.value)}
                   className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none"
                 />
+                <p className="mt-2 text-[10px] text-slate-400 font-bold">
+                  Default is job end date. You can change it here before creating the invoice.
+                </p>
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -449,11 +483,63 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 <button
                   type="button"
                   onClick={handleCreateInvoice}
-                  disabled={isSaving || !selectedInvoiceDate}
+                  disabled={isSaving || !(selectedInvoiceDate || job.endDate)}
                   className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2"
                 >
-                  {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-file-invoice-dollar"></i>}
+                  {isSaving ? (
+                    <i className="fa-solid fa-spinner animate-spin"></i>
+                  ) : (
+                    <i className="fa-solid fa-file-invoice-dollar"></i>
+                  )}
                   {isSaving ? "Creating..." : "Create Draft"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Invoice Date Modal */}
+      {showEditInvoiceDateModal && invoice && client && (
+        <div className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+          <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200">
+            <h3 className="text-xl font-black text-slate-900 mb-2">Change Invoice Date</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">
+              Invoice Ref: {invoice.id}
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">
+                  Invoice Date
+                </label>
+                <input
+                  type="date"
+                  value={editInvoiceDate}
+                  onChange={(e) => setEditInvoiceDate(e.target.value)}
+                  className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none"
+                />
+                <p className="mt-2 text-[10px] text-slate-400 font-bold">
+                  Due date will automatically update using client payment terms ({client.paymentTermsDays || 30} days).
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowEditInvoiceDateModal(false)}
+                  className="flex-1 py-4 bg-slate-50 text-slate-400 rounded-2xl font-black text-[10px] uppercase border border-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmChangeInvoiceDate}
+                  disabled={isSaving || !editInvoiceDate}
+                  className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2"
+                >
+                  {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-pen-to-square"></i>}
+                  {isSaving ? "Saving..." : "Update Date"}
                 </button>
               </div>
             </div>
@@ -466,11 +552,15 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         <div className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
           <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200">
             <h3 className="text-xl font-black text-slate-900 mb-2">Mark Invoice as Paid</h3>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">Invoice Ref: {invoice.id}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">
+              Invoice Ref: {invoice.id}
+            </p>
 
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Payment Date</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">
+                  Payment Date
+                </label>
                 <input
                   type="date"
                   value={paidDate}
@@ -512,7 +602,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
         <div className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
           <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl border border-slate-200">
             <h3 className="text-xl font-black text-slate-900 mb-2">Mark Invoice as Unpaid</h3>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">Invoice Ref: {invoice.id}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">
+              Invoice Ref: {invoice.id}
+            </p>
 
             <p className="text-[11px] text-slate-500 font-bold leading-relaxed">
               This will remove the paid date and return the invoice to Outstanding. The job will revert to Awaiting Payment.
@@ -543,7 +635,10 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       {/* Header */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Link to="/jobs" className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center shadow-sm">
+          <Link
+            to="/jobs"
+            className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center shadow-sm"
+          >
             <i className="fa-solid fa-arrow-left"></i>
           </Link>
           <div className="min-w-0">
@@ -564,7 +659,11 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           {!invoice ? (
             <button
               type="button"
-              onClick={() => setShowInvoiceModal(true)}
+              onClick={() => {
+                // default selection = job endDate when opening modal
+                setSelectedInvoiceDate(job.endDate);
+                setShowInvoiceModal(true);
+              }}
               className="px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg"
             >
               Issue Invoice
@@ -577,6 +676,19 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg"
               >
                 View Invoice
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditInvoiceDate(invoice.date || job.endDate);
+                  setShowEditInvoiceDateModal(true);
+                }}
+                disabled={isSaving}
+                className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-black text-[10px] uppercase shadow-sm"
+                title="Change invoice date"
+              >
+                Edit Invoice Date
               </button>
 
               {invoice.status !== InvoiceStatus.PAID ? (
@@ -677,7 +789,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                   <button
                     type="button"
                     onClick={() =>
-                      setJob((prev) => (prev ? { ...prev, schedulingType: SchedulingType.CONTINUOUS, syncToCalendar: true } : prev))
+                      setJob((prev) =>
+                        prev ? { ...prev, schedulingType: SchedulingType.CONTINUOUS, syncToCalendar: true } : prev
+                      )
                     }
                     className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
                       job.syncToCalendar && job.schedulingType === SchedulingType.CONTINUOUS
@@ -691,7 +805,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                   <button
                     type="button"
                     onClick={() =>
-                      setJob((prev) => (prev ? { ...prev, schedulingType: SchedulingType.SHIFT_BASED, syncToCalendar: true } : prev))
+                      setJob((prev) =>
+                        prev ? { ...prev, schedulingType: SchedulingType.SHIFT_BASED, syncToCalendar: true } : prev
+                      )
                     }
                     className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
                       job.syncToCalendar && job.schedulingType === SchedulingType.SHIFT_BASED
@@ -807,7 +923,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                                   <input
                                     type="time"
                                     value={(s as any).startTime || "09:00"}
-                                    className="bg-white px-4 py-2.5 rounded-xl text-sm font-black w-full min-w-[130px] md:min-w-[150px] border border-slate-200"
+                                    className="bg-white px-4 py-3 rounded-xl text-sm font-black w-full min-w-[140px] md:min-w-[160px] border border-slate-200"
                                     onChange={(e) => {
                                       const n = [...shifts];
                                       (n[idx] as any).startTime = e.target.value;
@@ -820,7 +936,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                                   <input
                                     type="time"
                                     value={(s as any).endTime || "17:30"}
-                                    className="bg-white px-4 py-2.5 rounded-xl text-sm font-black w-full min-w-[130px] md:min-w-[150px] border border-slate-200"
+                                    className="bg-white px-4 py-3 rounded-xl text-sm font-black w-full min-w-[140px] md:min-w-[160px] border border-slate-200"
                                     onChange={(e) => {
                                       const n = [...shifts];
                                       (n[idx] as any).endTime = e.target.value;
@@ -832,7 +948,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                             </div>
                           ) : (
                             <div className="flex items-end">
-                              <div className="text-[10px] text-slate-400 font-bold px-1">Timed fields hidden for full-day shifts.</div>
+                              <div className="text-[10px] text-slate-400 font-bold px-1">
+                                Timed fields hidden for full-day shifts.
+                              </div>
                             </div>
                           )}
                         </div>
