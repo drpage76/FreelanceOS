@@ -61,14 +61,12 @@ function statusToColorId(status: JobStatus): string {
   }
 }
 
-function buildSummary(job: Job, clientName?: string): string {
+export function formatGoogleCalendarSummary(job: Job, clientName?: string): string {
   const location = (job.location || "").trim();
   const c = (clientName || "Client").trim();
   const j = (job.description || "Job").trim();
 
   const base = `${c} — ${j} (${job.id})`;
-
-  // Only prepend location if it exists
   return location ? `${location} | ${base}` : base;
 }
 
