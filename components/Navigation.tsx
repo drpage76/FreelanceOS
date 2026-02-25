@@ -74,7 +74,12 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
         <NavItem to="/dashboard" icon="fa-chart-pie" label="Dashboard" active={location.pathname === "/dashboard"} />
         <NavItem to="/jobs" icon="fa-briefcase" label="Jobs" active={location.pathname.startsWith("/jobs")} />
         <NavItem to="/clients" icon="fa-users" label="Clients" active={location.pathname.startsWith("/clients")} />
-        <NavItem to="/invoices" icon="fa-file-invoice-dollar" label="Financials" active={location.pathname.startsWith("/invoices")} />
+        <NavItem
+          to="/invoices"
+          icon="fa-file-invoice-dollar"
+          label="Financials"
+          active={location.pathname.startsWith("/invoices")}
+        />
         <NavItem to="/mileage" icon="fa-car-side" label="Mileage" active={location.pathname === "/mileage"} />
         <NavItem to="/settings" icon="fa-gear" label="Settings" active={location.pathname === "/settings"} />
       </div>
@@ -86,7 +91,7 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
               className={`w-2 h-2 rounded-full ${
                 isSyncing ? "bg-indigo-500 animate-pulse" : cloudActive ? "bg-emerald-500" : "bg-rose-500"
               }`}
-            ></div>
+            />
           </div>
           <span className={`text-[10px] font-black uppercase tracking-widest ${cloudActive ? "text-slate-400" : "text-rose-500"}`}>
             {isSyncing ? "Syncing..." : cloudActive ? "Cloud Active" : "Offline"}
