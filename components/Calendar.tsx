@@ -23,14 +23,12 @@ interface CalendarProps {
   jobs: Job[];
   externalEvents: ExternalEvent[];
   clients: Client[];
-  googleAccessToken?: string; // pass token to show personal google events
+  googleAccessToken?: string;
 }
 
 const GCAL_BASE = "https://www.googleapis.com/calendar/v3";
 const CALENDAR_ID = "primary";
 
-// Map Google `event.colorId` to something usable in UI (simple + reliable).
-// (Google has 1..11; exact hex varies by user theme, so we keep a consistent palette.)
 const GOOGLE_COLOR_ID_MAP: Record<string, string> = {
   "1": "#a4bdfc",
   "2": "#7ae7bf",
@@ -48,16 +46,8 @@ const GOOGLE_COLOR_ID_MAP: Record<string, string> = {
 function safeISODateFromGoogleEvent(ev: any, which: "start" | "end"): string | null {
   const obj = ev?.[which];
   if (!obj) return null;
-
-  // All-day events: { date: "YYYY-MM-DD" }
   if (obj.date && typeof obj.date === "string") return obj.date;
-
-  // Timed events: { dateTime: "...", timeZone: "..." }
-  if (obj.dateTime && typeof obj.dateTime === "string") {
-    // We store only date in ExternalEvent, Calendar UI uses date-only.
-    return obj.dateTime.slice(0, 10);
-  }
-
+  if (obj.dateTime && typeof obj.dateTime === "string") return obj.dateTime.slice(0, 10);
   return null;
 }
 
@@ -76,7 +66,6 @@ function safeTimeLabelFromGoogleEvent(ev: any): string | undefined {
   }
 }
 
-// ✅ Internal titles must match Google Calendar “summary”
 function buildInternalTitle(job: Job, clientName: string, shiftTitle?: string) {
   const base = formatGoogleCalendarSummary(job, clientName);
   const st = (shiftTitle || "").trim();
@@ -90,7 +79,6 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
 
   const days = getCalendarDays(currentDate);
 
-  // Fetch personal Google events for the visible grid range (first day -> last day)
   useEffect(() => {
     let cancelled = false;
 
@@ -105,7 +93,6 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
         const gridEnd = days?.[days.length - 1];
         if (!gridStart || !gridEnd) return;
 
-        // Use UTC ISO strings for Google API parameters
         const timeMin = new Date(
           Date.UTC(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate(), 0, 0, 0)
         ).toISOString();
@@ -141,24 +128,19 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
 
         const mapped: ExternalEvent[] = items
           .filter((ev: any) => {
-            // Skip FreelanceOS-managed job events (avoid duplicates)
             const priv = ev?.extendedProperties?.private;
             if (priv?.freelanceosJobId) return false;
-
-            // Skip cancelled events
             if ((ev?.status || "").toLowerCase() === "cancelled") return false;
-
             return true;
           })
           .map((ev: any) => {
             const startDate = safeISODateFromGoogleEvent(ev, "start");
             const endDate = safeISODateFromGoogleEvent(ev, "end") || startDate;
-
             if (!startDate) return null;
 
             const color =
               (ev?.colorId && GOOGLE_COLOR_ID_MAP[String(ev.colorId)]) ||
-              "#6366f1"; // fallback indigo
+              "#6366f1";
 
             return {
               id: String(ev.id || `${startDate}-${Math.random()}`),
@@ -183,8 +165,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [googleAccessToken, currentDate]);
+  }, [googleAccessToken, currentDate, days]); // ✅ include days so the visible grid always refreshes
 
   const weeks = useMemo(() => {
     const weeksList: Date[][] = [];
@@ -198,7 +179,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
 
     (jobs || []).forEach((job) => {
       if (job.syncToCalendar === false) return;
-      if (job.status === JobStatus.CANCELLED) return; // cancelled should not appear at all
+      if (job.status === JobStatus.CANCELLED) return;
 
       const client = clients.find((c) => c.id === job.clientId);
       const clientName = client?.name || "Client";
@@ -242,13 +223,11 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
       });
     });
 
-    // Combine: externalEvents prop + personal google events fetched here
     const combinedExternal = [...(externalEvents || []), ...(googlePersonalEvents || [])];
 
     (combinedExternal || []).forEach((e) => {
       const title = e.title || "";
 
-      // existing de-dupe logic: if external title contains our protocol ref, skip it
       const refMatch = title.match(/\(Ref:\s*([a-zA-Z0-9-]+)\)/i) || title.match(/#([a-zA-Z0-9-]+)/);
       if (refMatch) {
         const matchedId = refMatch[1];
@@ -259,7 +238,6 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
       if (sDate && isValid(sDate)) {
         let endDate = e.endDate;
 
-        // Google all-day fix: Google end.date is exclusive
         if (e.source === "google" && e.startDate !== e.endDate) {
           const endISO = parseISO(e.endDate);
           if (isValid(endISO)) {
@@ -357,8 +335,8 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
 
       <div className="flex-1">
         {weeks.map((week, wIdx) => {
-          const weekStart = startOfDay(week[0]),
-            weekEnd = endOfDay(week[6]);
+          const weekStart = startOfDay(week[0]);
+          const weekEnd = endOfDay(week[6]);
 
           const weekEntries = allCalendarEntries.filter((e) => {
             const s = parseISO(e.startDate);
@@ -448,9 +426,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
                       const tooltipText =
                         entry.type === "external"
                           ? `Google Event: ${entry.title}\nPeriod: ${formatDateLabel(entry.startDate)} - ${formatDateLabel(entry.endDate)}`
-                          : `Project: ${entry.fullDescription || entry.title}\nClient: ${entry.clientName}\nTime: ${
-                              entry.timeLabel || "Continuous"
-                            }`;
+                          : `Project: ${entry.fullDescription || entry.title}\nClient: ${entry.clientName}\nTime: ${entry.timeLabel || "Continuous"}`;
 
                       return (
                         <div
