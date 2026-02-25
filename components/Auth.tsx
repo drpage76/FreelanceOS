@@ -14,6 +14,10 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
   const [isSignUp, setIsSignUp] = useState(initialIsSignUp);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Supabase OAuth returns with query params (code/state etc).
+   * With HashRouter, we want to keep the hash route, but remove query params.
+   */
   const cleanUrlParams = () => {
     const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
     window.history.replaceState({}, document.title, cleanUrl);
@@ -50,6 +54,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
   const handleEmailAuth = async () => {
     setError(null);
     setLoading(true);
+
     try {
       if (!email || !password) throw new Error("Enter email + password");
 
@@ -60,6 +65,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
+      // onAuthStateChange will fire and call onSuccess()
     } catch (e: any) {
       setError(e?.message || "Authentication failed");
     } finally {
@@ -72,13 +78,17 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
     setLoading(true);
 
     try {
-      const redirectTo = window.location.origin;
+      // For HashRouter apps, it's usually safest to return to the app root,
+      // then your router handles navigation.
+      const redirectTo = window.location.origin + window.location.pathname;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo,
-          // ✅ MUST request scopes or Calendar will 401/403
+
+          // ✅ Calendar + Drive scopes (space-separated string)
+          // If you ONLY want read access, remove calendar.events and keep calendar.readonly.
           scopes: [
             "openid",
             "email",
@@ -87,6 +97,8 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
             "https://www.googleapis.com/auth/calendar.readonly",
             "https://www.googleapis.com/auth/drive.file",
           ].join(" "),
+
+          // ✅ Force refresh token (offline) + consent screen so scopes apply
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -95,6 +107,9 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
       });
 
       if (error) throw error;
+
+      // On success, the browser will redirect to Google then back to your app.
+      // No need to setLoading(false) here.
     } catch (e: any) {
       setError(e?.message || "OAuth failed");
       setLoading(false);
@@ -112,16 +127,23 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
       )}
 
       <div style={{ display: "grid", gap: 10 }}>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" autoComplete="email" />
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+          autoComplete="email"
+          disabled={loading}
+        />
         <input
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password"
           type="password"
           autoComplete={isSignUp ? "new-password" : "current-password"}
+          disabled={loading}
         />
 
-        <button onClick={handleEmailAuth} disabled={loading}>
+        <button type="button" onClick={handleEmailAuth} disabled={loading}>
           {loading ? "Please wait…" : isSignUp ? "Register" : "Sign In"}
         </button>
 
@@ -131,7 +153,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
           <div style={{ flex: 1, height: 1, background: "#ddd" }} />
         </div>
 
-        <button onClick={handleGoogleLogin} disabled={loading} style={{ display: "flex", justifyContent: "center" }}>
+        <button type="button" onClick={handleGoogleLogin} disabled={loading} style={{ display: "flex", justifyContent: "center" }}>
           Continue with Google
         </button>
 
@@ -144,6 +166,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
             border: "none",
             color: "#4f46e5",
             cursor: "pointer",
+            padding: 0,
           }}
         >
           {isSignUp ? "Already have an account? Sign in" : "No account? Register"}

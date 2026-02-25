@@ -1,5 +1,5 @@
 // src/services/googleCalendar.ts
-import { Job, JobStatus, SchedulingType, JobShift } from "../types";
+import { Job, JobStatus, SchedulingType, JobShift, ExternalEvent } from "../types";
 
 const CALENDAR_ID = "primary";
 const GCAL_BASE = "https://www.googleapis.com/calendar/v3";
@@ -47,17 +47,17 @@ function clampRangeEnd(dateStr: string, daysForward = 7): string {
 function statusToColorId(status: JobStatus): string {
   switch (status) {
     case JobStatus.POTENTIAL:
-      return "11"; // red
+      return "11";
     case JobStatus.PENCILLED:
-      return "5"; // yellow  ✅ FIXED
+      return "5";
     case JobStatus.CONFIRMED:
-      return "10"; // green
+      return "10";
     case JobStatus.AWAITING_PAYMENT:
-      return "9"; // blue
+      return "9";
     case JobStatus.COMPLETED:
-      return "8"; // dark grey / "black-ish"
+      return "8";
     default:
-      return "1"; // default calendar colour
+      return "1";
   }
 }
 
@@ -156,13 +156,16 @@ async function upsertEvent(
     return !priv.freelanceosShiftId;
   });
 
+  // De-dupe
   if (matching.length > 1) {
     const extras = matching.slice(1);
     await Promise.allSettled(
       extras.map((ev: any) =>
-        gcalFetch(accessToken, `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`, {
-          method: "DELETE",
-        })
+        gcalFetch(
+          accessToken,
+          `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`,
+          { method: "DELETE" }
+        )
       )
     );
   }
@@ -185,7 +188,7 @@ export async function syncJobToGoogle(job: Job, accessToken: string, clientName?
   if (!accessToken) return;
   if (!job?.id) throw new Error("Calendar: missing job id");
 
-  // ✅ Cancelled should NOT show at all
+  // Cancelled should NOT show at all
   if (job.status === JobStatus.CANCELLED) {
     await deleteJobFromGoogle(job.id, accessToken);
     return;
@@ -231,7 +234,9 @@ export async function syncJobToGoogle(job: Job, accessToken: string, clientName?
     },
   };
 
+  // SHIFT BASED
   if (job.schedulingType === SchedulingType.SHIFT_BASED && shifts.length) {
+    // Remove any continuous event for this job, keep shifts only
     const allExisting = await listEventsByJobId(accessToken, String(job.id), timeMin, timeMax);
     const continuous = allExisting.filter((ev: any) => {
       const priv = ev?.extendedProperties?.private || {};
@@ -240,12 +245,15 @@ export async function syncJobToGoogle(job: Job, accessToken: string, clientName?
 
     await Promise.allSettled(
       continuous.map((ev: any) =>
-        gcalFetch(accessToken, `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`, {
-          method: "DELETE",
-        })
+        gcalFetch(
+          accessToken,
+          `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`,
+          { method: "DELETE" }
+        )
       )
     );
 
+    // Upsert each shift
     for (const shift of shifts) {
       const shiftId = String((shift as any).id || "");
       if (!shiftId) continue;
@@ -267,6 +275,7 @@ export async function syncJobToGoogle(job: Job, accessToken: string, clientName?
       await upsertEvent(accessToken, body, String(job.id), shiftId, timeMin, timeMax);
     }
 
+    // Cleanup stale shifts
     const refreshed = await listEventsByJobId(accessToken, String(job.id), timeMin, timeMax);
     const validShiftIds = new Set(shifts.map((s: any) => String(s.id)));
     const stale = refreshed.filter((ev: any) => {
@@ -277,22 +286,20 @@ export async function syncJobToGoogle(job: Job, accessToken: string, clientName?
 
     await Promise.allSettled(
       stale.map((ev: any) =>
-        gcalFetch(accessToken, `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`, {
-          method: "DELETE",
-        })
+        gcalFetch(
+          accessToken,
+          `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`,
+          { method: "DELETE" }
+        )
       )
     );
 
     return;
   }
 
+  // CONTINUOUS
   const when = buildWhenFromJobOrShift(job);
-
-  const body = {
-    ...common,
-    ...when,
-  };
-
+  const body = { ...common, ...when };
   await upsertEvent(accessToken, body, String(job.id), undefined, timeMin, timeMax);
 }
 
@@ -305,9 +312,64 @@ export async function deleteJobFromGoogle(jobId: string, accessToken: string) {
   const events = await listEventsByJobId(accessToken, String(jobId), min, max);
   await Promise.allSettled(
     events.map((ev: any) =>
-      gcalFetch(accessToken, `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`, {
-        method: "DELETE",
-      })
+      gcalFetch(
+        accessToken,
+        `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(ev.id)}`,
+        { method: "DELETE" }
+      )
     )
   );
+}
+
+/**
+ * Pull personal Google Calendar events for in-app calendar display.
+ * - filters out FreelanceOS-managed events (those with extendedProperties.private.freelanceosJobId)
+ */
+export async function listPersonalGoogleEvents(
+  accessToken: string,
+  opts?: { timeMin?: string; timeMax?: string; maxResults?: number }
+): Promise<ExternalEvent[]> {
+  if (!accessToken) return [];
+
+  const timeMin = opts?.timeMin || new Date(Date.now() - 1000 * 60 * 60 * 24 * 60).toISOString(); // 60d back
+  const timeMax = opts?.timeMax || new Date(Date.now() + 1000 * 60 * 60 * 24 * 365).toISOString(); // 12m forward
+  const maxResults = String(opts?.maxResults ?? 2500);
+
+  const params = new URLSearchParams({
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults,
+    timeMin,
+    timeMax,
+  });
+
+  const url = `${GCAL_BASE}/calendars/${encodeURIComponent(CALENDAR_ID)}/events?${params.toString()}`;
+  const res = await gcalFetch(accessToken, url);
+  const data = await res.json();
+  const items = Array.isArray(data?.items) ? data.items : [];
+
+  const out: ExternalEvent[] = [];
+
+  for (const ev of items) {
+    const priv = ev?.extendedProperties?.private || {};
+    if (priv?.freelanceosJobId) continue; // skip managed events
+
+    const title = String(ev?.summary || "Busy").trim() || "Busy";
+    const link = ev?.htmlLink ? String(ev.htmlLink) : undefined;
+
+    const start = (ev?.start?.dateTime as string) || (ev?.start?.date as string) || null;
+    const end = (ev?.end?.dateTime as string) || (ev?.end?.date as string) || null;
+    if (!start || !end) continue;
+
+    out.push({
+      id: String(ev.id),
+      title,
+      startDate: start.slice(0, 10),
+      endDate: end.slice(0, 10),
+      source: "google",
+      link,
+    } as any);
+  }
+
+  return out;
 }

@@ -45,21 +45,16 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showPreview, setShowPreview] = useState<"invoice" | "quote" | null>(null);
 
-  // used for creating invoice (default job end date)
   const [selectedInvoiceDate, setSelectedInvoiceDate] = useState("");
 
-  // edit invoice date (for existing invoice)
   const [showEditInvoiceDateModal, setShowEditInvoiceDateModal] = useState(false);
   const [editInvoiceDate, setEditInvoiceDate] = useState("");
 
-  // paid date picker
   const [showPaidModal, setShowPaidModal] = useState(false);
   const [paidDate, setPaidDate] = useState<string>(new Date().toISOString().slice(0, 10));
 
-  // mark unpaid modal
   const [showUnpaidModal, setShowUnpaidModal] = useState(false);
 
-  // calendar warning (non-blocking)
   const [calendarWarning, setCalendarWarning] = useState<string | null>(null);
 
   const docRef = useRef<HTMLDivElement>(null);
@@ -94,7 +89,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       const inv = allInvoices.find((i) => i.jobId === foundJob.id) || null;
       setInvoice(inv);
 
-      // invoice date defaults:
       const defaultInvoiceDate = inv?.date || foundJob.endDate || foundJob.startDate || "";
       setSelectedInvoiceDate(defaultInvoiceDate);
       setEditInvoiceDate(inv?.date || defaultInvoiceDate);
@@ -149,7 +143,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
   const normalizeShift = (s: JobShift): JobShift => {
     const startDate = (s as any).startDate || (job as any)?.startDate;
     const endDate = (s as any).endDate || startDate;
-    const isFullDay = (s as any).isFullDay !== false; // default true
+    const isFullDay = (s as any).isFullDay !== false;
 
     return {
       ...s,
@@ -242,22 +236,28 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     }
   };
 
+  /**
+   * ✅ Improved PDF export:
+   * - Adds a safe "page padding" wrapper so text doesn't sit on the edges.
+   * - Captures at higher quality.
+   */
   const handleDownloadPDF = async () => {
     if (!docRef.current || !job || !client) return;
 
     setIsSaving(true);
 
-    // give logo/images a moment to load before canvas snapshot
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 250));
 
     try {
       const element = docRef.current;
 
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 2.5,
         useCORS: true,
         backgroundColor: "#ffffff",
         scrollY: -window.scrollY,
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight,
       });
 
       const imgData = canvas.toDataURL("image/png");
@@ -326,7 +326,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     }
   };
 
-  // Create draft invoice
   const handleCreateInvoice = async () => {
     if (!job || !client || !selectedInvoiceDate) return;
 
@@ -362,7 +361,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     }
   };
 
-  // Edit invoice date (existing)
   const confirmEditInvoiceDate = async () => {
     if (!invoice || !client) return;
     if (!editInvoiceDate) return alert("Please choose an invoice date.");
@@ -385,8 +383,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       await DB.saveInvoice(updated);
       setInvoice(updated);
       setShowEditInvoiceDateModal(false);
-
-      // keep preview date aligned
       setSelectedInvoiceDate(updated.date);
 
       await onRefresh();
@@ -398,7 +394,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     }
   };
 
-  // Mark paid -> invoice PAID + job COMPLETED
   const confirmMarkInvoicePaid = async () => {
     if (!invoice || !job) return;
     if (!paidDate) return alert("Please select the date the payment was made.");
@@ -430,7 +425,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     }
   };
 
-  // Mark unpaid -> clear datePaid, set invoice back to SENT, job back to AWAITING_PAYMENT
   const confirmMarkInvoiceUnpaid = async () => {
     if (!invoice || !job) return;
 
@@ -526,19 +520,27 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
               <div className="flex-1 overflow-y-auto bg-white">
                 <div className="px-4 md:px-6 py-6 bg-white">
                   {/* Printable area */}
-                  <div ref={docRef} className="bg-white">
+                  <div
+                    ref={docRef}
+                    className="bg-white"
+                    style={{
+                      // ✅ Safe A4-ish padding for PDF capture
+                      padding: "28px",
+                    }}
+                  >
                     {/* Top band: logo + FROM */}
                     <div className="flex items-start justify-between gap-6">
-                      <div className="flex items-start gap-4">
+                      <div className="flex items-start gap-5">
                         {logoUrl ? (
                           <img
                             src={logoUrl}
                             alt="Logo"
-                            className="w-14 h-14 rounded-2xl object-contain border border-slate-200 bg-white"
+                            // ✅ at least 2x larger than before (was w-14 h-14)
+                            className="w-28 h-28 rounded-3xl object-contain border border-slate-200 bg-white"
                             crossOrigin="anonymous"
                           />
                         ) : (
-                          <div className="w-14 h-14 rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400 text-xs font-black">
+                          <div className="w-28 h-28 rounded-3xl border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400 text-sm font-black">
                             LOGO
                           </div>
                         )}
@@ -561,8 +563,16 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
                           {(fromReg || fromVat) && (
                             <div className="mt-2 text-[10px] text-slate-500 font-bold space-y-1">
-                              {fromReg && <div>Company Reg: <span className="font-black text-slate-900">{fromReg}</span></div>}
-                              {fromVat && <div>VAT: <span className="font-black text-slate-900">{fromVat}</span></div>}
+                              {fromReg && (
+                                <div>
+                                  Company Reg: <span className="font-black text-slate-900">{fromReg}</span>
+                                </div>
+                              )}
+                              {fromVat && (
+                                <div>
+                                  VAT: <span className="font-black text-slate-900">{fromVat}</span>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -587,7 +597,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                             <div className="mt-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
                               Due Date
                             </div>
-                            <div className="text-sm font-black text-slate-900">{formatDate(invoiceDueDateForDisplay)}</div>
+                            <div className="text-sm font-black text-slate-900">
+                              {formatDate(invoiceDueDateForDisplay)}
+                            </div>
                           </>
                         )}
                       </div>
@@ -610,10 +622,15 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                         <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
                           Job Details
                         </div>
-                        <div className="text-xs font-black text-slate-900">{job.location || "—"}</div>
-                        <div className="text-xs font-bold text-slate-500 mt-1">
+
+                        {/* ✅ show Job Name + Location */}
+                        <div className="text-xs font-black text-slate-900">{job.description || "—"}</div>
+                        <div className="text-[11px] font-bold text-slate-600 mt-1">{job.location || "—"}</div>
+
+                        <div className="text-xs font-bold text-slate-500 mt-2">
                           {formatDate(job.startDate)} → {formatDate(job.endDate)}
                         </div>
+
                         <div className="text-[10px] text-slate-400 mt-2">
                           PO: <span className="font-black text-slate-900">{job.poNumber || "—"}</span>
                         </div>
@@ -654,14 +671,17 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                         <div className="w-full max-w-sm space-y-2">
                           <div className="flex justify-between text-sm font-bold text-slate-500">
                             <span>Subtotal</span>
-                            <span className="font-black text-slate-900">{formatCurrency(totalRecharge, currentUser)}</span>
+                            <span className="font-black text-slate-900">
+                              {formatCurrency(totalRecharge, currentUser)}
+                            </span>
                           </div>
 
                           <div className="flex justify-between text-sm font-bold text-slate-500">
                             <span>Gross</span>
                             <span className="font-black text-slate-900">
                               {formatCurrency(
-                                totalRecharge * (currentUser?.isVatRegistered ? 1 + ((currentUser.taxRate || 20) / 100) : 1),
+                                totalRecharge *
+                                  (currentUser?.isVatRegistered ? 1 + ((currentUser.taxRate || 20) / 100) : 1),
                                 currentUser
                               )}
                             </span>
@@ -735,8 +755,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           </div>
         </div>
       )}
-
-      {/* --- the rest of your component (modals + main page) remains unchanged below --- */}
 
       {/* Edit Invoice Date Modal */}
       {showEditInvoiceDateModal && invoice && client && (
@@ -958,6 +976,17 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg"
               >
                 View Invoice
+              </button>
+
+              {/* ✅ You had the modal but no button to open it */}
+              <button
+                type="button"
+                onClick={() => setShowEditInvoiceDateModal(true)}
+                disabled={isSaving || invoice.status === InvoiceStatus.PAID}
+                className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-black text-[10px] uppercase shadow-sm"
+                title={invoice.status === InvoiceStatus.PAID ? "Cannot edit a paid invoice" : "Edit invoice date"}
+              >
+                Edit Invoice Date
               </button>
 
               {invoice.status !== InvoiceStatus.PAID ? (

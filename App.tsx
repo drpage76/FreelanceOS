@@ -18,7 +18,7 @@ import { Terms } from "./pages/Terms";
 import { CreateJobModal } from "./components/CreateJobModal";
 import { AppState, Tenant, JobStatus, InvoiceStatus, UserPlan, Job, JobItem } from "./types";
 import { DB, getSupabase } from "./services/db";
-import { syncJobToGoogle, deleteJobFromGoogle } from "./services/googleCalendar";
+import { syncJobToGoogle, deleteJobFromGoogle, listPersonalGoogleEvents } from "./services/googleCalendar";
 import { checkSubscriptionStatus } from "./utils";
 
 /**
@@ -132,8 +132,8 @@ const App: React.FC = () => {
   const isReadOnly = useMemo(() => subStatus.isTrialExpired && currentUser?.plan !== UserPlan.ACTIVE, [subStatus, currentUser]);
 
   const getLatestToken = useCallback(async () => {
-  return (await DB.getGoogleAccessToken()) || undefined;
-}, []);
+    return (await DB.getGoogleAccessToken()) || undefined;
+  }, []);
 
   const loadData = useCallback(
     async (forcedUser?: Tenant) => {
@@ -171,6 +171,20 @@ const App: React.FC = () => {
           return job;
         });
 
+        // ✅ NEW: load personal google events into appState.externalEvents
+        let externalEvents: any[] = [];
+        if (token) {
+          try {
+            externalEvents = await listPersonalGoogleEvents(token, {
+              timeMin: new Date(Date.now() - 1000 * 60 * 60 * 24 * 60).toISOString(),
+              timeMax: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365).toISOString(),
+              maxResults: 2500,
+            });
+          } catch (e) {
+            console.warn("[Google personal events fetch failed]", e);
+          }
+        }
+
         setCurrentUser(user);
         setAppState({
           user,
@@ -179,7 +193,7 @@ const App: React.FC = () => {
           quotes: [],
           invoices: getVal(invoices) || [],
           mileage: getVal(mileage) || [],
-          externalEvents: [],
+          externalEvents,
           jobItems: [],
         });
 
