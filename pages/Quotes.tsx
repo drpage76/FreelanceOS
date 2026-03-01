@@ -4,7 +4,7 @@ import { AppState, Quote, QuoteStatus, Client, JobItem, JobStatus, SchedulingTyp
 import { DB, generateId } from '../services/db';
 import { formatCurrency, formatDate, generateJobId } from '../utils';
 // Use direct named imports from react-router to resolve missing export errors in unified environments
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface QuotesProps {
   state: AppState;
