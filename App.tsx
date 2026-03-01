@@ -15,6 +15,7 @@ import { Landing } from "./pages/Landing";
 import { Privacy } from "./pages/Privacy";
 import { Terms } from "./pages/Terms";
 import { Diag } from "./pages/Diag";
+
 import { CreateJobModal } from "./components/CreateJobModal";
 import { AppState, Tenant, JobStatus, InvoiceStatus, UserPlan, Job, JobItem } from "./types";
 import { DB, getSupabase } from "./services/db";
@@ -29,9 +30,26 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     super(props);
     this.state = { hasError: false, error: null };
   }
+
   static getDerivedStateFromError(error: any) {
     return { hasError: true, error };
   }
+
+  private hardReset = () => {
+    /**
+     * ✅ IMPORTANT FOR HASHROUTER:
+     * Never redirect to origin+pathname (it drops "#/...").
+     * Either reload in-place or preserve hash.
+     */
+    try {
+      window.location.reload();
+    } catch {
+      // absolute fallback: preserve existing hash if reload fails
+      window.location.href =
+        window.location.origin + window.location.pathname + window.location.search + (window.location.hash || "#/");
+    }
+  };
+
   render() {
     if (this.state.hasError) {
       return (
@@ -44,7 +62,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
             A technical protocol failure occurred. Your data is safe in the cloud, but the interface needs a hard reset.
           </p>
           <button
-            onClick={() => (window.location.href = window.location.origin + window.location.pathname)}
+            onClick={this.hardReset}
             className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 transition-all"
           >
             Re-Initialize Workspace
@@ -55,6 +73,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
         </div>
       );
     }
+
     return this.props.children;
   }
 }
@@ -123,7 +142,7 @@ const App: React.FC = () => {
   const [isNewJobModalOpen, setIsNewJobModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // ✅ NEW: prevents redirect ping-pong in production
+  // ✅ prevents redirect ping-pong while auth is still settling
   const [authChecked, setAuthChecked] = useState(false);
 
   const hasLoadedOnce = useRef(false);
@@ -267,7 +286,6 @@ const App: React.FC = () => {
       } catch (e) {
         console.warn("[init failed]", e);
       } finally {
-        // ✅ auth is now definitively checked
         setAuthChecked(true);
       }
     };
@@ -302,7 +320,6 @@ const App: React.FC = () => {
           });
         }
 
-        // ✅ ensures router doesn't bounce around before auth is known
         setAuthChecked(true);
       });
 
@@ -336,7 +353,6 @@ const App: React.FC = () => {
     await loadData();
   };
 
-  // ✅ Don't render routes until auth is settled (prevents production redirect loops)
   if (!authChecked) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-6 p-4">
@@ -358,6 +374,7 @@ const App: React.FC = () => {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/diag" element={<Diag />} />
+
           {/* Landing */}
           <Route path="/" element={!currentUser ? <Landing /> : <Navigate to="/dashboard" replace />} />
 
@@ -407,6 +424,7 @@ const App: React.FC = () => {
             <Route path="clients" element={<Clients state={appState} onRefresh={loadData} />} />
             <Route path="invoices" element={<Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
             <Route path="mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
+
             <Route
               path="settings"
               element={
