@@ -69,7 +69,16 @@ const MainLayout: React.FC<{
   clients: any[];
   existingJobs: Job[];
   onSaveJob: (job: Job, items: JobItem[], clientName: string) => Promise<void>;
-}> = ({ isSyncing, currentUser, isReadOnly, isNewJobModalOpen, setIsNewJobModalOpen, clients, existingJobs, onSaveJob }) => {
+}> = ({
+  isSyncing,
+  currentUser,
+  isReadOnly,
+  isNewJobModalOpen,
+  setIsNewJobModalOpen,
+  clients,
+  existingJobs,
+  onSaveJob,
+}) => {
   const location = useLocation();
 
   if (!currentUser) {
@@ -87,7 +96,11 @@ const MainLayout: React.FC<{
           </Link>
         </div>
       )}
-      <main className={`flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar ${isReadOnly ? "pt-12" : ""}`}>
+      <main
+        className={`flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar ${
+          isReadOnly ? "pt-12" : ""
+        }`}
+      >
         <div className="max-w-7xl mx-auto w-full">
           <Outlet />
         </div>
@@ -129,7 +142,10 @@ const App: React.FC = () => {
   });
 
   const subStatus = useMemo(() => checkSubscriptionStatus(currentUser), [currentUser]);
-  const isReadOnly = useMemo(() => subStatus.isTrialExpired && currentUser?.plan !== UserPlan.ACTIVE, [subStatus, currentUser]);
+  const isReadOnly = useMemo(
+    () => subStatus.isTrialExpired && currentUser?.plan !== UserPlan.ACTIVE,
+    [subStatus, currentUser]
+  );
 
   const getLatestToken = useCallback(async () => {
     return (await DB.getGoogleAccessToken()) || undefined;
@@ -171,7 +187,7 @@ const App: React.FC = () => {
           return job;
         });
 
-        // ✅ NEW: load personal google events into appState.externalEvents
+        // ✅ load personal google events into appState.externalEvents
         let externalEvents: any[] = [];
         if (token) {
           try {
@@ -349,7 +365,9 @@ const App: React.FC = () => {
 
           <Route path="/" element={!currentUser ? <Landing /> : <Navigate to="/dashboard" replace />} />
 
+          {/* ✅ FIX: make layout route explicit + add index redirect */}
           <Route
+            path="/"
             element={
               <MainLayout
                 isSyncing={isSyncing}
@@ -363,6 +381,8 @@ const App: React.FC = () => {
               />
             }
           >
+            <Route index element={<Navigate to="/dashboard" replace />} />
+
             <Route
               path="dashboard"
               element={
@@ -371,9 +391,11 @@ const App: React.FC = () => {
                   onNewJobClick={() => !isReadOnly && setIsNewJobModalOpen(true)}
                   onSyncCalendar={handleSyncAll}
                   isSyncing={isSyncing}
+                  googleAccessToken={googleAccessToken}
                 />
               }
             />
+
             <Route
               path="jobs"
               element={
@@ -385,9 +407,14 @@ const App: React.FC = () => {
               }
             />
             <Route path="jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
+
             <Route path="clients" element={<Clients state={appState} onRefresh={loadData} />} />
-            <Route path="invoices" element={<Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
+            <Route
+              path="invoices"
+              element={<Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} />}
+            />
             <Route path="mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
+
             <Route
               path="settings"
               element={

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppState, JobStatus, InvoiceStatus, Invoice, Job, Client } from '../types';
 import { formatCurrency, formatDate, calculateDueDate } from '../utils';
 import { STATUS_COLORS } from '../constants';

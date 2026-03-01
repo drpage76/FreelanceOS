@@ -77,21 +77,28 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
   const [googlePersonalEvents, setGooglePersonalEvents] = useState<ExternalEvent[]>([]);
   const navigate = useNavigate();
 
-  const days = getCalendarDays(currentDate);
+  // compute days for rendering calendar grid (kept as memo so UI rendering is stable)
+  const days = useMemo(() => getCalendarDays(currentDate), [currentDate]);
 
   useEffect(() => {
+    // NOTE: don't depend on `days` here directly (it can be a new array identity each render).
+    // Instead, compute a local grid to derive timeMin/timeMax. This avoids a repeated-effect loop.
     let cancelled = false;
 
     const run = async () => {
       if (!googleAccessToken) {
-        setGooglePersonalEvents([]);
+        if (!cancelled) setGooglePersonalEvents([]);
         return;
       }
 
       try {
-        const gridStart = days?.[0];
-        const gridEnd = days?.[days.length - 1];
-        if (!gridStart || !gridEnd) return;
+        const localDays = getCalendarDays(currentDate);
+        const gridStart = localDays?.[0];
+        const gridEnd = localDays?.[localDays.length - 1];
+        if (!gridStart || !gridEnd) {
+          if (!cancelled) setGooglePersonalEvents([]);
+          return;
+        }
 
         const timeMin = new Date(
           Date.UTC(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate(), 0, 0, 0)
@@ -119,7 +126,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
         });
 
         if (!res.ok) {
-          setGooglePersonalEvents([]);
+          if (!cancelled) setGooglePersonalEvents([]);
           return;
         }
 
@@ -151,7 +158,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
               link: ev?.htmlLink ? String(ev.htmlLink) : undefined,
               color,
               timeLabel: safeTimeLabelFromGoogleEvent(ev),
-            } as any;
+            } as ExternalEvent;
           })
           .filter(Boolean) as ExternalEvent[];
 
@@ -162,10 +169,12 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     };
 
     run();
+
     return () => {
       cancelled = true;
     };
-  }, [googleAccessToken, currentDate, days]); // ✅ include days so the visible grid always refreshes
+    // only depend on stable values
+  }, [googleAccessToken, currentDate]);
 
   const weeks = useMemo(() => {
     const weeksList: Date[][] = [];
@@ -226,7 +235,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     const combinedExternal = [...(externalEvents || []), ...(googlePersonalEvents || [])];
 
     (combinedExternal || []).forEach((e) => {
-      const title = e.title || "";
+      const title = (e as any).title || "";
 
       const refMatch = title.match(/\(Ref:\s*([a-zA-Z0-9-]+)\)/i) || title.match(/#([a-zA-Z0-9-]+)/);
       if (refMatch) {
@@ -234,18 +243,18 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
         if (allInternalJobIds.has(matchedId)) return;
       }
 
-      const sDate = e.startDate ? parseISO(e.startDate) : null;
+      const sDate = (e as any).startDate ? parseISO((e as any).startDate) : null;
       if (sDate && isValid(sDate)) {
-        let endDate = e.endDate;
+        let endDate = (e as any).endDate;
 
-        if (e.source === "google" && e.startDate !== e.endDate) {
-          const endISO = parseISO(e.endDate);
+        if ((e as any).source === "google" && (e as any).startDate !== (e as any).endDate) {
+          const endISO = parseISO((e as any).endDate);
           if (isValid(endISO)) {
             endDate = format(subDays(endISO, 1), "yyyy-MM-dd");
           }
         }
 
-        entries.push({ ...e, endDate, type: "external" });
+        entries.push({ ...(e as any), endDate, type: "external" });
       }
     });
 
