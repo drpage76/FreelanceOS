@@ -77,7 +77,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
   const [googlePersonalEvents, setGooglePersonalEvents] = useState<ExternalEvent[]>([]);
   const navigate = useNavigate();
 
-  // ✅ FIX: memoize days so it doesn't change identity every render
+  // ✅ CRITICAL FIX: memoize days so it doesn't change on every render
   const days = useMemo(() => getCalendarDays(currentDate), [currentDate]);
 
   useEffect(() => {
@@ -94,8 +94,12 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
         const gridEnd = days?.[days.length - 1];
         if (!gridStart || !gridEnd) return;
 
-        const timeMin = new Date(Date.UTC(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate(), 0, 0, 0)).toISOString();
-        const timeMax = new Date(Date.UTC(gridEnd.getFullYear(), gridEnd.getMonth(), gridEnd.getDate(), 23, 59, 59)).toISOString();
+        const timeMin = new Date(
+          Date.UTC(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate(), 0, 0, 0)
+        ).toISOString();
+        const timeMax = new Date(
+          Date.UTC(gridEnd.getFullYear(), gridEnd.getMonth(), gridEnd.getDate(), 23, 59, 59)
+        ).toISOString();
 
         const params = new URLSearchParams({
           timeMin,
@@ -160,7 +164,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     return () => {
       cancelled = true;
     };
-  }, [googleAccessToken, days]); // ✅ days is now memoized, safe dependency
+  }, [googleAccessToken, days]); // ✅ days is now stable (memoized)
 
   const weeks = useMemo(() => {
     const weeksList: Date[][] = [];
