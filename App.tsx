@@ -88,6 +88,7 @@ const MainLayout: React.FC<{
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-slate-50 overflow-hidden relative">
       <Navigation isSyncing={isSyncing} user={currentUser} />
+
       {isReadOnly && (
         <div className="fixed top-0 left-0 right-0 bg-rose-600 text-white py-2 text-center z-[200] text-[10px] font-black uppercase tracking-[0.2em] shadow-lg">
           Trial Period Expired. Access is currently Read-Only.{" "}
@@ -96,11 +97,8 @@ const MainLayout: React.FC<{
           </Link>
         </div>
       )}
-      <main
-        className={`flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar ${
-          isReadOnly ? "pt-12" : ""
-        }`}
-      >
+
+      <main className={`flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar ${isReadOnly ? "pt-12" : ""}`}>
         <div className="max-w-7xl mx-auto w-full">
           <Outlet />
         </div>
@@ -187,7 +185,6 @@ const App: React.FC = () => {
           return job;
         });
 
-        // ✅ load personal google events into appState.externalEvents
         let externalEvents: any[] = [];
         if (token) {
           try {
@@ -360,14 +357,16 @@ const App: React.FC = () => {
     <ErrorBoundary>
       <HashRouter>
         <Routes>
+          {/* Public pages */}
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
 
+          {/* Landing */}
           <Route path="/" element={!currentUser ? <Landing /> : <Navigate to="/dashboard" replace />} />
 
-          {/* ✅ FIX: make layout route explicit + add index redirect */}
+          {/* ✅ IMPORTANT: Protected app lives under /* so it doesn't collide with "/" */}
           <Route
-            path="/"
+            path="/*"
             element={
               <MainLayout
                 isSyncing={isSyncing}
@@ -409,12 +408,8 @@ const App: React.FC = () => {
             <Route path="jobs/:id" element={<JobDetails onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
 
             <Route path="clients" element={<Clients state={appState} onRefresh={loadData} />} />
-            <Route
-              path="invoices"
-              element={<Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} />}
-            />
+            <Route path="invoices" element={<Invoices state={appState} onRefresh={loadData} googleAccessToken={googleAccessToken} />} />
             <Route path="mileage" element={<Mileage state={appState} onRefresh={loadData} />} />
-
             <Route
               path="settings"
               element={
