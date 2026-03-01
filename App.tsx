@@ -14,7 +14,7 @@ import { Settings } from "./pages/Settings";
 import { Landing } from "./pages/Landing";
 import { Privacy } from "./pages/Privacy";
 import { Terms } from "./pages/Terms";
-
+import { Diag } from "./pages/Diag";
 import { CreateJobModal } from "./components/CreateJobModal";
 import { AppState, Tenant, JobStatus, InvoiceStatus, UserPlan, Job, JobItem } from "./types";
 import { DB, getSupabase } from "./services/db";
@@ -357,7 +357,7 @@ const App: React.FC = () => {
           {/* Public pages */}
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
-
+          <Route path="/diag" element={<Diag />} />
           {/* Landing */}
           <Route path="/" element={!currentUser ? <Landing /> : <Navigate to="/dashboard" replace />} />
 
