@@ -77,35 +77,25 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
   const [googlePersonalEvents, setGooglePersonalEvents] = useState<ExternalEvent[]>([]);
   const navigate = useNavigate();
 
-  // compute days for rendering calendar grid (kept as memo so UI rendering is stable)
+  // ✅ FIX: memoize days so it doesn't change identity every render
   const days = useMemo(() => getCalendarDays(currentDate), [currentDate]);
 
   useEffect(() => {
-    // NOTE: don't depend on `days` here directly (it can be a new array identity each render).
-    // Instead, compute a local grid to derive timeMin/timeMax. This avoids a repeated-effect loop.
     let cancelled = false;
 
     const run = async () => {
       if (!googleAccessToken) {
-        if (!cancelled) setGooglePersonalEvents([]);
+        setGooglePersonalEvents([]);
         return;
       }
 
       try {
-        const localDays = getCalendarDays(currentDate);
-        const gridStart = localDays?.[0];
-        const gridEnd = localDays?.[localDays.length - 1];
-        if (!gridStart || !gridEnd) {
-          if (!cancelled) setGooglePersonalEvents([]);
-          return;
-        }
+        const gridStart = days?.[0];
+        const gridEnd = days?.[days.length - 1];
+        if (!gridStart || !gridEnd) return;
 
-        const timeMin = new Date(
-          Date.UTC(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate(), 0, 0, 0)
-        ).toISOString();
-        const timeMax = new Date(
-          Date.UTC(gridEnd.getFullYear(), gridEnd.getMonth(), gridEnd.getDate(), 23, 59, 59)
-        ).toISOString();
+        const timeMin = new Date(Date.UTC(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate(), 0, 0, 0)).toISOString();
+        const timeMax = new Date(Date.UTC(gridEnd.getFullYear(), gridEnd.getMonth(), gridEnd.getDate(), 23, 59, 59)).toISOString();
 
         const params = new URLSearchParams({
           timeMin,
@@ -145,9 +135,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
             const endDate = safeISODateFromGoogleEvent(ev, "end") || startDate;
             if (!startDate) return null;
 
-            const color =
-              (ev?.colorId && GOOGLE_COLOR_ID_MAP[String(ev.colorId)]) ||
-              "#6366f1";
+            const color = (ev?.colorId && GOOGLE_COLOR_ID_MAP[String(ev.colorId)]) || "#6366f1";
 
             return {
               id: String(ev.id || `${startDate}-${Math.random()}`),
@@ -158,7 +146,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
               link: ev?.htmlLink ? String(ev.htmlLink) : undefined,
               color,
               timeLabel: safeTimeLabelFromGoogleEvent(ev),
-            } as ExternalEvent;
+            } as any;
           })
           .filter(Boolean) as ExternalEvent[];
 
@@ -169,12 +157,10 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     };
 
     run();
-
     return () => {
       cancelled = true;
     };
-    // only depend on stable values
-  }, [googleAccessToken, currentDate]);
+  }, [googleAccessToken, days]); // ✅ days is now memoized, safe dependency
 
   const weeks = useMemo(() => {
     const weeksList: Date[][] = [];
@@ -235,7 +221,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
     const combinedExternal = [...(externalEvents || []), ...(googlePersonalEvents || [])];
 
     (combinedExternal || []).forEach((e) => {
-      const title = (e as any).title || "";
+      const title = e.title || "";
 
       const refMatch = title.match(/\(Ref:\s*([a-zA-Z0-9-]+)\)/i) || title.match(/#([a-zA-Z0-9-]+)/);
       if (refMatch) {
@@ -243,18 +229,18 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
         if (allInternalJobIds.has(matchedId)) return;
       }
 
-      const sDate = (e as any).startDate ? parseISO((e as any).startDate) : null;
+      const sDate = e.startDate ? parseISO(e.startDate) : null;
       if (sDate && isValid(sDate)) {
-        let endDate = (e as any).endDate;
+        let endDate = e.endDate;
 
-        if ((e as any).source === "google" && (e as any).startDate !== (e as any).endDate) {
-          const endISO = parseISO((e as any).endDate);
+        if (e.source === "google" && e.startDate !== e.endDate) {
+          const endISO = parseISO(e.endDate);
           if (isValid(endISO)) {
             endDate = format(subDays(endISO, 1), "yyyy-MM-dd");
           }
         }
 
-        entries.push({ ...(e as any), endDate, type: "external" });
+        entries.push({ ...e, endDate, type: "external" });
       }
     });
 
