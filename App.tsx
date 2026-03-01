@@ -122,7 +122,9 @@ const App: React.FC = () => {
   const [googleAccessToken, setGoogleAccessToken] = useState<string | undefined>(undefined);
   const [isNewJobModalOpen, setIsNewJobModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+
+  // ✅ NEW: prevents redirect ping-pong in production
+  const [authChecked, setAuthChecked] = useState(false);
 
   const hasLoadedOnce = useRef(false);
   const syncInProgress = useRef(false);
@@ -160,7 +162,6 @@ const App: React.FC = () => {
         if (!user) {
           setAppState((prev) => ({ ...prev, user: null }));
           setCurrentUser(null);
-          setIsLoading(false);
           syncInProgress.current = false;
           return;
         }
@@ -216,7 +217,6 @@ const App: React.FC = () => {
       } finally {
         setIsSyncing(false);
         syncInProgress.current = false;
-        setIsLoading(false);
       }
     },
     [getLatestToken]
@@ -256,8 +256,6 @@ const App: React.FC = () => {
     if (initializationStarted.current) return;
     initializationStarted.current = true;
 
-    const safetyTimeout = setTimeout(() => setIsLoading(false), 8000);
-
     const init = async () => {
       try {
         await DB.initializeSession();
@@ -265,15 +263,15 @@ const App: React.FC = () => {
         if (user) {
           setCurrentUser(user);
           await loadData(user);
-        } else {
-          setIsLoading(false);
         }
-      } catch {
-        setIsLoading(false);
+      } catch (e) {
+        console.warn("[init failed]", e);
       } finally {
-        clearTimeout(safetyTimeout);
+        // ✅ auth is now definitively checked
+        setAuthChecked(true);
       }
     };
+
     init();
 
     const client = getSupabase();
@@ -281,11 +279,11 @@ const App: React.FC = () => {
       const {
         data: { subscription },
       } = (client.auth as any).onAuthStateChange(async (event: string) => {
-        if (event === "SIGNED_IN" && !hasLoadedOnce.current) {
+        if (event === "SIGNED_IN") {
           const user = await DB.getCurrentUser();
           if (user) {
             setCurrentUser(user);
-            loadData(user);
+            if (!hasLoadedOnce.current) loadData(user);
           }
         }
 
@@ -302,17 +300,14 @@ const App: React.FC = () => {
             invoices: [],
             mileage: [],
           });
-          setIsLoading(false);
         }
+
+        // ✅ ensures router doesn't bounce around before auth is known
+        setAuthChecked(true);
       });
 
-      return () => {
-        clearTimeout(safetyTimeout);
-        subscription.unsubscribe();
-      };
+      return () => subscription.unsubscribe();
     }
-
-    return () => clearTimeout(safetyTimeout);
   }, [loadData]);
 
   const handleSaveNewJob = async (job: Job, items: JobItem[], clientName: string) => {
@@ -341,7 +336,8 @@ const App: React.FC = () => {
     await loadData();
   };
 
-  if (isLoading)
+  // ✅ Don't render routes until auth is settled (prevents production redirect loops)
+  if (!authChecked) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-6 p-4">
         <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
@@ -352,6 +348,7 @@ const App: React.FC = () => {
         </div>
       </div>
     );
+  }
 
   return (
     <ErrorBoundary>
@@ -364,7 +361,7 @@ const App: React.FC = () => {
           {/* Landing */}
           <Route path="/" element={!currentUser ? <Landing /> : <Navigate to="/dashboard" replace />} />
 
-          {/* ✅ IMPORTANT: Protected app lives under /* so it doesn't collide with "/" */}
+          {/* Protected app */}
           <Route
             path="/*"
             element={
