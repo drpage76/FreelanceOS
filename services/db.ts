@@ -17,13 +17,12 @@ const LOCAL_STORAGE_KEY = "freelance_os_local_data_v4";
 const DELETED_ITEMS_KEY = "freelance_os_deleted_ids";
 const LOCAL_USER_EMAIL = "local@freelanceos.internal";
 
-// ✅ cache the signed-in email to prevent auth “blink” -> landing loops
+// ✅ cache the signed-in email (ONLY safe for offline mode)
 const TENANT_CACHE_KEY = "FO_TENANT_ID";
 
 // ✅ cache last good Google provider token (helps when session “blinks”)
 const GOOGLE_TOKEN_CACHE_KEY = "FO_GOOGLE_PROVIDER_TOKEN";
 
-// Keep your map (trim/extend as needed)
 const FIELD_MAP: Record<string, string> = {
   // Tenant
   email: "email",
@@ -48,14 +47,14 @@ const FIELD_MAP: Record<string, string> = {
   plan: "plan",
   paymentTermsDays: "payment_terms_days",
 
-  // ✅ Bank details (tenants table)
+  // Bank details (tenants table)
   accountName: "account_name",
   accountNumber: "account_number",
 
-  // ✅ FIX: your UI uses sortCodeOrIBAN, DB column is sort_code_iban
+  // UI uses sortCodeOrIBAN, DB column is sort_code_iban
   sortCodeOrIBAN: "sort_code_iban",
 
-  // ✅ Backwards compat (if any older code used this key)
+  // Backwards compat
   sortCodeIban: "sort_code_iban",
   sortCodeIbanSwift: "sort_code_iban",
 
@@ -95,9 +94,7 @@ const FIELD_MAP: Record<string, string> = {
 
 export const generateId = () => crypto.randomUUID();
 
-const inverseMap = Object.fromEntries(
-  Object.entries(FIELD_MAP).map(([k, v]) => [v, k])
-);
+const inverseMap = Object.fromEntries(Object.entries(FIELD_MAP).map(([k, v]) => [v, k]));
 
 // ---- Better Supabase error printing + throwing
 const formatPgError = (err: any) => {
@@ -272,24 +269,18 @@ export const getSupabase = (): SupabaseClient => supabase;
 
 export const DB = {
   isCloudConfigured: () =>
-    !!import.meta.env.VITE_SUPABASE_URL &&
-    !!import.meta.env.VITE_SUPABASE_ANON_KEY,
+    !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY,
 
   // Navigation.tsx expects this to exist
   testConnection: async (): Promise<{ success: boolean; message?: string }> => {
     try {
-      if (!DB.isCloudConfigured())
-        return { success: false, message: "Not configured" };
+      if (!DB.isCloudConfigured()) return { success: false, message: "Not configured" };
 
       const { data } = await getSupabase().auth.getSession();
       const email = data?.session?.user?.email;
       if (!email) return { success: false, message: "No session" };
 
-      const { error } = await getSupabase()
-        .from("tenants")
-        .select("email")
-        .eq("email", email)
-        .limit(1);
+      const { error } = await getSupabase().from("tenants").select("email").eq("email", email).limit(1);
 
       if (error) return { success: false, message: error.message };
       return { success: true };
@@ -299,50 +290,47 @@ export const DB = {
   },
 
   /**
-   * ✅ Refresh session best-effort (prevents stale provider_token issues)
+   * Refresh session best-effort
    */
   refreshAuthSession: async (): Promise<void> => {
     try {
       const client = getSupabase();
-      // refreshSession may throw depending on auth state — keep it safe
       await (client.auth as any).refreshSession?.();
     } catch {}
   },
 
   /**
-   * ✅ Bulletproof Google access token retrieval.
-   * - Uses current session.provider_token if present
-   * - Tries refreshSession() if missing
-   * - Falls back to cached provider token to avoid “blink” failures
+   * Google token retrieval (session -> refresh -> cached)
    */
   getGoogleAccessToken: async (): Promise<string | null> => {
     try {
       const client = getSupabase();
 
-      // 1) try existing session
       const s1 = await client.auth.getSession();
       const token1 = (s1?.data?.session as any)?.provider_token as string | undefined;
       const email1 = s1?.data?.session?.user?.email || null;
 
+      // ✅ only cache tenant id when an ACTIVE session exists
       if (email1) setCachedTenantId(email1);
+
       if (token1) {
         setCachedGoogleToken(token1);
         return token1;
       }
 
-      // 2) try refresh session (often fixes “works in incognito only”)
       await DB.refreshAuthSession();
       const s2 = await client.auth.getSession();
       const token2 = (s2?.data?.session as any)?.provider_token as string | undefined;
       const email2 = s2?.data?.session?.user?.email || null;
 
       if (email2) setCachedTenantId(email2);
+
       if (token2) {
         setCachedGoogleToken(token2);
         return token2;
       }
 
-      // 3) fallback to cached token (last known good)
+      // fallback token is OK (doesn't imply signed-in user)
       return getCachedGoogleToken();
     } catch {
       return getCachedGoogleToken();
@@ -353,12 +341,19 @@ export const DB = {
     clearCachedGoogleToken();
   },
 
-  // stable tenant id retrieval (session -> cache -> null)
+  /**
+   * ✅ FIXED: tenant id retrieval
+   * - If cloud is configured: ONLY return email from a real session
+   * - If cloud is NOT configured: allow cached/offline tenant id
+   */
   getTenantId: async (): Promise<string | null> => {
+    const cloud = DB.isCloudConfigured();
+
     try {
       const client = getSupabase();
-
       const { data, error } = await client.auth.getSession();
+
+      // if we have a real session, use it
       if (!error) {
         const email = data?.session?.user?.email || null;
         if (email) {
@@ -366,23 +361,28 @@ export const DB = {
           return email;
         }
       }
-
-      const cached = getCachedTenantId();
-      if (cached) return cached;
-
-      return null;
     } catch {
-      const cached = getCachedTenantId();
-      return cached || null;
+      // ignore
     }
+
+    // ✅ CRITICAL: do NOT “ghost login” from cache when cloud exists
+    if (cloud) return null;
+
+    // offline mode: ok to use cached tenant
+    const cached = getCachedTenantId();
+    return cached || null;
   },
 
-  // caches email when session exists
+  /**
+   * caches email when session exists
+   */
   initializeSession: async () => {
     try {
       const client = getSupabase();
       const { data } = await client.auth.getSession();
       const email = data?.session?.user?.email || null;
+
+      // ✅ only cache if session exists
       if (email) setCachedTenantId(email);
 
       const token = (data?.session as any)?.provider_token as string | undefined;
@@ -399,7 +399,7 @@ export const DB = {
     const localData = getLocalData();
     let localList = (localData as any)[table] || [];
 
-    const effectiveId = await DB.getTenantId(); // email when signed in
+    const effectiveId = await DB.getTenantId(); // email when signed in (real session only)
     const tenantId = effectiveId || LOCAL_USER_EMAIL;
     const deletedIds = getDeletedIds();
 
@@ -424,8 +424,7 @@ export const DB = {
     if (method === "upsert" && payload) {
       const raw = Array.isArray(payload) ? payload : [payload];
       raw.forEach((p) => {
-        const item =
-          table === "tenants" ? { ...p } : { ...p, tenant_id: tenantId };
+        const item = table === "tenants" ? { ...p } : { ...p, tenant_id: tenantId };
 
         const pk = table === "tenants" ? "email" : "id";
         const idx = localList.findIndex((i: any) => i[pk] === item[pk]);
@@ -444,17 +443,14 @@ export const DB = {
 
       (localData as any)[table] = localList.filter((item: any) => {
         if (filter?.id) return item[pk] !== filter.id;
-        if (filter?.jobId)
-          return (
-            item["jobId"] !== filter.jobId && item["job_id"] !== filter.jobId
-          );
+        if (filter?.jobId) return item["jobId"] !== filter.jobId && item["job_id"] !== filter.jobId;
         return true;
       });
 
       saveLocalData(localData);
     }
 
-    // ----- CLOUD (only if signed in)
+    // ----- CLOUD (only if signed in AND cloud configured)
     if (DB.isCloudConfigured() && effectiveId) {
       const client = getSupabase();
       const query = client.from(table);
@@ -464,10 +460,7 @@ export const DB = {
         const mapped = raw.map((p) => toDb(table, p, effectiveId));
         const conflictKey = table === "tenants" ? "email" : "id";
 
-        const { data, error } = await query
-          .upsert(mapped, { onConflict: conflictKey })
-          .select("*");
-
+        const { data, error } = await query.upsert(mapped, { onConflict: conflictKey }).select("*");
         if (error) logAndThrow(`upsert:${table}`, error);
         return (data || []).map(fromDb);
       }
@@ -484,11 +477,7 @@ export const DB = {
           const { error } = await q;
           if (error) logAndThrow(`delete:${table}`, error);
         } else if (filter?.jobId) {
-          const { error } = await query
-            .delete()
-            .eq("job_id", filter.jobId)
-            .eq("tenant_id", effectiveId);
-
+          const { error } = await query.delete().eq("job_id", filter.jobId).eq("tenant_id", effectiveId);
           if (error) logAndThrow(`delete:${table}`, error);
         }
 
@@ -520,10 +509,7 @@ export const DB = {
             const pk = table === "tenants" ? "email" : "id";
 
             localFiltered.forEach((localItem: any) => {
-              if (
-                !merged.find((r: any) => r[pk] === localItem[pk]) &&
-                !deletedIds.has(localItem[pk])
-              ) {
+              if (!merged.find((r: any) => r[pk] === localItem[pk]) && !deletedIds.has(localItem[pk])) {
                 merged.push(localItem);
               }
             });
@@ -544,29 +530,31 @@ export const DB = {
     return payload || [];
   },
 
-  // loop-fix user loader
+  /**
+   * ✅ FIXED: only return a user if we truly have a session (in cloud mode)
+   * Prevents “ghost user” creation which causes redirect loops.
+   */
   getCurrentUser: async (): Promise<Tenant | null> => {
+    const cloud = DB.isCloudConfigured();
     const email = await DB.getTenantId();
+
+    if (cloud && !email) return null;
     if (!email) return null;
 
     try {
-      const { data, error } = await getSupabase()
-        .from("tenants")
-        .select("*")
-        .eq("email", email)
-        .maybeSingle();
+      const { data, error } = await getSupabase().from("tenants").select("*").eq("email", email).maybeSingle();
 
-      if (!error && data) {
-        return fromDb(data) as Tenant;
-      }
+      if (!error && data) return fromDb(data) as Tenant;
 
-      if (error) {
-        console.warn("[DB.getCurrentUser] tenants read failed:", formatPgError(error));
-      }
+      if (error) console.warn("[DB.getCurrentUser] tenants read failed:", formatPgError(error));
     } catch (e) {
       console.warn("[DB.getCurrentUser] tenants read threw:", e);
     }
 
+    // If cloud is enabled but tenant row doesn't exist (RLS/missing seed), do NOT create a ghost user.
+    if (cloud) return null;
+
+    // Offline fallback
     const fallback: Tenant = {
       email,
       name: email.split("@")[0],
@@ -590,7 +578,7 @@ export const DB = {
     try {
       await DB.updateTenant(fallback);
     } catch (e) {
-      console.warn("[DB.getCurrentUser] updateTenant failed (RLS?):", e);
+      console.warn("[DB.getCurrentUser] updateTenant failed (offline):", e);
     }
 
     return fallback;
@@ -620,7 +608,6 @@ export const DB = {
     await DB.saveShifts(j.id, (j as any).shifts || []);
 
     const prepared: Job = { ...j, tenant_id: (j as any).tenant_id || tenantId } as any;
-
     return DB.call("jobs", "upsert", prepared);
   },
 
@@ -631,8 +618,7 @@ export const DB = {
     await DB.call("invoices", "delete", null, { jobId: id });
   },
 
-  getShifts: async (jobId: string) =>
-    DB.call("job_shifts", "select", null, { jobId }).then((r) => r || []),
+  getShifts: async (jobId: string) => DB.call("job_shifts", "select", null, { jobId }).then((r) => r || []),
 
   saveShifts: async (jobId: string, shifts: JobShift[]) => {
     await DB.call("job_shifts", "delete", null, { jobId });
@@ -644,16 +630,14 @@ export const DB = {
   },
 
   // Job items
-  getJobItems: async (jobId: string) =>
-    DB.call("job_items", "select", null, { jobId }).then((r) => r || []),
+  getJobItems: async (jobId: string) => DB.call("job_items", "select", null, { jobId }).then((r) => r || []),
 
   saveJobItems: async (jobId: string, items: JobItem[]) => {
     await DB.call("job_items", "delete", null, { jobId });
     await DB.call("job_items", "upsert", items);
   },
 
-  deleteJobItem: async (id: string) =>
-    DB.call("job_items", "delete", null, { id }),
+  deleteJobItem: async (id: string) => DB.call("job_items", "delete", null, { id }),
 
   // Quotes
   getQuotes: async () => DB.call("quotes", "select").then((r) => r || []),
