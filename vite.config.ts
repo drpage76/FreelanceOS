@@ -7,7 +7,7 @@ export default defineConfig({
 
   // If you deploy under a subpath, set base accordingly.
   // For normal root hosting (freelanceos.org), this is fine:
-  base: "/",
+  base: "./",
 
   server: {
     port: 5173,
