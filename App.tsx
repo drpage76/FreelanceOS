@@ -22,9 +22,7 @@ import { DB, getSupabase } from "./services/db";
 import { syncJobToGoogle, deleteJobFromGoogle, listPersonalGoogleEvents } from "./services/googleCalendar";
 import { checkSubscriptionStatus } from "./utils";
 
-/**
- * Error Boundary Component to prevent Blank Screens
- */
+/** Error Boundary Component to prevent Blank Screens */
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: any }> {
   constructor(props: any) {
     super(props);
@@ -36,15 +34,9 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 
   private hardReset = () => {
-    /**
-     * ✅ IMPORTANT FOR HASHROUTER:
-     * Never redirect to origin+pathname (it drops "#/...").
-     * Either reload in-place or preserve hash.
-     */
     try {
       window.location.reload();
     } catch {
-      // absolute fallback: preserve existing hash if reload fails
       window.location.href =
         window.location.origin + window.location.pathname + window.location.search + (window.location.hash || "#/");
     }
@@ -78,10 +70,34 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 }
 
-// Layout Wrapper
+/** ✅ SAFE AUTH GATE */
+const AuthGate: React.FC<{
+  authChecked: boolean;
+  currentUser: Tenant | null;
+  children: React.ReactNode;
+}> = ({ authChecked, currentUser, children }) => {
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-6 p-4">
+        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="text-center">
+          <p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">
+            Establishing Secure Workspace
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) return <Landing />;
+
+  return <>{children}</>;
+};
+
+// Layout Wrapper (NO redirects here)
 const MainLayout: React.FC<{
   isSyncing: boolean;
-  currentUser: Tenant | null;
+  currentUser: Tenant;
   isReadOnly: boolean;
   isNewJobModalOpen: boolean;
   setIsNewJobModalOpen: (open: boolean) => void;
@@ -98,12 +114,6 @@ const MainLayout: React.FC<{
   existingJobs,
   onSaveJob,
 }) => {
-  const location = useLocation();
-
-  if (!currentUser) {
-    return <Navigate to="/" state={{ from: location }} replace />;
-  }
-
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-slate-50 overflow-hidden relative">
       <Navigation isSyncing={isSyncing} user={currentUser} />
@@ -117,7 +127,11 @@ const MainLayout: React.FC<{
         </div>
       )}
 
-      <main className={`flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar ${isReadOnly ? "pt-12" : ""}`}>
+      <main
+        className={`flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 custom-scrollbar ${
+          isReadOnly ? "pt-12" : ""
+        }`}
+      >
         <div className="max-w-7xl mx-auto w-full">
           <Outlet />
         </div>
@@ -142,7 +156,6 @@ const App: React.FC = () => {
   const [isNewJobModalOpen, setIsNewJobModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // ✅ prevents redirect ping-pong while auth is still settling
   const [authChecked, setAuthChecked] = useState(false);
 
   const hasLoadedOnce = useRef(false);
@@ -170,6 +183,15 @@ const App: React.FC = () => {
     return (await DB.getGoogleAccessToken()) || undefined;
   }, []);
 
+  const stripOAuthCodeFromUrl = useCallback(() => {
+    // ✅ Keep hash routes (HashRouter), but remove ?code=... once session established
+    if (window.location.search && window.location.search.includes("code=")) {
+      const cleanUrl =
+        window.location.origin + window.location.pathname + (window.location.hash || "#/");
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+  }, []);
+
   const loadData = useCallback(
     async (forcedUser?: Tenant) => {
       if (syncInProgress.current) return;
@@ -181,7 +203,6 @@ const App: React.FC = () => {
         if (!user) {
           setAppState((prev) => ({ ...prev, user: null }));
           setCurrentUser(null);
-          syncInProgress.current = false;
           return;
         }
 
@@ -263,7 +284,6 @@ const App: React.FC = () => {
         }
       }
 
-      syncInProgress.current = false;
       await loadData(currentUser);
     } catch (e) {
       console.error(e);
@@ -278,6 +298,10 @@ const App: React.FC = () => {
     const init = async () => {
       try {
         await DB.initializeSession();
+
+        // ✅ clean up the URL once session exchange is done
+        stripOAuthCodeFromUrl();
+
         const user = await DB.getCurrentUser();
         if (user) {
           setCurrentUser(user);
@@ -297,35 +321,39 @@ const App: React.FC = () => {
       const {
         data: { subscription },
       } = (client.auth as any).onAuthStateChange(async (event: string) => {
-        if (event === "SIGNED_IN") {
-          const user = await DB.getCurrentUser();
-          if (user) {
-            setCurrentUser(user);
-            if (!hasLoadedOnce.current) loadData(user);
+        try {
+          if (event === "SIGNED_IN") {
+            stripOAuthCodeFromUrl();
+
+            const user = await DB.getCurrentUser();
+            if (user) {
+              setCurrentUser(user);
+              if (!hasLoadedOnce.current) await loadData(user);
+            }
           }
-        }
 
-        if (event === "SIGNED_OUT") {
-          setCurrentUser(null);
-          hasLoadedOnce.current = false;
-          setAppState({
-            user: null,
-            clients: [],
-            jobs: [],
-            quotes: [],
-            externalEvents: [],
-            jobItems: [],
-            invoices: [],
-            mileage: [],
-          });
+          if (event === "SIGNED_OUT") {
+            setCurrentUser(null);
+            hasLoadedOnce.current = false;
+            setAppState({
+              user: null,
+              clients: [],
+              jobs: [],
+              quotes: [],
+              externalEvents: [],
+              jobItems: [],
+              invoices: [],
+              mileage: [],
+            });
+          }
+        } finally {
+          setAuthChecked(true);
         }
-
-        setAuthChecked(true);
       });
 
       return () => subscription.unsubscribe();
     }
-  }, [loadData]);
+  }, [loadData, stripOAuthCodeFromUrl]);
 
   const handleSaveNewJob = async (job: Job, items: JobItem[], clientName: string) => {
     if (isReadOnly) {
@@ -353,48 +381,36 @@ const App: React.FC = () => {
     await loadData();
   };
 
-  if (!authChecked) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-6 p-4">
-        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-        <div className="text-center">
-          <p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">
-            Establishing Secure Workspace
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <ErrorBoundary>
       <HashRouter>
         <Routes>
-          {/* Public pages */}
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/diag" element={<Diag />} />
 
-          {/* Landing */}
-          <Route path="/" element={!currentUser ? <Landing /> : <Navigate to="/dashboard" replace />} />
-
-          {/* Protected app */}
           <Route
             path="/*"
             element={
-              <MainLayout
-                isSyncing={isSyncing}
-                currentUser={currentUser}
-                isReadOnly={isReadOnly}
-                isNewJobModalOpen={isNewJobModalOpen}
-                setIsNewJobModalOpen={setIsNewJobModalOpen}
-                clients={appState.clients}
-                existingJobs={appState.jobs}
-                onSaveJob={handleSaveNewJob}
-              />
+              <AuthGate authChecked={authChecked} currentUser={currentUser}>
+                {currentUser ? (
+                  <MainLayout
+                    isSyncing={isSyncing}
+                    currentUser={currentUser}
+                    isReadOnly={isReadOnly}
+                    isNewJobModalOpen={isNewJobModalOpen}
+                    setIsNewJobModalOpen={setIsNewJobModalOpen}
+                    clients={appState.clients}
+                    existingJobs={appState.jobs}
+                    onSaveJob={handleSaveNewJob}
+                  />
+                ) : (
+                  <Landing />
+                )}
+              </AuthGate>
             }
           >
-            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route index element={currentUser ? <Navigate to="dashboard" replace /> : <Landing />} />
 
             <Route
               path="dashboard"
@@ -435,9 +451,9 @@ const App: React.FC = () => {
                 />
               }
             />
-          </Route>
 
-          <Route path="*" element={<Navigate to={currentUser ? "/dashboard" : "/"} replace />} />
+            <Route path="*" element={<Navigate to={currentUser ? "dashboard" : "/"} replace />} />
+          </Route>
         </Routes>
       </HashRouter>
     </ErrorBoundary>
