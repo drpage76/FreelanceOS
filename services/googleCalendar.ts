@@ -70,6 +70,14 @@ export function formatGoogleCalendarSummary(job: Job, clientName?: string): stri
   return location ? `${location} | ${base}` : base;
 }
 
+/**
+ * ✅ Fix for "buildSummary is not defined"
+ * Keep existing call-sites stable, but use the real formatter.
+ */
+function buildSummary(job: Job, clientName?: string): string {
+  return formatGoogleCalendarSummary(job, clientName);
+}
+
 function buildWhenFromJobOrShift(job: Job, shift?: JobShift) {
   const timezone = tz();
 
