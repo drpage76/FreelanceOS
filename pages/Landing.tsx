@@ -13,9 +13,9 @@ export const Landing: React.FC = () => {
   };
 
   const handleAuthSuccess = () => {
-    // ✅ do NOT reload (reload often causes “basic HTML” + redirect weirdness)
+    // ✅ No reloads. Just close modal and route into the app.
     setShowAuth(false);
-    navigate("/dashboard");
+    navigate("/dashboard", { replace: true });
   };
 
   return (
@@ -44,7 +44,6 @@ export const Landing: React.FC = () => {
               </button>
             </div>
 
-            {/* Modal card wrapper so Auth can stay “plain” but still looks styled */}
             <div className="rounded-[28px] border border-white/10 bg-slate-900/60 backdrop-blur-2xl shadow-2xl shadow-indigo-500/10 p-6">
               <Auth initialIsSignUp={initialIsSignUp} onSuccess={handleAuthSuccess} />
             </div>
@@ -160,10 +159,16 @@ export const Landing: React.FC = () => {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="flex flex-wrap justify-center items-center gap-6">
             <span className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">FREELANCEOS CORE</span>
-            <Link to="/privacy" className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400">
+            <Link
+              to="/privacy"
+              className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400"
+            >
               Privacy
             </Link>
-            <Link to="/terms" className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400">
+            <Link
+              to="/terms"
+              className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400"
+            >
               Terms
             </Link>
           </div>

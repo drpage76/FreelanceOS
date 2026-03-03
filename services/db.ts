@@ -267,6 +267,112 @@ const clearCachedGoogleToken = () => {
 
 export const getSupabase = (): SupabaseClient => supabase;
 
+/* =======================================================================================
+   ✅ HARDENED AUTH SESSION LAYER
+   - Your symptom: deleting sb-...-auth-token fixes it => stored session token occasionally corrupts
+   - Fix: never allow getSession/getUser to hang forever.
+     If it times out, clear ONLY Supabase auth keys and retry once.
+======================================================================================= */
+
+const SESSION_TIMEOUT_MS = 8000;
+
+// prevents multiple concurrent session reads getting stuck together
+let sessionOp: Promise<any> | null = null;
+
+const withTimeout = async <T,>(p: Promise<T>, ms: number, label: string): Promise<T> => {
+  let t: any;
+  const timeout = new Promise<T>((_, reject) => {
+    t = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  try {
+    return await Promise.race([p, timeout]);
+  } finally {
+    clearTimeout(t);
+  }
+};
+
+const clearSupabaseAuthStorage = () => {
+  try {
+    // Clear the common Supabase auth keys (project specific + custom)
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+
+      // Typical supabase-js key looks like: sb-<project-ref>-auth-token
+      if (/^sb-.*-auth-token$/.test(k)) keys.push(k);
+
+      // If you set storageKey in supabaseClient.ts
+      if (k === "freelanceos-auth") keys.push(k);
+
+      // some older builds may use these
+      if (k.includes("supabase.auth")) keys.push(k);
+    }
+
+    keys.forEach((k) => {
+      try {
+        localStorage.removeItem(k);
+      } catch {}
+    });
+
+    if (keys.length) {
+      console.warn("[Supabase] Cleared auth storage keys due to session hang:", keys);
+    }
+  } catch (e) {
+    console.warn("[Supabase] Failed clearing auth storage keys:", e);
+  }
+};
+
+const getSessionSafe = async () => {
+  const client = getSupabase();
+
+  // de-dupe concurrent calls
+  if (!sessionOp) {
+    sessionOp = (async () => {
+      // 1) try normally (with timeout)
+      try {
+        return await withTimeout(client.auth.getSession(), SESSION_TIMEOUT_MS, "supabase.auth.getSession");
+      } catch (e) {
+        console.warn("[Supabase] getSession first attempt failed:", e);
+      }
+
+      // 2) recovery: clear only auth keys and retry once
+      clearSupabaseAuthStorage();
+
+      try {
+        return await withTimeout(client.auth.getSession(), SESSION_TIMEOUT_MS, "supabase.auth.getSession");
+      } catch (e2) {
+        console.warn("[Supabase] getSession retry failed:", e2);
+        return { data: { session: null }, error: e2 as any };
+      }
+    })().finally(() => {
+      sessionOp = null;
+    });
+  }
+
+  return sessionOp;
+};
+
+const getUserSafe = async () => {
+  const client = getSupabase();
+
+  // getUser() sometimes hangs the same way (rare, but happens)
+  try {
+    return await withTimeout(client.auth.getUser(), SESSION_TIMEOUT_MS, "supabase.auth.getUser");
+  } catch (e) {
+    console.warn("[Supabase] getUser first attempt failed:", e);
+  }
+
+  clearSupabaseAuthStorage();
+
+  try {
+    return await withTimeout(client.auth.getUser(), SESSION_TIMEOUT_MS, "supabase.auth.getUser");
+  } catch (e2) {
+    console.warn("[Supabase] getUser retry failed:", e2);
+    return { data: { user: null }, error: e2 as any };
+  }
+};
+
 export const DB = {
   isCloudConfigured: () =>
     !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -276,7 +382,7 @@ export const DB = {
     try {
       if (!DB.isCloudConfigured()) return { success: false, message: "Not configured" };
 
-      const { data } = await getSupabase().auth.getSession();
+      const { data } = await getSessionSafe();
       const email = data?.session?.user?.email;
       if (!email) return { success: false, message: "No session" };
 
@@ -306,7 +412,7 @@ export const DB = {
     try {
       const client = getSupabase();
 
-      const s1 = await client.auth.getSession();
+      const s1 = await getSessionSafe();
       const token1 = (s1?.data?.session as any)?.provider_token as string | undefined;
       const email1 = s1?.data?.session?.user?.email || null;
 
@@ -319,7 +425,8 @@ export const DB = {
       }
 
       await DB.refreshAuthSession();
-      const s2 = await client.auth.getSession();
+
+      const s2 = await getSessionSafe();
       const token2 = (s2?.data?.session as any)?.provider_token as string | undefined;
       const email2 = s2?.data?.session?.user?.email || null;
 
@@ -350,8 +457,7 @@ export const DB = {
     const cloud = DB.isCloudConfigured();
 
     try {
-      const client = getSupabase();
-      const { data, error } = await client.auth.getSession();
+      const { data, error } = await getSessionSafe();
 
       // if we have a real session, use it
       if (!error) {
@@ -375,11 +481,12 @@ export const DB = {
 
   /**
    * caches email when session exists
+   * (now hardened: session read cannot hang forever; auto-recovers if auth token key corrupt)
    */
   initializeSession: async () => {
     try {
       const client = getSupabase();
-      const { data } = await client.auth.getSession();
+      const { data } = await getSessionSafe();
       const email = data?.session?.user?.email || null;
 
       // ✅ only cache if session exists
@@ -387,6 +494,12 @@ export const DB = {
 
       const token = (data?.session as any)?.provider_token as string | undefined;
       if (token) setCachedGoogleToken(token);
+
+      // Optional: attempt to ensure user object is readable too (also hardened)
+      // This prevents “session exists but user fetch hangs” edge cases.
+      try {
+        await getUserSafe();
+      } catch {}
     } catch {}
   },
 
@@ -542,7 +655,11 @@ export const DB = {
     if (!email) return null;
 
     try {
-      const { data, error } = await getSupabase().from("tenants").select("*").eq("email", email).maybeSingle();
+      const { data, error } = await getSupabase()
+        .from("tenants")
+        .select("*")
+        .eq("email", email)
+        .maybeSingle();
 
       if (!error && data) return fromDb(data) as Tenant;
 
@@ -660,5 +777,10 @@ export const DB = {
     } catch {}
     clearCachedTenantId();
     clearCachedGoogleToken();
+
+    // also remove stuck auth keys so next run is clean
+    try {
+      clearSupabaseAuthStorage();
+    } catch {}
   },
 };

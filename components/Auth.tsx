@@ -1,5 +1,4 @@
-// src/components/Auth.tsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 interface AuthProps {
@@ -14,32 +13,18 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
   const [isSignUp, setIsSignUp] = useState(initialIsSignUp);
   const [error, setError] = useState<string | null>(null);
 
-  // Prevent multiple onSuccess calls (SIGNED_IN + getSession etc.)
-  const didCallSuccess = useRef(false);
-
-  /**
-   * Keep HashRouter route but remove OAuth query params (?code=...)
-   * Example: https://freelanceos.org/?code=xxx#/dashboard  ->  https://freelanceos.org/#/dashboard
-   */
-  const cleanOAuthParamsPreservingHash = () => {
-    try {
-      const url = new URL(window.location.href);
-      // keep hash, drop query string
-      url.search = "";
-      window.history.replaceState({}, document.title, url.toString());
-    } catch {
-      // fallback
-      const cleanUrl = window.location.origin + window.location.pathname + (window.location.hash || "#/");
-      window.history.replaceState({}, document.title, cleanUrl);
-    }
+  // Keep hash routes, but strip query params like ?code=...
+  const cleanUrlParams = () => {
+    const cleanUrl = window.location.origin + window.location.pathname + (window.location.hash || "#/");
+    window.history.replaceState({}, document.title, cleanUrl);
   };
 
-  const safeSuccess = () => {
-    if (didCallSuccess.current) return;
-    didCallSuccess.current = true;
-    cleanOAuthParamsPreservingHash();
-    onSuccess();
-  };
+  // ✅ IMPORTANT: Always return to the SAME origin you started on
+  // localhost -> localhost, live -> live. Do NOT hardcode domains.
+  // Also: don't include hash in redirectTo because OAuth providers drop it.
+  const redirectTo = useMemo(() => {
+    return window.location.origin + window.location.pathname; // e.g. http://localhost:5173/
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,7 +33,8 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
       try {
         const { data } = await supabase.auth.getSession();
         if (!cancelled && data?.session) {
-          safeSuccess();
+          cleanUrlParams();
+          onSuccess();
         }
       } catch {
         // ignore
@@ -57,10 +43,8 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
 
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN") {
-        safeSuccess();
-      }
-      if (event === "SIGNED_OUT") {
-        didCallSuccess.current = false;
+        cleanUrlParams();
+        onSuccess();
       }
     });
 
@@ -68,8 +52,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [onSuccess]);
 
   const handleEmailAuth = async () => {
     setError(null);
@@ -86,7 +69,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
         if (error) throw error;
       }
 
-      // onAuthStateChange will fire and call onSuccess
+      // onAuthStateChange will call onSuccess()
     } catch (e: any) {
       setError(e?.message || "Authentication failed");
     } finally {
@@ -99,14 +82,6 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
     setLoading(true);
 
     try {
-      /**
-       * ✅ IMPORTANT:
-       * Use HashRouter-safe redirect.
-       * - In dev: http://localhost:5173/#/
-       * - In prod: https://freelanceos.org/#/
-       */
-      const redirectTo = `${window.location.origin}${window.location.pathname}`;
-
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -127,8 +102,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
       });
 
       if (error) throw error;
-
-      // Browser will redirect away; no need to setLoading(false) here.
+      // browser will redirect away
     } catch (e: any) {
       setError(e?.message || "OAuth failed");
       setLoading(false);
@@ -136,24 +110,34 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
   };
 
   return (
-    <div style={{ maxWidth: 420, margin: "0 auto", padding: 24 }}>
-      <h2 style={{ marginBottom: 12 }}>{isSignUp ? "Create account" : "Sign in"}</h2>
+    <div className="w-full">
+      <div className="mb-4">
+        <h2 className="text-white text-xl font-black tracking-tight">
+          {isSignUp ? "Create account" : "Sign in"}
+        </h2>
+        <p className="text-slate-400 text-xs font-bold mt-1">
+          Use email/password or Google.
+        </p>
+      </div>
 
       {error && (
-        <div style={{ marginBottom: 12, color: "#b00020", whiteSpace: "pre-wrap" }}>
+        <div className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-200 text-xs font-bold p-3 whitespace-pre-wrap">
           {error}
         </div>
       )}
 
-      <div style={{ display: "grid", gap: 10 }}>
+      <div className="grid gap-3">
         <input
+          className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white placeholder:text-slate-500 text-sm font-semibold outline-none focus:border-indigo-400/60 focus:ring-2 focus:ring-indigo-500/20"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email"
           autoComplete="email"
           disabled={loading}
         />
+
         <input
+          className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white placeholder:text-slate-500 text-sm font-semibold outline-none focus:border-indigo-400/60 focus:ring-2 focus:ring-indigo-500/20"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password"
@@ -162,21 +146,26 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
           disabled={loading}
         />
 
-        <button type="button" onClick={handleEmailAuth} disabled={loading}>
+        <button
+          type="button"
+          onClick={handleEmailAuth}
+          disabled={loading}
+          className="w-full px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20 transition-all"
+        >
           {loading ? "Please wait…" : isSignUp ? "Register" : "Sign In"}
         </button>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <div style={{ flex: 1, height: 1, background: "#ddd" }} />
-          <span style={{ color: "#666", fontSize: 12 }}>or</span>
-          <div style={{ flex: 1, height: 1, background: "#ddd" }} />
+        <div className="flex items-center gap-3 py-1">
+          <div className="flex-1 h-px bg-white/10" />
+          <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">or</span>
+          <div className="flex-1 h-px bg-white/10" />
         </div>
 
         <button
           type="button"
           onClick={handleGoogleLogin}
           disabled={loading}
-          style={{ display: "flex", justifyContent: "center" }}
+          className="w-full px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-60 text-white text-xs font-black uppercase tracking-widest border border-white/10 transition-all"
         >
           Continue with Google
         </button>
@@ -185,16 +174,14 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
           type="button"
           onClick={() => setIsSignUp((s) => !s)}
           disabled={loading}
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "#4f46e5",
-            cursor: "pointer",
-            padding: 0,
-          }}
+          className="text-indigo-400 hover:text-indigo-300 text-xs font-black tracking-wide text-left disabled:opacity-60"
         >
           {isSignUp ? "Already have an account? Sign in" : "No account? Register"}
         </button>
+      </div>
+
+      <div className="mt-4 text-[10px] text-slate-500 font-bold">
+        Redirect target: <span className="text-slate-400">{redirectTo}</span>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 // src/App.tsx
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { HashRouter, Routes, Route, Navigate, Link, Outlet, useLocation } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate, Link, Outlet } from "react-router-dom";
 
 import { Navigation } from "./components/Navigation";
 
@@ -21,6 +21,18 @@ import { AppState, Tenant, JobStatus, InvoiceStatus, UserPlan, Job, JobItem } fr
 import { DB, getSupabase } from "./services/db";
 import { syncJobToGoogle, deleteJobFromGoogle, listPersonalGoogleEvents } from "./services/googleCalendar";
 import { checkSubscriptionStatus } from "./utils";
+
+// ✅ Use ONE Supabase client everywhere (this should be your singleton)
+import { supabase } from "./lib/supabaseClient";
+
+/** Hard timeout so the app never hangs forever */
+function withTimeout<T>(promise: Promise<T>, ms: number, label = "Operation") {
+  let timer: any;
+  const timeout = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 /** Error Boundary Component to prevent Blank Screens */
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: any }> {
@@ -90,7 +102,6 @@ const AuthGate: React.FC<{
   }
 
   if (!currentUser) return <Landing />;
-
   return <>{children}</>;
 };
 
@@ -155,7 +166,6 @@ const App: React.FC = () => {
   const [googleAccessToken, setGoogleAccessToken] = useState<string | undefined>(undefined);
   const [isNewJobModalOpen, setIsNewJobModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-
   const [authChecked, setAuthChecked] = useState(false);
 
   const hasLoadedOnce = useRef(false);
@@ -184,10 +194,8 @@ const App: React.FC = () => {
   }, []);
 
   const stripOAuthCodeFromUrl = useCallback(() => {
-    // ✅ Keep hash routes (HashRouter), but remove ?code=... once session established
     if (window.location.search && window.location.search.includes("code=")) {
-      const cleanUrl =
-        window.location.origin + window.location.pathname + (window.location.hash || "#/");
+      const cleanUrl = window.location.origin + window.location.pathname + (window.location.hash || "#/");
       window.history.replaceState({}, document.title, cleanUrl);
     }
   }, []);
@@ -297,62 +305,86 @@ const App: React.FC = () => {
 
     const init = async () => {
       try {
-        await DB.initializeSession();
+        // ✅ If we returned from Google with ?code=..., do the PKCE exchange ourselves (no DB.initializeSession)
+        if (window.location.search?.includes("code=")) {
+          await withTimeout(supabase.auth.exchangeCodeForSession(window.location.href), 8000, "exchangeCodeForSession");
+          stripOAuthCodeFromUrl();
+        }
 
-        // ✅ clean up the URL once session exchange is done
-        stripOAuthCodeFromUrl();
+        // ✅ Get session (never hang forever)
+        const { data } = await withTimeout(supabase.auth.getSession(), 8000, "supabase.auth.getSession");
+        const hasSession = !!data?.session;
 
-        const user = await DB.getCurrentUser();
+        if (!hasSession) {
+          setCurrentUser(null);
+          return;
+        }
+
+        // ✅ Load your tenant/profile (wrap it too, just in case)
+        const user = await withTimeout(DB.getCurrentUser(), 8000, "DB.getCurrentUser");
         if (user) {
           setCurrentUser(user);
           await loadData(user);
+        } else {
+          setCurrentUser(null);
         }
       } catch (e) {
         console.warn("[init failed]", e);
+        setCurrentUser(null);
+        hasLoadedOnce.current = false;
+        setAppState({
+          user: null,
+          clients: [],
+          jobs: [],
+          quotes: [],
+          externalEvents: [],
+          jobItems: [],
+          invoices: [],
+          mileage: [],
+        });
       } finally {
+        // ✅ This guarantees the spinner can’t stick forever
         setAuthChecked(true);
       }
     };
 
     init();
 
-    const client = getSupabase();
-    if (client) {
-      const {
-        data: { subscription },
-      } = (client.auth as any).onAuthStateChange(async (event: string) => {
-        try {
-          if (event === "SIGNED_IN") {
-            stripOAuthCodeFromUrl();
+    // Keep your auth change listener (but make sure it uses the same singleton client)
+    const {
+      data: { subscription },
+    } = (supabase.auth as any).onAuthStateChange(async (event: string) => {
+      try {
+        if (event === "SIGNED_IN") {
+          stripOAuthCodeFromUrl();
 
-            const user = await DB.getCurrentUser();
-            if (user) {
-              setCurrentUser(user);
-              if (!hasLoadedOnce.current) await loadData(user);
-            }
+          const user = await withTimeout(DB.getCurrentUser(), 8000, "DB.getCurrentUser");
+          if (user) {
+            setCurrentUser(user);
+            if (!hasLoadedOnce.current) await loadData(user);
           }
-
-          if (event === "SIGNED_OUT") {
-            setCurrentUser(null);
-            hasLoadedOnce.current = false;
-            setAppState({
-              user: null,
-              clients: [],
-              jobs: [],
-              quotes: [],
-              externalEvents: [],
-              jobItems: [],
-              invoices: [],
-              mileage: [],
-            });
-          }
-        } finally {
-          setAuthChecked(true);
         }
-      });
 
-      return () => subscription.unsubscribe();
-    }
+        if (event === "SIGNED_OUT") {
+          setCurrentUser(null);
+          hasLoadedOnce.current = false;
+          setAppState({
+            user: null,
+            clients: [],
+            jobs: [],
+            quotes: [],
+            externalEvents: [],
+            jobItems: [],
+            invoices: [],
+            mileage: [],
+          });
+        }
+      } finally {
+        setAuthChecked(true);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [loadData, stripOAuthCodeFromUrl]);
 
   const handleSaveNewJob = async (job: Job, items: JobItem[], clientName: string) => {

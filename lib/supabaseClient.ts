@@ -24,15 +24,30 @@ function assertSupabaseConfig() {
 
 assertSupabaseConfig();
 
+// Safer storage access (avoids crashing in non-browser contexts)
+const safeStorage =
+  typeof window !== "undefined" && window.localStorage ? window.localStorage : undefined;
+
+// Make the auth token key predictable (still unique per project)
+const storageKey = "freelanceos-auth";
+
+// Create client
 export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
+    // ✅ Required for Google OAuth in SPA
     flowType: "pkce",
+
+    // ✅ Keep sessions across reloads
     persistSession: true,
     autoRefreshToken: true,
 
-    // ✅ IMPORTANT: MUST be true if your redirect returns ?code=... (your screenshot shows it does)
+    // ✅ MUST be true when provider returns ?code=...
     detectSessionInUrl: true,
 
-    storage: window.localStorage,
+    // ✅ Use localStorage when available
+    storage: safeStorage,
+
+    // ✅ Predictable key name (helps debugging; avoids surprises)
+    storageKey,
   },
 });
