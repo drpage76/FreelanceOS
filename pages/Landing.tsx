@@ -1,22 +1,29 @@
 import React, { useState } from "react";
 import { Auth } from "../components/Auth";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export const Landing: React.FC = () => {
   const [showAuth, setShowAuth] = useState(false);
   const [initialIsSignUp, setInitialIsSignUp] = useState(false);
+  const navigate = useNavigate();
 
   const openAuth = (isSignUp: boolean) => {
     setInitialIsSignUp(isSignUp);
     setShowAuth(true);
   };
 
+  const handleAuthSuccess = () => {
+    // ✅ do NOT reload (reload often causes “basic HTML” + redirect weirdness)
+    setShowAuth(false);
+    navigate("/dashboard");
+  };
+
   return (
     <div className="min-h-screen w-full bg-slate-900 text-white selection:bg-indigo-500 selection:text-white overflow-x-hidden flex flex-col relative">
       {/* Background Decor */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-20 z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-indigo-600 rounded-full blur-[140px]"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-600 rounded-full blur-[140px]"></div>
+        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-indigo-600 rounded-full blur-[140px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-600 rounded-full blur-[140px]" />
       </div>
 
       {/* Auth Modal Overlay */}
@@ -31,15 +38,16 @@ export const Landing: React.FC = () => {
               <button
                 onClick={() => setShowAuth(false)}
                 className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-all border border-white/10"
+                aria-label="Close"
               >
-                <i className="fa-solid fa-xmark"></i>
+                <i className="fa-solid fa-xmark" />
               </button>
             </div>
 
-            <Auth
-              initialIsSignUp={initialIsSignUp}
-              onSuccess={() => window.location.reload()}
-            />
+            {/* Modal card wrapper so Auth can stay “plain” but still looks styled */}
+            <div className="rounded-[28px] border border-white/10 bg-slate-900/60 backdrop-blur-2xl shadow-2xl shadow-indigo-500/10 p-6">
+              <Auth initialIsSignUp={initialIsSignUp} onSuccess={handleAuthSuccess} />
+            </div>
           </div>
         </div>
       )}
@@ -47,12 +55,13 @@ export const Landing: React.FC = () => {
       <nav className="relative z-50 max-w-7xl mx-auto w-full px-4 sm:px-8 py-6 sm:py-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-2xl shadow-indigo-500/40">
-            <i className="fa-solid fa-bolt text-lg"></i>
+            <i className="fa-solid fa-bolt text-lg" />
           </div>
           <span className="text-xl font-black tracking-tighter">
             Freelance<span className="text-indigo-400">OS</span>
           </span>
         </div>
+
         <div className="flex gap-2">
           <button
             onClick={() => openAuth(false)}
@@ -72,7 +81,7 @@ export const Landing: React.FC = () => {
       <main className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-8 pt-6 pb-20 flex-1">
         <div className="space-y-6 sm:space-y-10 mb-12 text-center lg:text-left">
           <div className="inline-flex items-center gap-3 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400 shadow-inner">
-            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_#10b981]"></span>
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_#10b981]" />
             Professional Business Operating System
           </div>
 
@@ -119,7 +128,7 @@ export const Landing: React.FC = () => {
                   className="flex gap-4 p-5 bg-white/5 border border-white/10 rounded-[24px] hover:bg-white/10 transition-all cursor-default group text-left"
                 >
                   <div className="w-10 h-10 bg-indigo-50/10 rounded-xl flex items-center justify-center group-hover:bg-indigo-500 transition-all shrink-0">
-                    <i className={`fa-solid ${f.icon} text-indigo-400 group-hover:text-white text-lg`}></i>
+                    <i className={`fa-solid ${f.icon} text-indigo-400 group-hover:text-white text-lg`} />
                   </div>
                   <div className="min-w-0">
                     <h3 className="text-[10px] font-black uppercase tracking-widest mb-1 truncate">{f.title}</h3>
@@ -132,7 +141,7 @@ export const Landing: React.FC = () => {
 
           <div className="relative w-full overflow-hidden">
             <div className="relative w-full group max-w-2xl mx-auto lg:max-w-none">
-              <div className="absolute inset-0 bg-indigo-500/20 blur-[60px] rounded-full group-hover:bg-indigo-500/30 transition-all duration-700 animate-pulse"></div>
+              <div className="absolute inset-0 bg-indigo-500/20 blur-[60px] rounded-full group-hover:bg-indigo-500/30 transition-all duration-700 animate-pulse" />
               <div className="bg-slate-800/40 border border-white/10 p-2 rounded-[32px] backdrop-blur-3xl relative z-10 shadow-2xl transition-all duration-700">
                 <div className="overflow-hidden rounded-[24px] bg-slate-900 aspect-video">
                   <img

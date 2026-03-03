@@ -1,5 +1,5 @@
 // src/components/Auth.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 interface AuthProps {
@@ -14,13 +14,31 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
   const [isSignUp, setIsSignUp] = useState(initialIsSignUp);
   const [error, setError] = useState<string | null>(null);
 
+  // Prevent multiple onSuccess calls (SIGNED_IN + getSession etc.)
+  const didCallSuccess = useRef(false);
+
   /**
-   * Supabase OAuth returns with query params (code/state etc).
-   * With HashRouter, we want to keep the hash route, but remove query params.
+   * Keep HashRouter route but remove OAuth query params (?code=...)
+   * Example: https://freelanceos.org/?code=xxx#/dashboard  ->  https://freelanceos.org/#/dashboard
    */
-  const cleanUrlParams = () => {
-    const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
-    window.history.replaceState({}, document.title, cleanUrl);
+  const cleanOAuthParamsPreservingHash = () => {
+    try {
+      const url = new URL(window.location.href);
+      // keep hash, drop query string
+      url.search = "";
+      window.history.replaceState({}, document.title, url.toString());
+    } catch {
+      // fallback
+      const cleanUrl = window.location.origin + window.location.pathname + (window.location.hash || "#/");
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+  };
+
+  const safeSuccess = () => {
+    if (didCallSuccess.current) return;
+    didCallSuccess.current = true;
+    cleanOAuthParamsPreservingHash();
+    onSuccess();
   };
 
   useEffect(() => {
@@ -30,8 +48,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
       try {
         const { data } = await supabase.auth.getSession();
         if (!cancelled && data?.session) {
-          cleanUrlParams();
-          onSuccess();
+          safeSuccess();
         }
       } catch {
         // ignore
@@ -40,8 +57,10 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
 
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN") {
-        cleanUrlParams();
-        onSuccess();
+        safeSuccess();
+      }
+      if (event === "SIGNED_OUT") {
+        didCallSuccess.current = false;
       }
     });
 
@@ -49,7 +68,8 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, [onSuccess]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleEmailAuth = async () => {
     setError(null);
@@ -65,7 +85,8 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-      // onAuthStateChange will fire and call onSuccess()
+
+      // onAuthStateChange will fire and call onSuccess
     } catch (e: any) {
       setError(e?.message || "Authentication failed");
     } finally {
@@ -78,17 +99,18 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
     setLoading(true);
 
     try {
-      // For HashRouter apps, it's usually safest to return to the app root,
-      // then your router handles navigation.
-      const redirectTo = window.location.origin + window.location.pathname;
+      /**
+       * ✅ IMPORTANT:
+       * Use HashRouter-safe redirect.
+       * - In dev: http://localhost:5173/#/
+       * - In prod: https://freelanceos.org/#/
+       */
+      const redirectTo = `${window.location.origin}${window.location.pathname}`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo,
-
-          // ✅ Calendar + Drive scopes (space-separated string)
-          // If you ONLY want read access, remove calendar.events and keep calendar.readonly.
           scopes: [
             "openid",
             "email",
@@ -97,8 +119,6 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
             "https://www.googleapis.com/auth/calendar.readonly",
             "https://www.googleapis.com/auth/drive.file",
           ].join(" "),
-
-          // ✅ Force refresh token (offline) + consent screen so scopes apply
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -108,8 +128,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
 
       if (error) throw error;
 
-      // On success, the browser will redirect to Google then back to your app.
-      // No need to setLoading(false) here.
+      // Browser will redirect away; no need to setLoading(false) here.
     } catch (e: any) {
       setError(e?.message || "OAuth failed");
       setLoading(false);
@@ -153,7 +172,12 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
           <div style={{ flex: 1, height: 1, background: "#ddd" }} />
         </div>
 
-        <button type="button" onClick={handleGoogleLogin} disabled={loading} style={{ display: "flex", justifyContent: "center" }}>
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          disabled={loading}
+          style={{ display: "flex", justifyContent: "center" }}
+        >
           Continue with Google
         </button>
 
