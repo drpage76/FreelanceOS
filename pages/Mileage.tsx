@@ -587,16 +587,16 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
       {/* RECORDS */}
       <div className="bg-white rounded-[40px] border border-slate-200 overflow-hidden shadow-sm">
         <div className="hidden md:block">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full table-fixed text-left border-collapse">
             <thead className="bg-slate-50/50 border-b border-slate-100">
               <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <th className="p-5 w-[210px]">Date</th>
+                <th className="p-5 w-[165px]">Date</th>
                 <th className="p-5">Description</th>
-                <th className="p-5 w-[220px]">Route</th>
-                <th className="p-5 w-[140px]">Leg</th>
-                <th className="p-5 text-right w-[110px]">Total mi</th>
-                <th className="p-5 text-right w-[120px]">Valuation</th>
-                <th className="p-5 text-center w-[170px]">Actions</th>
+                <th className="p-5 w-[180px]">Route</th>
+                <th className="p-5 w-[110px]">Leg</th>
+                <th className="p-5 text-right w-[90px]">Total mi</th>
+                <th className="p-5 text-right w-[110px]">Valuation</th>
+                <th className="p-5 text-center w-[130px]">Actions</th>
               </tr>
             </thead>
 
@@ -616,15 +616,28 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                   const dateLabel = formatRangePretty(record.date, record.endDate);
 
                   return (
-                    <tr key={record.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-5 text-[12px] font-black text-slate-900 whitespace-nowrap">{dateLabel}</td>
-                      <td className="p-5 text-[12px] font-bold text-slate-700">{record.description || "Travel"}</td>
-                      <td className="p-5 text-[11px] font-black text-slate-700 whitespace-nowrap">
-                        {record.startPostcode} <i className="fa-solid fa-arrow-right-long mx-2 text-indigo-400"></i> {record.endPostcode}
+                    <tr key={record.id} className="hover:bg-slate-50/50 transition-colors align-top">
+                      <td className="p-5 text-[12px] font-black text-slate-900">
+                        <div className="leading-snug break-words">{dateLabel}</div>
                       </td>
+
+                      <td className="p-5 text-[12px] font-bold text-slate-700">
+                        <div className="leading-snug break-words">
+                          {record.description || "Travel"}
+                        </div>
+                      </td>
+
+                      <td className="p-5 text-[11px] font-black text-slate-700">
+                        <div className="leading-snug break-words">
+                          <span>{record.startPostcode}</span>{" "}
+                          <i className="fa-solid fa-arrow-right-long mx-2 text-indigo-400"></i>{" "}
+                          <span>{record.endPostcode}</span>
+                        </div>
+                      </td>
+
                       <td className="p-5">
                         <span
-                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border whitespace-nowrap ${
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
                             ret ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-400 border-slate-100"
                           }`}
                         >
@@ -632,21 +645,28 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                           {trips > 1 ? ` x${trips}` : ""}
                         </span>
                       </td>
-                      <td className="p-5 text-right font-black text-slate-900">{totalTripMiles.toFixed(1)}</td>
-                      <td className="p-5 text-right font-black text-indigo-600">{formatCurrency(totalTripMiles * MILEAGE_RATE, state.user)}</td>
+
+                      <td className="p-5 text-right font-black text-slate-900 whitespace-nowrap">
+                        {totalTripMiles.toFixed(1)}
+                      </td>
+
+                      <td className="p-5 text-right font-black text-indigo-600 whitespace-nowrap">
+                        {formatCurrency(totalTripMiles * MILEAGE_RATE, state.user)}
+                      </td>
+
                       <td className="p-5 text-center">
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => handleStartAmend(record)}
-                            className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50"
+                            className="px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black text-[9px] uppercase tracking-widest hover:bg-slate-50"
                           >
                             Amend
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDelete(record.id)}
-                            className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all"
                             title="Delete"
                           >
                             <i className="fa-solid fa-trash-can text-xs"></i>
