@@ -1,10 +1,10 @@
 // src/pages/Mileage.tsx
-import React, { useState, useMemo, useEffect, useRef } from "react";
-import type { AppState, MileageRecord, Job } from "../types";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import type { AppState, Job, MileageRecord } from "../types";
 import { DB, generateId } from "../services/db";
 import { formatCurrency } from "../utils";
 import { getDrivingDistanceFromGoogleMaps } from "../lib/googleMaps";
-import { parseISO, format, isValid } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 
 interface MileageProps {
   state: AppState;
@@ -13,7 +13,6 @@ interface MileageProps {
 
 const MILEAGE_RATE = 0.45; // HMRC £0.45/mile
 
-// ---------- Date formatting helpers ----------
 function ordinal(n: number) {
   if (n % 100 >= 11 && n % 100 <= 13) return `${n}th`;
   if (n % 10 === 1) return `${n}st`;
@@ -22,707 +21,704 @@ function ordinal(n: number) {
   return `${n}th`;
 }
 
-function safeParse(dateStr?: string) {
-  if (!dateStr) return null;
-  const d = parseISO(dateStr);
-  return isValid(d) ? d : null;
-}
-
-function formatRangePretty(startStr?: string, endStr?: string) {
-  const s = safeParse(startStr);
-  if (!s) return "-";
-  const e = safeParse(endStr);
-
-  const sDay = Number(format(s, "d"));
-  const sMon = format(s, "MMM");
-  const sYY = format(s, "yy");
-  const sMonthKey = format(s, "yyyy-MM");
-
-  if (!e) return `${ordinal(sDay)} ${sMon} ${sYY}`;
-
-  const eDay = Number(format(e, "d"));
-  const eMon = format(e, "MMM");
-  const eYY = format(e, "yy");
-  const eMonthKey = format(e, "yyyy-MM");
-
-  if (sMonthKey === eMonthKey) {
-    return `${ordinal(sDay)} - ${ordinal(eDay)} ${eMon} ${eYY}`;
+function formatDisplayDate(dateStr?: string) {
+  if (!dateStr) return "No date";
+  try {
+    const parsed = parseISO(dateStr);
+    if (!isValid(parsed)) return dateStr;
+    return format(parsed, `do MMM yy`).replace(
+      /\b(\d+)(st|nd|rd|th)\b/,
+      (_, d, suffix) => `${d}${suffix}`
+    );
+  } catch {
+    return dateStr;
   }
-  return `${ordinal(sDay)} ${sMon} ${sYY} - ${ordinal(eDay)} ${eMon} ${eYY}`;
 }
 
-// ---------- Job helpers ----------
-function jobTitle(job: any) {
-  return job?.title || job?.name || job?.jobName || job?.description || job?.reference || "Job";
+function formatDateRange(start?: string, end?: string) {
+  if (!start && !end) return "No date";
+  if (start && !end) return formatDisplayDate(start);
+  if (!start && end) return formatDisplayDate(end);
+
+  try {
+    const s = parseISO(start as string);
+    const e = parseISO(end as string);
+
+    if (!isValid(s) || !isValid(e)) {
+      return `${start ?? ""}${end ? ` - ${end}` : ""}`;
+    }
+
+    const sameDay = format(s, "yyyy-MM-dd") === format(e, "yyyy-MM-dd");
+    if (sameDay) return format(s, `do MMM yy`);
+
+    const sameMonth = format(s, "MMM yy") === format(e, "MMM yy");
+    if (sameMonth) {
+      return `${ordinal(Number(format(s, "d")))} - ${ordinal(
+        Number(format(e, "d"))
+      )} ${format(e, "MMM yy")}`;
+    }
+
+    return `${format(s, `do MMM yy`)} - ${format(e, `do MMM yy`)}`;
+  } catch {
+    return `${start ?? ""}${end ? ` - ${end}` : ""}`;
+  }
 }
 
-function pickDatesFromJob(job: any) {
-  const start = job?.startDate || job?.dateStart || job?.jobStartDate || job?.date || "";
-  const end = job?.endDate || job?.dateEnd || job?.jobEndDate || "";
-
-  const norm = (d: any) => (typeof d === "string" ? d.split("T")[0] : "");
-  return { date: norm(start), endDate: norm(end) };
-}
-
-function pickStartEndFromJob(job: any) {
-  const start = job?.startPostcode || job?.fromPostcode || job?.originPostcode || "";
-  const end = job?.endPostcode || job?.toPostcode || job?.destinationPostcode || "";
-  return { start: String(start || ""), end: String(end || "") };
-}
-
-function buildJobLabel(job: Job) {
-  const { date, endDate } = pickDatesFromJob(job);
-  const range = formatRangePretty(date, endDate);
-  return `${job.id} — ${jobTitle(job)} — ${range}`;
-}
-
-function asNumber(v: any, fallback = 0) {
-  const n = typeof v === "number" ? v : parseFloat(String(v ?? ""));
+function safeNumber(value: unknown, fallback = 0) {
+  const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
-function asInt(v: any, fallback = 1) {
-  const n = typeof v === "number" ? v : parseInt(String(v ?? ""), 10);
-  return Number.isFinite(n) ? n : fallback;
-}
-function asBool(v: any) {
-  if (typeof v === "boolean") return v;
-  if (typeof v === "string") return v.toLowerCase() === "true";
-  return !!v;
+
+function normaliseText(value: unknown) {
+  return String(value ?? "").trim();
 }
 
-const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
-  const [isSaving, setIsSaving] = useState(false);
-  const [isCalculating, setIsCalculating] = useState(false);
-  const lastCalculatedRef = useRef("");
+function getJobLabel(job?: Partial<Job> | null) {
+  if (!job) return "";
+  return (
+    normaliseText((job as any).jobNumber) ||
+    normaliseText((job as any).quoteNumber) ||
+    normaliseText((job as any).id)
+  );
+}
 
+function getJobName(job?: Partial<Job> | null) {
+  if (!job) return "";
+  return (
+    normaliseText((job as any).title) ||
+    normaliseText((job as any).name) ||
+    normaliseText((job as any).client) ||
+    ""
+  );
+}
+
+export const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
+  const jobs = useMemo<Job[]>(() => state.jobs ?? [], [state.jobs]);
+  const mileageRecords = useMemo<MileageRecord[]>(
+    () => state.mileageRecords ?? [],
+    [state.mileageRecords]
+  );
+
+  const [selectedJobId, setSelectedJobId] = useState("");
+  const [date, setDate] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [fromLocation, setFromLocation] = useState("");
+  const [toLocation, setToLocation] = useState("");
+  const [notes, setNotes] = useState("");
+  const [isReturn, setIsReturn] = useState(true);
+  const [manualMiles, setManualMiles] = useState("");
+  const [useManualMiles, setUseManualMiles] = useState(false);
+
+  const [filterText, setFilterText] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // ✅ validation message shown above submit
-  const [formError, setFormError] = useState<string | null>(null);
+  const [loadingDistance, setLoadingDistance] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const jobs = state?.jobs || [];
+  const formRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ track jobs already linked to mileage
-  const usedJobIds = useMemo(() => {
-    return new Set((state.mileage || []).map((m: any) => String(m.jobId || "")).filter(Boolean));
-  }, [state.mileage]);
-
-  const blankEntry = {
-    date: new Date().toISOString().split("T")[0],
-    endDate: new Date().toISOString().split("T")[0], // ✅ default to same day (fixes "Add does nothing")
-    startPostcode: "",
-    endPostcode: "",
-    numTrips: 1,
-    isReturn: true,
-    distanceMiles: 0,
-    jobId: "",
-    clientId: "",
-    description: "",
-  };
-
-  const [newEntry, setNewEntry] = useState(blankEntry);
-
-  const jobOptions = useMemo(() => {
-    return jobs
-      .filter((j: Job) => {
-        const id = String(j.id);
-        // ✅ allow currently-selected job (important when editing existing mileage)
-        if (newEntry.jobId && id === String(newEntry.jobId)) return true;
-        // ✅ otherwise hide jobs already used
-        return !usedJobIds.has(id);
-      })
-      .slice()
-      .sort((a, b) => (b.startDate || "").localeCompare(a.startDate || ""))
-      .map((j: Job) => ({
-        id: String(j.id),
-        label: buildJobLabel(j),
-        job: j,
-      }));
-  }, [jobs, usedJobIds, newEntry.jobId]);
-
-  // ✅ centralised validation
-  const validateEntry = () => {
-    const date = (newEntry.date || "").trim();
-    const endDate = (newEntry.endDate || "").trim();
-    const start = (newEntry.startPostcode || "").trim();
-    const end = (newEntry.endPostcode || "").trim();
-
-    if (!date) return "Start date is required.";
-
-    // ✅ Treat blank endDate as same-day trip
-    const effectiveEnd = endDate || date;
-    if (effectiveEnd < date) return "End date cannot be earlier than start date.";
-
-    if (!start || start.length < 5) return "Start postcode is required.";
-    if (!end || end.length < 5) return "End postcode is required.";
-
-    // Distance must be > 0 to save
-    const miles = asNumber(newEntry.distanceMiles, 0);
-    if (!Number.isFinite(miles) || miles <= 0) return "Miles must be greater than 0.";
-
-    return null;
-  };
-
-  const entryTripMiles = useMemo(() => {
-    const miles = asNumber(newEntry.distanceMiles, 0);
-    const trips = Math.max(1, asInt(newEntry.numTrips, 1));
-    const ret = asBool(newEntry.isReturn);
-    return miles * trips * (ret ? 2 : 1);
-  }, [newEntry.distanceMiles, newEntry.numTrips, newEntry.isReturn]);
+  const selectedJob = useMemo(
+    () => jobs.find((j) => String((j as any).id) === selectedJobId) ?? null,
+    [jobs, selectedJobId]
+  );
 
   useEffect(() => {
-    // clear error as the user edits key fields
-    if (formError) setFormError(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newEntry.date, newEntry.endDate, newEntry.startPostcode, newEntry.endPostcode, newEntry.distanceMiles]);
+    if (!selectedJob || editingId) return;
 
-  useEffect(() => {
-    const start = newEntry.startPostcode.trim();
-    const end = newEntry.endPostcode.trim();
+    const jobStart =
+      normaliseText((selectedJob as any).startDate) ||
+      normaliseText((selectedJob as any).date);
+    const jobEnd =
+      normaliseText((selectedJob as any).endDate) ||
+      normaliseText((selectedJob as any).startDate) ||
+      normaliseText((selectedJob as any).date);
 
-    if (start.length >= 5 && end.length >= 5) {
-      const key = `${start}-${end}`;
-      if (key !== lastCalculatedRef.current) {
-        const timer = setTimeout(() => {
-          handleCalculateMileage();
-        }, 900);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [newEntry.startPostcode, newEntry.endPostcode]); // eslint-disable-line
+    if (jobStart && !startDate) setStartDate(jobStart);
+    if (jobEnd && !endDate) setEndDate(jobEnd);
 
-  const handleSelectJob = (jobId: string) => {
-    const opt = jobOptions.find((o) => o.id === jobId);
+    const base =
+      normaliseText((selectedJob as any).venue) ||
+      normaliseText((selectedJob as any).location) ||
+      normaliseText((selectedJob as any).siteAddress) ||
+      normaliseText((selectedJob as any).address);
 
-    if (!opt) {
-      setNewEntry((prev) => ({ ...prev, jobId: "", clientId: "" }));
-      return;
-    }
+    if (base && !toLocation) setToLocation(base);
+  }, [selectedJob, editingId, startDate, endDate, toLocation]);
 
-    const { date, endDate } = pickDatesFromJob(opt.job);
-    const { start, end } = pickStartEndFromJob(opt.job);
-    const autoDesc = `${opt.job.id} — ${jobTitle(opt.job)}`.trim();
-
-    setNewEntry((prev) => {
-      const nextDate = date || prev.date;
-      const nextEnd = endDate || prev.endDate || nextDate; // ✅ ensure end date always has a value
-      return {
-        ...prev,
-        jobId: opt.id,
-        clientId: opt.job.clientId || "",
-        date: nextDate,
-        endDate: nextEnd,
-        description: autoDesc,
-        startPostcode: start ? String(start).toUpperCase() : prev.startPostcode,
-        endPostcode: end ? String(end).toUpperCase() : prev.endPostcode,
-      };
+  const sortedRecords = useMemo(() => {
+    return [...mileageRecords].sort((a, b) => {
+      const aDate = normaliseText((a as any).startDate || a.date);
+      const bDate = normaliseText((b as any).startDate || b.date);
+      return bDate.localeCompare(aDate);
     });
+  }, [mileageRecords]);
 
-    lastCalculatedRef.current = "";
-  };
+  const filteredMileage = useMemo(() => {
+    const q = filterText.trim().toLowerCase();
+    if (!q) return sortedRecords;
 
-  const handleCalculateMileage = async () => {
-    const start = newEntry.startPostcode.trim();
-    const end = newEntry.endPostcode.trim();
-    if (!start || !end) return;
+    return sortedRecords.filter((record) => {
+      const linkedJob =
+        jobs.find((j) => String((j as any).id) === String((record as any).jobId)) ??
+        null;
 
-    setIsCalculating(true);
-    lastCalculatedRef.current = `${start}-${end}`;
+      const haystack = [
+        normaliseText((record as any).fromLocation),
+        normaliseText((record as any).toLocation),
+        normaliseText((record as any).notes),
+        normaliseText((record as any).jobName),
+        normaliseText((record as any).jobNumber),
+        getJobLabel(linkedJob),
+        getJobName(linkedJob),
+        normaliseText((record as any).date),
+        normaliseText((record as any).startDate),
+        normaliseText((record as any).endDate),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(q);
+    });
+  }, [filterText, sortedRecords, jobs]);
+
+  const totalMiles = useMemo(
+    () => filteredMileage.reduce((sum, r) => sum + safeNumber((r as any).miles), 0),
+    [filteredMileage]
+  );
+
+  const totalAmount = useMemo(
+    () => filteredMileage.reduce((sum, r) => sum + safeNumber((r as any).amount), 0),
+    [filteredMileage]
+  );
+
+  async function calculateMiles() {
+    setError(null);
+
+    if (useManualMiles) {
+      const miles = safeNumber(manualMiles, 0);
+      if (miles <= 0) {
+        setError("Please enter a valid mileage amount.");
+        return 0;
+      }
+      return miles;
+    }
+
+    if (!fromLocation.trim() || !toLocation.trim()) {
+      setError("Please enter both a start and destination location.");
+      return 0;
+    }
 
     try {
-      // ✅ UK-scope the query to avoid geocoding to the wrong country/region
-      const startUK = `${start}, UK`;
-      const endUK = `${end}, UK`;
+      setLoadingDistance(true);
+      const result = await getDrivingDistanceFromGoogleMaps(
+        fromLocation.trim(),
+        toLocation.trim()
+      );
 
-      const result = await getDrivingDistanceFromGoogleMaps(startUK, endUK);
+      const oneWayMiles =
+        safeNumber((result as any)?.miles) ||
+        safeNumber((result as any)?.distanceMiles) ||
+        safeNumber((result as any)?.distance) ||
+        0;
 
-      if (result.miles !== null && result.miles > 0) {
-        setNewEntry((prev) => ({ ...prev, distanceMiles: result.miles || 0 }));
-      } else {
-        console.warn("Distance lookup returned no miles:", result);
+      if (!oneWayMiles || oneWayMiles <= 0) {
+        setError("Could not calculate mileage for this journey.");
+        return 0;
       }
+
+      return isReturn ? oneWayMiles * 2 : oneWayMiles;
     } catch (err) {
-      console.warn("Distance lookup failed:", err);
+      console.error("Mileage calculation failed:", err);
+      setError("Unable to calculate distance right now.");
+      return 0;
     } finally {
-      setIsCalculating(false);
+      setLoadingDistance(false);
     }
-  };
+  }
 
-  const handleStartAmend = (record: MileageRecord) => {
-    setEditingId(record.id);
-
-    const date = (record.date || "").split("T")[0];
-    const endDate = record.endDate ? String(record.endDate).split("T")[0] : date; // ✅ fallback to date
-
-    setNewEntry({
-      date,
-      endDate,
-      startPostcode: String(record.startPostcode || "").toUpperCase(),
-      endPostcode: String(record.endPostcode || "").toUpperCase(),
-      numTrips: asInt((record as any).numTrips, 1),
-      isReturn: asBool((record as any).isReturn),
-      distanceMiles: asNumber((record as any).distanceMiles, 0),
-      jobId: record.jobId || "",
-      clientId: record.clientId || "",
-      description: record.description || "",
-    });
-
-    setFormError(null);
-    lastCalculatedRef.current = "";
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleCancelAmend = () => {
+  function resetForm() {
+    setSelectedJobId("");
+    setDate("");
+    setStartDate("");
+    setEndDate("");
+    setFromLocation("");
+    setToLocation("");
+    setNotes("");
+    setIsReturn(true);
+    setManualMiles("");
+    setUseManualMiles(false);
     setEditingId(null);
-    setNewEntry(blankEntry);
-    setFormError(null);
-    lastCalculatedRef.current = "";
-  };
+    setError(null);
+  }
 
-  const canSubmit = useMemo(() => {
-    if (isSaving || isCalculating) return false;
-    return validateEntry() === null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSaving, isCalculating, newEntry]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-
-    const err = validateEntry();
-    if (err) {
-      setFormError(err);
-      return;
-    }
-
-    if (isSaving) return;
-
-    setIsSaving(true);
-    setFormError(null);
+    setError(null);
+    setSaving(true);
 
     try {
-      const tenantId = state.user?.email || "";
+      const miles = await calculateMiles();
+      if (!miles || miles <= 0) {
+        setSaving(false);
+        return;
+      }
 
-      const record: MileageRecord = {
+      const amount = Number((miles * MILEAGE_RATE).toFixed(2));
+
+      const linkedJob =
+        jobs.find((j) => String((j as any).id) === selectedJobId) ?? null;
+
+      const payload: MileageRecord = {
+        ...(editingId
+          ? (mileageRecords.find((r) => String((r as any).id) === editingId) as MileageRecord)
+          : ({} as MileageRecord)),
         id: editingId ?? generateId(),
-        ...newEntry,
-        endDate: (newEntry.endDate || newEntry.date).trim(), // ✅ guarantee endDate
-        numTrips: Math.max(1, asInt(newEntry.numTrips, 1)),
-        isReturn: asBool(newEntry.isReturn),
-        distanceMiles: asNumber(newEntry.distanceMiles, 0),
-        tenant_id: tenantId,
-      } as any;
+        jobId: selectedJobId || undefined,
+        date: date || startDate || endDate || "",
+        startDate: startDate || date || "",
+        endDate: endDate || startDate || date || "",
+        fromLocation: fromLocation.trim(),
+        toLocation: toLocation.trim(),
+        notes: notes.trim(),
+        isReturn,
+        miles,
+        amount,
+        jobNumber:
+          normaliseText((linkedJob as any)?.jobNumber) ||
+          normaliseText((linkedJob as any)?.quoteNumber) ||
+          "",
+        jobName:
+          normaliseText((linkedJob as any)?.title) ||
+          normaliseText((linkedJob as any)?.name) ||
+          normaliseText((linkedJob as any)?.client) ||
+          "",
+        mileageRate: MILEAGE_RATE,
+        createdAt:
+          (editingId
+            ? (mileageRecords.find((r) => String((r as any).id) === editingId) as any)?.createdAt
+            : new Date().toISOString()) ?? new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
 
-      await DB.saveMileage(record);
+      if (editingId) {
+        await DB.mileage.update(payload);
+      } else {
+        await DB.mileage.create(payload);
+      }
 
-      setEditingId(null);
-      setNewEntry(blankEntry);
-      lastCalculatedRef.current = "";
+      resetForm();
       onRefresh();
-    } catch (err2: any) {
-      // keep the form as-is so user can fix and retry
-      setFormError("Failed to save to cloud. Please check required fields and try again.");
-      console.warn("Mileage save failed:", err2);
+    } catch (err) {
+      console.error(err);
+      setError("Unable to save mileage entry.");
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
-  };
+  }
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm("Remove this entry from the ledger?")) {
-      await DB.deleteMileage(id);
-      onRefresh();
-    }
-  };
-
-  const totals = useMemo(() => {
-    return (state.mileage || []).reduce(
-      (acc, curr: any) => {
-        const miles = asNumber(curr.distanceMiles, 0);
-        const trips = Math.max(1, asInt(curr.numTrips, 1));
-        const ret = asBool(curr.isReturn);
-
-        const tripDistance = miles * trips * (ret ? 2 : 1);
-
-        return {
-          miles: acc.miles + tripDistance,
-          value: acc.value + tripDistance * MILEAGE_RATE,
-        };
-      },
-      { miles: 0, value: 0 }
+  function handleEdit(record: MileageRecord) {
+    setEditingId(String((record as any).id));
+    setSelectedJobId(normaliseText((record as any).jobId));
+    setDate(normaliseText((record as any).date));
+    setStartDate(normaliseText((record as any).startDate || (record as any).date));
+    setEndDate(
+      normaliseText((record as any).endDate || (record as any).startDate || (record as any).date)
     );
-  }, [state.mileage]);
+    setFromLocation(normaliseText((record as any).fromLocation));
+    setToLocation(normaliseText((record as any).toLocation));
+    setNotes(normaliseText((record as any).notes));
+    setIsReturn(Boolean((record as any).isReturn));
+    setManualMiles(String(safeNumber((record as any).miles)));
+    setUseManualMiles(true);
+    setError(null);
 
-  const recordsSorted = useMemo(() => {
-    return (state.mileage || [])
-      .slice()
-      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [state.mileage]);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+  }
+
+  async function handleDelete(id: string) {
+    const ok = window.confirm("Delete this mileage entry?");
+    if (!ok) return;
+
+    try {
+      await DB.mileage.delete(id);
+      if (editingId === id) resetForm();
+      onRefresh();
+    } catch (err) {
+      console.error(err);
+      setError("Unable to delete mileage entry.");
+    }
+  }
 
   return (
-    <div className="space-y-6 px-4 pb-24 md:pb-6">
-      <header>
-        <h2 className="text-3xl font-black text-slate-900 leading-tight italic">Travel &amp; Mileage</h2>
-        <p className="text-slate-500 font-bold uppercase text-[9px] tracking-widest italic">
-          Distance via Secure Edge Function
-        </p>
-      </header>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Mileage</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Track journeys, claim mileage, and edit entries without the action
+              buttons disappearing off-screen.
+            </p>
+          </div>
 
-      {/* LINK TO JOB */}
-      <div className="bg-white p-6 rounded-[40px] border border-slate-200 shadow-sm">
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
-            Link to Job (optional)
-          </label>
-          <select
-            className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none"
-            value={newEntry.jobId}
-            onChange={(e) => handleSelectJob(e.target.value)}
-          >
-            <option value="">— No job selected —</option>
-            {jobOptions.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl bg-slate-50 px-4 py-3">
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Entries
+              </div>
+              <div className="mt-1 text-xl font-bold text-slate-900">
+                {filteredMileage.length}
+              </div>
+            </div>
 
-          <div className="text-[10px] font-bold text-slate-400 px-1">
-            Selecting a job auto-fills <span className="font-black">Project ID + Job Description</span> and dates.
+            <div className="rounded-2xl bg-slate-50 px-4 py-3">
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Miles
+              </div>
+              <div className="mt-1 text-xl font-bold text-slate-900">
+                {totalMiles.toFixed(1)}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 px-4 py-3 col-span-2 sm:col-span-1">
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Value
+              </div>
+              <div className="mt-1 text-xl font-bold text-indigo-600">
+                {formatCurrency(totalAmount)}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ENTRY FORM */}
-      <div className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm relative overflow-hidden">
-        <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
-                Date <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="date"
-                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none"
-                value={newEntry.date}
-                onChange={(e) => {
-                  const nextDate = e.target.value;
-                  setNewEntry((prev) => {
-                    const prevEnd = (prev.endDate || "").trim();
-                    const shouldSyncEnd = !prevEnd || prevEnd === prev.date;
-                    return {
-                      ...prev,
-                      date: nextDate,
-                      endDate: shouldSyncEnd ? nextDate : prev.endDate,
-                    };
-                  });
-                }}
-              />
-            </div>
+      {/* Form */}
+      <div
+        ref={formRef}
+        className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+      >
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-xl font-bold text-slate-900">
+            {editingId ? "Edit mileage entry" : "Add mileage entry"}
+          </h2>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
-                End Date (Range) <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="date"
-                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none"
-                value={newEntry.endDate}
-                onChange={(e) => setNewEntry({ ...newEntry, endDate: e.target.value })}
-              />
-            </div>
+          {editingId && (
+            <button
+              type="button"
+              onClick={resetForm}
+              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Cancel edit
+            </button>
+          )}
+        </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
-                Description (Project ID + Job)
+        <form onSubmit={handleSave} className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                Link to job
               </label>
-              <input
-                placeholder="e.g. 250461 — AWS London"
-                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none"
-                value={newEntry.description}
-                onChange={(e) => setNewEntry({ ...newEntry, description: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-            <div className="md:col-span-3 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
-                Start Postcode <span className="text-rose-500">*</span>
-              </label>
-              <input
-                placeholder="SW1..."
-                className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase"
-                value={newEntry.startPostcode}
-                onChange={(e) => setNewEntry({ ...newEntry, startPostcode: e.target.value.toUpperCase() })}
-              />
-            </div>
-
-            <div className="md:col-span-3 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
-                End Postcode <span className="text-rose-500">*</span>
-              </label>
-              <input
-                placeholder="E1..."
-                className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase"
-                value={newEntry.endPostcode}
-                onChange={(e) => setNewEntry({ ...newEntry, endPostcode: e.target.value.toUpperCase() })}
-              />
-            </div>
-
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
-                Miles (one-way) <span className="text-rose-500">*</span>
-              </label>
-              <div
-                className={`relative px-4 py-4 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[56px] transition-all ${
-                  isCalculating ? "border-indigo-400 animate-pulse" : "border-indigo-100 text-indigo-700"
-                }`}
+              <select
+                value={selectedJobId}
+                onChange={(e) => setSelectedJobId(e.target.value)}
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-indigo-500"
               >
+                <option value="">No linked job</option>
+                {jobs.map((job) => {
+                  const jobId = String((job as any).id);
+                  const label = getJobLabel(job);
+                  const name = getJobName(job);
+                  return (
+                    <option key={jobId} value={jobId}>
+                      {[label, name].filter(Boolean).join(" — ") || jobId}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Date
+                </label>
                 <input
-                  type="number"
-                  step="0.01"
-                  className="w-full bg-transparent outline-none font-black text-indigo-700 placeholder:text-indigo-300"
-                  value={newEntry.distanceMiles || ""}
-                  placeholder={isCalculating ? "GEO..." : "0.00"}
-                  onChange={(e) =>
-                    setNewEntry({
-                      ...newEntry,
-                      distanceMiles: parseFloat(e.target.value) || 0,
-                    })
-                  }
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-indigo-500"
                 />
-                <button
-                  type="button"
-                  onClick={handleCalculateMileage}
-                  className="text-indigo-400 hover:text-indigo-600 ml-1"
-                  title="Recalculate"
-                >
-                  <i className="fa-solid fa-arrows-rotate text-[10px]"></i>
-                </button>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Start date
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  End date
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-indigo-500"
+                />
               </div>
             </div>
+          </div>
 
-            <div className="md:col-span-1 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Trips</label>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                From
+              </label>
               <input
-                type="number"
-                min="1"
-                className="w-full md:min-w-[110px] px-5 py-4 bg-white border border-slate-200 rounded-2xl font-black outline-none h-[56px] text-center text-base"
-                value={newEntry.numTrips}
-                onChange={(e) =>
-                  setNewEntry({
-                    ...newEntry,
-                    numTrips: Math.max(1, parseInt(e.target.value) || 1),
-                  })
-                }
+                type="text"
+                value={fromLocation}
+                onChange={(e) => setFromLocation(e.target.value)}
+                placeholder="e.g. WV3 8DA"
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-indigo-500"
               />
             </div>
 
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Return?</label>
-              <button
-                type="button"
-                onClick={() => setNewEntry({ ...newEntry, isReturn: !newEntry.isReturn })}
-                className={`w-full px-2 py-4 rounded-2xl font-black text-[10px] uppercase border transition-all h-[56px] ${
-                  newEntry.isReturn ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-400 border-slate-200"
-                }`}
-              >
-                {newEntry.isReturn ? "Yes" : "No"}
-              </button>
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                To
+              </label>
+              <input
+                type="text"
+                value={toLocation}
+                onChange={(e) => setToLocation(e.target.value)}
+                placeholder="e.g. Manchester Airport"
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-indigo-500"
+              />
             </div>
-
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              className="md:col-span-1 h-[56px] bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50"
-              title={!canSubmit ? "Please complete required fields" : "Save mileage entry"}
-            >
-              {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : editingId ? "Update" : "Add"}
-            </button>
           </div>
 
-          {formError && (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-[11px] font-black text-rose-600">
-              {formError}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[auto_1fr_auto] xl:items-end">
+            <label className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
+              <input
+                type="checkbox"
+                checked={isReturn}
+                onChange={(e) => setIsReturn(e.target.checked)}
+                className="h-4 w-4"
+              />
+              <span className="text-sm font-semibold text-slate-700">
+                Return journey
+              </span>
+            </label>
+
+            <label className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
+              <input
+                type="checkbox"
+                checked={useManualMiles}
+                onChange={(e) => setUseManualMiles(e.target.checked)}
+                className="h-4 w-4"
+              />
+              <span className="text-sm font-semibold text-slate-700">
+                Enter miles manually
+              </span>
+            </label>
+
+            {useManualMiles && (
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Miles
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={manualMiles}
+                  onChange={(e) => setManualMiles(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-indigo-500"
+                />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Notes
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              placeholder="Optional notes"
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-indigo-500"
+            />
+          </div>
+
+          {error && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
             </div>
           )}
 
-          <div className="flex flex-col md:flex-row gap-3 md:items-center justify-between pt-2">
-            <div className="text-[11px] font-bold text-slate-500">
-              This entry total:
-              <span className="font-black text-slate-900 ml-2">{entryTripMiles.toFixed(1)} mi</span>
-              <span className="ml-3 text-indigo-600 font-black">{formatCurrency(entryTripMiles * MILEAGE_RATE, state.user)}</span>
-            </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="submit"
+              disabled={saving || loadingDistance}
+              className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving
+                ? "Saving..."
+                : editingId
+                ? "Update mileage entry"
+                : "Save mileage entry"}
+            </button>
 
-            {editingId && (
-              <button
-                type="button"
-                onClick={handleCancelAmend}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-500 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 w-fit"
-              >
-                Cancel amend
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={resetForm}
+              className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Clear
+            </button>
           </div>
         </form>
       </div>
 
-      {/* TOTALS */}
-      <div className="flex flex-col md:flex-row justify-end gap-4">
-        <div className="bg-white border border-slate-200 p-6 rounded-[32px] shadow-sm flex items-center gap-8 w-full md:w-auto">
-          <div className="text-center">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fiscal Total</p>
-            <p className="text-2xl font-black text-slate-900">
-              {totals.miles.toFixed(1)} <span className="text-[10px] text-slate-400">mi</span>
-            </p>
-          </div>
-          <div className="w-px h-10 bg-slate-100"></div>
-          <div className="text-center">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Reclaim Val</p>
-            <p className="text-2xl font-black text-indigo-600">{formatCurrency(totals.value, state.user)}</p>
+      {/* Search */}
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <h2 className="text-xl font-bold text-slate-900">Mileage entries</h2>
+
+          <div className="w-full lg:w-[360px]">
+            <input
+              type="text"
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+              placeholder="Search by job, location, date..."
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-indigo-500"
+            />
           </div>
         </div>
       </div>
 
-      {/* RECORDS */}
-      <div className="bg-white rounded-[40px] border border-slate-200 overflow-hidden shadow-sm">
-        <div className="hidden md:block">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-50/50 border-b border-slate-100">
-              <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <th className="p-5 w-[210px]">Date</th>
-                <th className="p-5">Description</th>
-                <th className="p-5 w-[220px]">Route</th>
-                <th className="p-5 w-[140px]">Leg</th>
-                <th className="p-5 text-right w-[110px]">Total mi</th>
-                <th className="p-5 text-right w-[120px]">Valuation</th>
-                <th className="p-5 text-center w-[170px]">Actions</th>
-              </tr>
-            </thead>
+      {/* Entries */}
+      <div className="space-y-3 overflow-x-hidden">
+        {filteredMileage.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500 shadow-sm">
+            No mileage entries found.
+          </div>
+        ) : (
+          filteredMileage.map((record) => {
+            const linkedJob =
+              jobs.find((j) => String((j as any).id) === String((record as any).jobId)) ??
+              null;
 
-            <tbody className="divide-y divide-slate-100 font-medium">
-              {recordsSorted.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest italic">
-                    Operational travel ledger is empty
-                  </td>
-                </tr>
-              ) : (
-                recordsSorted.map((record: any) => {
-                  const miles = asNumber(record.distanceMiles, 0);
-                  const trips = Math.max(1, asInt(record.numTrips, 1));
-                  const ret = asBool(record.isReturn);
-                  const totalTripMiles = miles * trips * (ret ? 2 : 1);
-                  const dateLabel = formatRangePretty(record.date, record.endDate);
+            const recordJobNumber =
+              normaliseText((record as any).jobNumber) || getJobLabel(linkedJob);
+            const recordJobName =
+              normaliseText((record as any).jobName) || getJobName(linkedJob);
 
-                  return (
-                    <tr key={record.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-5 text-[12px] font-black text-slate-900 whitespace-nowrap">{dateLabel}</td>
-                      <td className="p-5 text-[12px] font-bold text-slate-700">{record.description || "Travel"}</td>
-                      <td className="p-5 text-[11px] font-black text-slate-700 whitespace-nowrap">
-                        {record.startPostcode} <i className="fa-solid fa-arrow-right-long mx-2 text-indigo-400"></i> {record.endPostcode}
-                      </td>
-                      <td className="p-5">
-                        <span
-                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border whitespace-nowrap ${
-                            ret ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-400 border-slate-100"
-                          }`}
-                        >
-                          {ret ? "Return" : "Single"}
-                          {trips > 1 ? ` x${trips}` : ""}
+            const displayRange = formatDateRange(
+              normaliseText((record as any).startDate || (record as any).date),
+              normaliseText(
+                (record as any).endDate ||
+                  (record as any).startDate ||
+                  (record as any).date
+              )
+            );
+
+            const miles = safeNumber((record as any).miles);
+            const amount = safeNumber((record as any).amount);
+
+            return (
+              <div
+                key={String((record as any).id)}
+                className="rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5"
+              >
+                <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[1.1fr_1.4fr_1.6fr_0.7fr_auto] 2xl:items-center">
+                  {/* Date */}
+                  <div className="min-w-0">
+                    <div className="text-xl font-bold text-slate-900">
+                      {displayRange}
+                    </div>
+                  </div>
+
+                  {/* Job */}
+                  <div className="min-w-0">
+                    <div className="truncate text-lg font-semibold text-slate-800">
+                      {recordJobNumber || "No job number"}
+                    </div>
+                    <div className="truncate text-base text-slate-600">
+                      {recordJobName || "No linked job"}
+                    </div>
+                  </div>
+
+                  {/* Route */}
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 text-base font-semibold text-slate-700">
+                      <span className="truncate">{normaliseText((record as any).fromLocation) || "—"}</span>
+                      <span className="text-indigo-500">→</span>
+                      <span className="truncate">{normaliseText((record as any).toLocation) || "—"}</span>
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-600">
+                        {(record as any).isReturn ? "Return" : "One way"}
+                      </span>
+
+                      {normaliseText((record as any).notes) && (
+                        <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                          {normaliseText((record as any).notes)}
                         </span>
-                      </td>
-                      <td className="p-5 text-right font-black text-slate-900">{totalTripMiles.toFixed(1)}</td>
-                      <td className="p-5 text-right font-black text-indigo-600">{formatCurrency(totalTripMiles * MILEAGE_RATE, state.user)}</td>
-                      <td className="p-5 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleStartAmend(record)}
-                            className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50"
-                          >
-                            Amend
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(record.id)}
-                            className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all"
-                            title="Delete"
-                          >
-                            <i className="fa-solid fa-trash-can text-xs"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="md:hidden divide-y divide-slate-100">
-          {recordsSorted.length === 0 ? (
-            <div className="p-16 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest italic">
-              Operational travel ledger is empty
-            </div>
-          ) : (
-            recordsSorted.map((record: any) => {
-              const miles = asNumber(record.distanceMiles, 0);
-              const trips = Math.max(1, asInt(record.numTrips, 1));
-              const ret = asBool(record.isReturn);
-              const totalTripMiles = miles * trips * (ret ? 2 : 1);
-
-              return (
-                <div key={record.id} className="p-5 space-y-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-[12px] font-black text-slate-900">{formatRangePretty(record.date, record.endDate)}</div>
-                      <div className="text-[12px] font-bold text-slate-700">{record.description || "Travel"}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[12px] font-black text-slate-900">{totalTripMiles.toFixed(1)} mi</div>
-                      <div className="text-[12px] font-black text-indigo-600">{formatCurrency(totalTripMiles * MILEAGE_RATE, state.user)}</div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="text-[11px] font-black text-slate-700 whitespace-nowrap">
-                    {record.startPostcode} <i className="fa-solid fa-arrow-right-long mx-2 text-indigo-400"></i> {record.endPostcode}
+                  {/* Figures */}
+                  <div className="text-left 2xl:text-right">
+                    <div className="text-2xl font-bold text-slate-900">
+                      {miles.toFixed(1)}
+                    </div>
+                    <div className="text-xl font-semibold text-indigo-600">
+                      {formatCurrency(amount)}
+                    </div>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border whitespace-nowrap ${
-                        ret ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-400 border-slate-100"
-                      }`}
+                  {/* Actions */}
+                  <div className="flex flex-wrap gap-2 2xl:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(record)}
+                      className="inline-flex items-center rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                     >
-                      {ret ? "Return" : "Single"}
-                      {trips > 1 ? ` x${trips}` : ""}
-                    </span>
+                      Edit
+                    </button>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleStartAmend(record)}
-                        className="px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50"
-                      >
-                        Amend
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(record.id)}
-                        className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all"
-                        title="Delete"
-                      >
-                        <i className="fa-solid fa-trash-can text-xs"></i>
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(String((record as any).id))}
+                      className="inline-flex items-center rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
-              );
-            })
-          )}
-        </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
