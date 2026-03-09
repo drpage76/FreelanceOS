@@ -53,24 +53,11 @@ function formatRangePretty(startStr?: string, endStr?: string) {
 
 // ---------- Job helpers ----------
 function jobTitle(job: any) {
-  return (
-    job?.title ||
-    job?.name ||
-    job?.jobName ||
-    job?.description ||
-    job?.reference ||
-    "Job"
-  );
+  return job?.title || job?.name || job?.jobName || job?.description || job?.reference || "Job";
 }
 
 function pickDatesFromJob(job: any) {
-  const start =
-    job?.startDate ||
-    job?.dateStart ||
-    job?.jobStartDate ||
-    job?.date ||
-    "";
-
+  const start = job?.startDate || job?.dateStart || job?.jobStartDate || job?.date || "";
   const end = job?.endDate || job?.dateEnd || job?.jobEndDate || "";
 
   const norm = (d: any) => (typeof d === "string" ? d.split("T")[0] : "");
@@ -78,10 +65,8 @@ function pickDatesFromJob(job: any) {
 }
 
 function pickStartEndFromJob(job: any) {
-  const start =
-    job?.startPostcode || job?.fromPostcode || job?.originPostcode || "";
-  const end =
-    job?.endPostcode || job?.toPostcode || job?.destinationPostcode || "";
+  const start = job?.startPostcode || job?.fromPostcode || job?.originPostcode || "";
+  const end = job?.endPostcode || job?.toPostcode || job?.destinationPostcode || "";
   return { start: String(start || ""), end: String(end || "") };
 }
 
@@ -112,25 +97,19 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // ✅ NEW: validation message shown above submit
+  // ✅ validation message shown above submit
   const [formError, setFormError] = useState<string | null>(null);
 
   const jobs = state?.jobs || [];
 
-  const jobOptions = useMemo(() => {
-    return jobs
-      .slice()
-      .sort((a, b) => (b.startDate || "").localeCompare(a.startDate || ""))
-      .map((j: Job) => ({
-        id: String(j.id),
-        label: buildJobLabel(j),
-        job: j,
-      }));
-  }, [jobs]);
+  // ✅ track jobs already linked to mileage
+  const usedJobIds = useMemo(() => {
+    return new Set((state.mileage || []).map((m: any) => String(m.jobId || "")).filter(Boolean));
+  }, [state.mileage]);
 
   const blankEntry = {
     date: new Date().toISOString().split("T")[0],
-    endDate: "", // ✅ mandatory now, keep blank and validate
+    endDate: new Date().toISOString().split("T")[0], // ✅ default to same day (fixes "Add does nothing")
     startPostcode: "",
     endPostcode: "",
     numTrips: 1,
@@ -143,7 +122,25 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
 
   const [newEntry, setNewEntry] = useState(blankEntry);
 
-  // ✅ NEW: centralised validation
+  const jobOptions = useMemo(() => {
+    return jobs
+      .filter((j: Job) => {
+        const id = String(j.id);
+        // ✅ allow currently-selected job (important when editing existing mileage)
+        if (newEntry.jobId && id === String(newEntry.jobId)) return true;
+        // ✅ otherwise hide jobs already used
+        return !usedJobIds.has(id);
+      })
+      .slice()
+      .sort((a, b) => (b.startDate || "").localeCompare(a.startDate || ""))
+      .map((j: Job) => ({
+        id: String(j.id),
+        label: buildJobLabel(j),
+        job: j,
+      }));
+  }, [jobs, usedJobIds, newEntry.jobId]);
+
+  // ✅ centralised validation
   const validateEntry = () => {
     const date = (newEntry.date || "").trim();
     const endDate = (newEntry.endDate || "").trim();
@@ -151,12 +148,15 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
     const end = (newEntry.endPostcode || "").trim();
 
     if (!date) return "Start date is required.";
-    if (!endDate) return "End date is required.";
-    if (endDate < date) return "End date cannot be earlier than start date.";
+
+    // ✅ Treat blank endDate as same-day trip
+    const effectiveEnd = endDate || date;
+    if (effectiveEnd < date) return "End date cannot be earlier than start date.";
+
     if (!start || start.length < 5) return "Start postcode is required.";
     if (!end || end.length < 5) return "End postcode is required.";
 
-    // Distance is optional to type manually, but must be > 0 to save
+    // Distance must be > 0 to save
     const miles = asNumber(newEntry.distanceMiles, 0);
     if (!Number.isFinite(miles) || miles <= 0) return "Miles must be greater than 0.";
 
@@ -171,7 +171,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
   }, [newEntry.distanceMiles, newEntry.numTrips, newEntry.isReturn]);
 
   useEffect(() => {
-    // clear error as the user edits
+    // clear error as the user edits key fields
     if (formError) setFormError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newEntry.date, newEntry.endDate, newEntry.startPostcode, newEntry.endPostcode, newEntry.distanceMiles]);
@@ -203,16 +203,20 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
     const { start, end } = pickStartEndFromJob(opt.job);
     const autoDesc = `${opt.job.id} — ${jobTitle(opt.job)}`.trim();
 
-    setNewEntry((prev) => ({
-      ...prev,
-      jobId: opt.id,
-      clientId: opt.job.clientId || "",
-      date: date || prev.date,
-      endDate: endDate || prev.endDate,
-      description: autoDesc,
-      startPostcode: start ? String(start).toUpperCase() : prev.startPostcode,
-      endPostcode: end ? String(end).toUpperCase() : prev.endPostcode,
-    }));
+    setNewEntry((prev) => {
+      const nextDate = date || prev.date;
+      const nextEnd = endDate || prev.endDate || nextDate; // ✅ ensure end date always has a value
+      return {
+        ...prev,
+        jobId: opt.id,
+        clientId: opt.job.clientId || "",
+        date: nextDate,
+        endDate: nextEnd,
+        description: autoDesc,
+        startPostcode: start ? String(start).toUpperCase() : prev.startPostcode,
+        endPostcode: end ? String(end).toUpperCase() : prev.endPostcode,
+      };
+    });
 
     lastCalculatedRef.current = "";
   };
@@ -247,9 +251,12 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
   const handleStartAmend = (record: MileageRecord) => {
     setEditingId(record.id);
 
+    const date = (record.date || "").split("T")[0];
+    const endDate = record.endDate ? String(record.endDate).split("T")[0] : date; // ✅ fallback to date
+
     setNewEntry({
-      date: (record.date || "").split("T")[0],
-      endDate: record.endDate ? String(record.endDate).split("T")[0] : "",
+      date,
+      endDate,
       startPostcode: String(record.startPostcode || "").toUpperCase(),
       endPostcode: String(record.endPostcode || "").toUpperCase(),
       numTrips: asInt((record as any).numTrips, 1),
@@ -298,6 +305,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
       const record: MileageRecord = {
         id: editingId ?? generateId(),
         ...newEntry,
+        endDate: (newEntry.endDate || newEntry.date).trim(), // ✅ guarantee endDate
         numTrips: Math.max(1, asInt(newEntry.numTrips, 1)),
         isReturn: asBool(newEntry.isReturn),
         distanceMiles: asNumber(newEntry.distanceMiles, 0),
@@ -353,9 +361,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
   return (
     <div className="space-y-6 px-4 pb-24 md:pb-6">
       <header>
-        <h2 className="text-3xl font-black text-slate-900 leading-tight italic">
-          Travel &amp; Mileage
-        </h2>
+        <h2 className="text-3xl font-black text-slate-900 leading-tight italic">Travel &amp; Mileage</h2>
         <p className="text-slate-500 font-bold uppercase text-[9px] tracking-widest italic">
           Distance via Secure Edge Function
         </p>
@@ -398,7 +404,18 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                 type="date"
                 className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none"
                 value={newEntry.date}
-                onChange={(e) => setNewEntry({ ...newEntry, date: e.target.value })}
+                onChange={(e) => {
+                  const nextDate = e.target.value;
+                  setNewEntry((prev) => {
+                    const prevEnd = (prev.endDate || "").trim();
+                    const shouldSyncEnd = !prevEnd || prevEnd === prev.date;
+                    return {
+                      ...prev,
+                      date: nextDate,
+                      endDate: shouldSyncEnd ? nextDate : prev.endDate,
+                    };
+                  });
+                }}
               />
             </div>
 
@@ -436,9 +453,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                 placeholder="SW1..."
                 className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase"
                 value={newEntry.startPostcode}
-                onChange={(e) =>
-                  setNewEntry({ ...newEntry, startPostcode: e.target.value.toUpperCase() })
-                }
+                onChange={(e) => setNewEntry({ ...newEntry, startPostcode: e.target.value.toUpperCase() })}
               />
             </div>
 
@@ -450,9 +465,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                 placeholder="E1..."
                 className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase"
                 value={newEntry.endPostcode}
-                onChange={(e) =>
-                  setNewEntry({ ...newEntry, endPostcode: e.target.value.toUpperCase() })
-                }
+                onChange={(e) => setNewEntry({ ...newEntry, endPostcode: e.target.value.toUpperCase() })}
               />
             </div>
 
@@ -462,9 +475,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
               </label>
               <div
                 className={`relative px-4 py-4 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[56px] transition-all ${
-                  isCalculating
-                    ? "border-indigo-400 animate-pulse"
-                    : "border-indigo-100 text-indigo-700"
+                  isCalculating ? "border-indigo-400 animate-pulse" : "border-indigo-100 text-indigo-700"
                 }`}
               >
                 <input
@@ -492,13 +503,11 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
             </div>
 
             <div className="md:col-span-1 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
-                Trips
-              </label>
+              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Trips</label>
               <input
                 type="number"
                 min="1"
-                className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl font-black outline-none h-[56px] text-center"
+                className="w-full md:min-w-[110px] px-5 py-4 bg-white border border-slate-200 rounded-2xl font-black outline-none h-[56px] text-center text-base"
                 value={newEntry.numTrips}
                 onChange={(e) =>
                   setNewEntry({
@@ -510,16 +519,12 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
             </div>
 
             <div className="md:col-span-2 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
-                Return?
-              </label>
+              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Return?</label>
               <button
                 type="button"
                 onClick={() => setNewEntry({ ...newEntry, isReturn: !newEntry.isReturn })}
                 className={`w-full px-2 py-4 rounded-2xl font-black text-[10px] uppercase border transition-all h-[56px] ${
-                  newEntry.isReturn
-                    ? "bg-indigo-600 text-white border-indigo-600"
-                    : "bg-white text-slate-400 border-slate-200"
+                  newEntry.isReturn ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-400 border-slate-200"
                 }`}
               >
                 {newEntry.isReturn ? "Yes" : "No"}
@@ -532,17 +537,10 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
               className="md:col-span-1 h-[56px] bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50"
               title={!canSubmit ? "Please complete required fields" : "Save mileage entry"}
             >
-              {isSaving ? (
-                <i className="fa-solid fa-spinner animate-spin"></i>
-              ) : editingId ? (
-                "Update"
-              ) : (
-                "Add"
-              )}
+              {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : editingId ? "Update" : "Add"}
             </button>
           </div>
 
-          {/* ✅ NEW: validation message */}
           {formError && (
             <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-[11px] font-black text-rose-600">
               {formError}
@@ -552,12 +550,8 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
           <div className="flex flex-col md:flex-row gap-3 md:items-center justify-between pt-2">
             <div className="text-[11px] font-bold text-slate-500">
               This entry total:
-              <span className="font-black text-slate-900 ml-2">
-                {entryTripMiles.toFixed(1)} mi
-              </span>
-              <span className="ml-3 text-indigo-600 font-black">
-                {formatCurrency(entryTripMiles * MILEAGE_RATE, state.user)}
-              </span>
+              <span className="font-black text-slate-900 ml-2">{entryTripMiles.toFixed(1)} mi</span>
+              <span className="ml-3 text-indigo-600 font-black">{formatCurrency(entryTripMiles * MILEAGE_RATE, state.user)}</span>
             </div>
 
             {editingId && (
@@ -577,22 +571,15 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
       <div className="flex flex-col md:flex-row justify-end gap-4">
         <div className="bg-white border border-slate-200 p-6 rounded-[32px] shadow-sm flex items-center gap-8 w-full md:w-auto">
           <div className="text-center">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-              Fiscal Total
-            </p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fiscal Total</p>
             <p className="text-2xl font-black text-slate-900">
-              {totals.miles.toFixed(1)}{" "}
-              <span className="text-[10px] text-slate-400">mi</span>
+              {totals.miles.toFixed(1)} <span className="text-[10px] text-slate-400">mi</span>
             </p>
           </div>
           <div className="w-px h-10 bg-slate-100"></div>
           <div className="text-center">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-              Reclaim Val
-            </p>
-            <p className="text-2xl font-black text-indigo-600">
-              {formatCurrency(totals.value, state.user)}
-            </p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Reclaim Val</p>
+            <p className="text-2xl font-black text-indigo-600">{formatCurrency(totals.value, state.user)}</p>
           </div>
         </div>
       </div>
@@ -616,10 +603,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
             <tbody className="divide-y divide-slate-100 font-medium">
               {recordsSorted.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="p-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest italic"
-                  >
+                  <td colSpan={7} className="p-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest italic">
                     Operational travel ledger is empty
                   </td>
                 </tr>
@@ -633,35 +617,23 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
 
                   return (
                     <tr key={record.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-5 text-[12px] font-black text-slate-900 whitespace-nowrap">
-                        {dateLabel}
-                      </td>
-                      <td className="p-5 text-[12px] font-bold text-slate-700">
-                        {record.description || "Travel"}
-                      </td>
+                      <td className="p-5 text-[12px] font-black text-slate-900 whitespace-nowrap">{dateLabel}</td>
+                      <td className="p-5 text-[12px] font-bold text-slate-700">{record.description || "Travel"}</td>
                       <td className="p-5 text-[11px] font-black text-slate-700 whitespace-nowrap">
-                        {record.startPostcode}{" "}
-                        <i className="fa-solid fa-arrow-right-long mx-2 text-indigo-400"></i>{" "}
-                        {record.endPostcode}
+                        {record.startPostcode} <i className="fa-solid fa-arrow-right-long mx-2 text-indigo-400"></i> {record.endPostcode}
                       </td>
                       <td className="p-5">
                         <span
                           className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border whitespace-nowrap ${
-                            ret
-                              ? "bg-indigo-50 text-indigo-600 border-indigo-100"
-                              : "bg-slate-50 text-slate-400 border-slate-100"
+                            ret ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-400 border-slate-100"
                           }`}
                         >
                           {ret ? "Return" : "Single"}
                           {trips > 1 ? ` x${trips}` : ""}
                         </span>
                       </td>
-                      <td className="p-5 text-right font-black text-slate-900">
-                        {totalTripMiles.toFixed(1)}
-                      </td>
-                      <td className="p-5 text-right font-black text-indigo-600">
-                        {formatCurrency(totalTripMiles * MILEAGE_RATE, state.user)}
-                      </td>
+                      <td className="p-5 text-right font-black text-slate-900">{totalTripMiles.toFixed(1)}</td>
+                      <td className="p-5 text-right font-black text-indigo-600">{formatCurrency(totalTripMiles * MILEAGE_RATE, state.user)}</td>
                       <td className="p-5 text-center">
                         <div className="flex items-center justify-center gap-2">
                           <button
@@ -705,35 +677,23 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                 <div key={record.id} className="p-5 space-y-2">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-[12px] font-black text-slate-900">
-                        {formatRangePretty(record.date, record.endDate)}
-                      </div>
-                      <div className="text-[12px] font-bold text-slate-700">
-                        {record.description || "Travel"}
-                      </div>
+                      <div className="text-[12px] font-black text-slate-900">{formatRangePretty(record.date, record.endDate)}</div>
+                      <div className="text-[12px] font-bold text-slate-700">{record.description || "Travel"}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-[12px] font-black text-slate-900">
-                        {totalTripMiles.toFixed(1)} mi
-                      </div>
-                      <div className="text-[12px] font-black text-indigo-600">
-                        {formatCurrency(totalTripMiles * MILEAGE_RATE, state.user)}
-                      </div>
+                      <div className="text-[12px] font-black text-slate-900">{totalTripMiles.toFixed(1)} mi</div>
+                      <div className="text-[12px] font-black text-indigo-600">{formatCurrency(totalTripMiles * MILEAGE_RATE, state.user)}</div>
                     </div>
                   </div>
 
                   <div className="text-[11px] font-black text-slate-700 whitespace-nowrap">
-                    {record.startPostcode}{" "}
-                    <i className="fa-solid fa-arrow-right-long mx-2 text-indigo-400"></i>{" "}
-                    {record.endPostcode}
+                    {record.startPostcode} <i className="fa-solid fa-arrow-right-long mx-2 text-indigo-400"></i> {record.endPostcode}
                   </div>
 
                   <div className="flex items-center justify-between">
                     <span
                       className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border whitespace-nowrap ${
-                        ret
-                          ? "bg-indigo-50 text-indigo-600 border-indigo-100"
-                          : "bg-slate-50 text-slate-400 border-slate-100"
+                        ret ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-400 border-slate-100"
                       }`}
                     >
                       {ret ? "Return" : "Single"}
