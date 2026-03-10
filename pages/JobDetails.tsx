@@ -224,9 +224,27 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
       await syncJobToGoogle(updatedJob, googleAccessToken, client?.name);
       return { ok: true as const, warning: null };
     } catch (e: any) {
-      const msg = e?.message || "Calendar sync failed.";
+      const msg = String(e?.message || e || "");
+      const isGoogleAuthError =
+        msg.includes("Invalid Credentials") ||
+        msg.includes("UNAUTHENTICATED") ||
+        msg.includes("Request had invalid authentication credentials") ||
+        msg.includes("401");
+
       console.warn("[Calendar Sync Failed]", e);
-      return { ok: false as const, warning: msg };
+
+      if (isGoogleAuthError) {
+        return {
+          ok: false as const,
+          warning:
+            "We couldn’t update Google Calendar because your Google connection has expired. Please sign out and sign back in.",
+        };
+      }
+
+      return {
+        ok: false as const,
+        warning: "We couldn’t update Google Calendar right now. Please try again shortly.",
+      };
     }
   };
 
@@ -522,9 +540,10 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     <div className="space-y-6 max-w-full overflow-x-hidden pb-20 px-1 md:px-4">
       {calendarWarning && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-[11px] font-bold">
-          Saved successfully, but calendar sync failed: <span className="font-mono">{calendarWarning}</span>
+          <div>Your changes were saved.</div>
+          <div className="mt-1">{calendarWarning}</div>
           <div className="mt-2 text-[10px] text-amber-700">
-            Tip: try “Sync All” from the dashboard after re-authing Google.
+            Your job is saved safely in FreelanceOS. Only the Google Calendar sync needs reconnecting.
           </div>
         </div>
       )}

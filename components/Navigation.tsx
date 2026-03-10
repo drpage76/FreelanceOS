@@ -24,7 +24,11 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, active }) => (
   </Link>
 );
 
-export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }> = ({ isSyncing, user }) => {
+export const Navigation: React.FC<{
+  isSyncing?: boolean;
+  user?: Tenant | null;
+  onLogout?: () => void;
+}> = ({ isSyncing, user, onLogout }) => {
   const location = useLocation();
   const [cloudActive, setCloudActive] = useState(false);
 
@@ -54,7 +58,8 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
           </div>
           <div>
             <h1 className="font-black text-xl tracking-tight leading-none text-slate-900">
-              Freelance<br />
+              Freelance
+              <br />
               <span className="text-indigo-600">OS</span>
             </h1>
             {isPro ? (
@@ -97,6 +102,17 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
             {isSyncing ? "Syncing..." : cloudActive ? "Cloud Active" : "Offline"}
           </span>
         </div>
+
+        {onLogout && (
+          <button
+            type="button"
+            onClick={onLogout}
+            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-rose-500 transition-all text-[10px] font-black uppercase tracking-widest"
+          >
+            <i className="fa-solid fa-right-from-bracket"></i>
+            Sign Out
+          </button>
+        )}
       </div>
     </nav>
   );

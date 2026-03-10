@@ -115,6 +115,7 @@ const MainLayout: React.FC<{
   clients: any[];
   existingJobs: Job[];
   onSaveJob: (job: Job, items: JobItem[], clientName: string) => Promise<void>;
+  onLogout: () => void;
 }> = ({
   isSyncing,
   currentUser,
@@ -124,10 +125,11 @@ const MainLayout: React.FC<{
   clients,
   existingJobs,
   onSaveJob,
+  onLogout,
 }) => {
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-slate-50 overflow-hidden relative">
-      <Navigation isSyncing={isSyncing} user={currentUser} />
+      <Navigation isSyncing={isSyncing} user={currentUser} onLogout={onLogout} />
 
       {isReadOnly && (
         <div className="fixed top-0 left-0 right-0 bg-rose-600 text-white py-2 text-center z-[200] text-[10px] font-black uppercase tracking-[0.2em] shadow-lg">
@@ -388,58 +390,58 @@ const App: React.FC = () => {
   }, [loadData, stripOAuthCodeFromUrl]);
 
   const handleSaveNewJob = async (job: Job, items: JobItem[], clientName: string) => {
-  if (isReadOnly) {
-    alert("Workspace is currently read-only.");
-    return;
-  }
+    if (isReadOnly) {
+      alert("Workspace is currently read-only.");
+      return;
+    }
 
-  // 1) ALWAYS save to DB first (this is the critical bit)
-  await DB.saveJob(job);
-  await DB.saveJobItems(job.id, items);
+    // 1) ALWAYS save to DB first (this is the critical bit)
+    await DB.saveJob(job);
+    await DB.saveJobItems(job.id, items);
 
-  // optimistic UI update
-  setAppState((prev) => ({
-    ...prev,
-    jobs: [job, ...prev.jobs],
-  }));
+    // optimistic UI update
+    setAppState((prev) => ({
+      ...prev,
+      jobs: [job, ...prev.jobs],
+    }));
 
-  // helper: detect Google auth failures
-  const isGoogleAuthError = (err: any) => {
-    const msg = String(err?.message || err || "");
-    return (
-      msg.includes("Invalid Credentials") ||
-      msg.includes("UNAUTHENTICATED") ||
-      msg.includes("Request had invalid authentication credentials") ||
-      msg.includes("401")
-    );
-  };
+    // helper: detect Google auth failures
+    const isGoogleAuthError = (err: any) => {
+      const msg = String(err?.message || err || "");
+      return (
+        msg.includes("Invalid Credentials") ||
+        msg.includes("UNAUTHENTICATED") ||
+        msg.includes("Request had invalid authentication credentials") ||
+        msg.includes("401")
+      );
+    };
 
-  // 2) Google sync is BEST-EFFORT (must never block saving)
-  try {
-    const token = await getLatestToken();
-    if (token) {
-      if (job.syncToCalendar === false || job.status === JobStatus.CANCELLED) {
-        await deleteJobFromGoogle(job.id, token);
-      } else {
-        await syncJobToGoogle(job, token, clientName);
+    // 2) Google sync is BEST-EFFORT (must never block saving)
+    try {
+      const token = await getLatestToken();
+      if (token) {
+        if (job.syncToCalendar === false || job.status === JobStatus.CANCELLED) {
+          await deleteJobFromGoogle(job.id, token);
+        } else {
+          await syncJobToGoogle(job, token, clientName);
+        }
       }
+    } catch (err: any) {
+      console.warn("[Calendar Sync Failed] Job was saved, but Google sync failed:", err);
+
+      // If token is dead/expired, clear the cached token so next action can re-auth cleanly
+      if (isGoogleAuthError(err)) {
+        try {
+          DB.clearGoogleTokenCache?.();
+        } catch {}
+      }
+
+      // IMPORTANT: do NOT throw
     }
-  } catch (err: any) {
-    console.warn("[Calendar Sync Failed] Job was saved, but Google sync failed:", err);
 
-    // If token is dead/expired, clear the cached token so next action can re-auth cleanly
-    if (isGoogleAuthError(err)) {
-      try {
-        DB.clearGoogleTokenCache?.();
-      } catch {}
-    }
-
-    // IMPORTANT: do NOT throw
-  }
-
-  // 3) Refresh state from source of truth
-  await loadData();
-};
+    // 3) Refresh state from source of truth
+    await loadData();
+  };
 
   return (
     <ErrorBoundary>
@@ -463,6 +465,7 @@ const App: React.FC = () => {
                     clients={appState.clients}
                     existingJobs={appState.jobs}
                     onSaveJob={handleSaveNewJob}
+                    onLogout={() => DB.signOut().then(() => window.location.reload())}
                   />
                 ) : (
                   <Landing />
