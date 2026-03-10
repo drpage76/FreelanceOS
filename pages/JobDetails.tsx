@@ -57,6 +57,8 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
 
   const [calendarWarning, setCalendarWarning] = useState<string | null>(null);
 
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
+
   const docRef = useRef<HTMLDivElement>(null);
 
   const fetchData = async () => {
@@ -111,6 +113,41 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
     () => (items || []).reduce((sum, item) => sum + (Number(item.qty) * Number(item.unitPrice) || 0), 0),
     [items]
   );
+
+  const descriptionSuggestions = useMemo(() => {
+    const defaults = [
+      "Day Rate",
+      "Prep Day",
+      "Travel Day",
+      "Half Day",
+      "Per Diem",
+      "Hotel",
+      "Parking",
+      "ULEZ",
+      "Mileage",
+      "Equipment Hire",
+      "Crew Call",
+      "Project Management",
+      "On Site Support",
+      "Install Day",
+      "Derig Day",
+      "Overtime",
+    ];
+
+    const historical = (items || [])
+      .map((it) => String(it.description || "").trim())
+      .filter(Boolean);
+
+    return Array.from(new Set([...defaults, ...historical]));
+  }, [items]);
+
+  const getMatchingSuggestions = (value: string) => {
+    const q = value.trim().toLowerCase();
+    if (!q) return [];
+    return descriptionSuggestions
+      .filter((s) => s.toLowerCase().includes(q) && s.toLowerCase() !== q)
+      .slice(0, 6);
+  };
 
   const handleAddItem = () => {
     if (!id) return;
@@ -521,15 +558,15 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 <div className="px-4 md:px-6 py-6 bg-white">
                   {/* Printable area */}
                   <div
-  ref={docRef}
-  className="bg-white mx-auto shadow-sm text-slate-900"
-  style={{
-    width: "794px",
-    minWidth: "794px",
-    padding: "32px",
-    boxSizing: "border-box",
-  }}
->
+                    ref={docRef}
+                    className="bg-white mx-auto shadow-sm text-slate-900"
+                    style={{
+                      width: "794px",
+                      minWidth: "794px",
+                      padding: "32px",
+                      boxSizing: "border-box",
+                    }}
+                  >
                     {/* Top band: logo + FROM */}
                     <div className="flex items-start justify-between gap-6">
                       <div className="flex items-start gap-5">
@@ -537,7 +574,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                           <img
                             src={logoUrl}
                             alt="Logo"
-                            // ✅ at least 2x larger than before (was w-14 h-14)
                             className="w-28 h-28 rounded-3xl object-contain border border-slate-200 bg-white"
                             crossOrigin="anonymous"
                           />
@@ -625,7 +661,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                           Job Details
                         </div>
 
-                        {/* ✅ show Job Name + Location */}
                         <div className="text-xs font-black text-slate-900">{job.description || "—"}</div>
                         <div className="text-[11px] font-bold text-slate-600 mt-1">{job.location || "—"}</div>
 
@@ -980,7 +1015,6 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 View Invoice
               </button>
 
-              {/* ✅ You had the modal but no button to open it */}
               <button
                 type="button"
                 onClick={() => setShowEditInvoiceDateModal(true)}
@@ -1335,14 +1369,40 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                   key={item.id}
                   className="grid grid-cols-12 gap-3 items-end bg-slate-50 p-4 rounded-2xl border border-slate-100 group"
                 >
-                  <div className="col-span-6 space-y-1">
+                  <div className="col-span-6 space-y-1 relative">
                     <span className="text-[7px] font-black text-slate-400 uppercase px-1">Description</span>
                     <input
                       className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none"
                       placeholder="Service description..."
                       value={item.description}
-                      onChange={(e) => handleUpdateItem(idx, "description", e.target.value)}
+                      onChange={(e) => {
+                        handleUpdateItem(idx, "description", e.target.value);
+                        setActiveSuggestionIndex(idx);
+                      }}
+                      onFocus={() => setActiveSuggestionIndex(idx)}
+                      onBlur={() => {
+                        setTimeout(() => setActiveSuggestionIndex(null), 150);
+                      }}
                     />
+
+                    {activeSuggestionIndex === idx && getMatchingSuggestions(String(item.description || "")).length > 0 && (
+                      <div className="absolute z-20 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+                        {getMatchingSuggestions(String(item.description || "")).map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            className="w-full px-4 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              handleUpdateItem(idx, "description", suggestion);
+                              setActiveSuggestionIndex(null);
+                            }}
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="col-span-2 space-y-1">
@@ -1351,8 +1411,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                       type="number"
                       step="any"
                       className="w-full px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-center outline-none"
-                      value={item.qty}
-                      onChange={(e) => handleUpdateItem(idx, "qty", parseFloat(e.target.value) || 0)}
+                      value={item.qty ?? ""}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => handleUpdateItem(idx, "qty", e.target.value)}
                     />
                   </div>
 
@@ -1362,8 +1423,9 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                       type="number"
                       step="any"
                       className="w-full px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-right outline-none"
-                      value={item.unitPrice}
-                      onChange={(e) => handleUpdateItem(idx, "unitPrice", parseFloat(e.target.value) || 0)}
+                      value={item.unitPrice ?? ""}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => handleUpdateItem(idx, "unitPrice", e.target.value)}
                     />
                   </div>
 
