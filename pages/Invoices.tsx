@@ -78,56 +78,59 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh, googleAcce
   };
 
   const handleDownloadPDF = async () => {
-    if (!docRef.current || !previewData) return;
-    setIsProcessing('downloading');
-    
-    await new Promise(r => setTimeout(r, 100));
+  if (!docRef.current || !previewData) return;
 
-    try {
-      const element = docRef.current;
-      const canvas = await html2canvas(element, { 
-        scale: 2, 
-        useCORS: true, 
-        backgroundColor: '#ffffff',
-        logging: false,
-        width: element.offsetWidth,
-        height: element.scrollHeight,
-        windowHeight: element.scrollHeight,
-        y: 0,
-        scrollX: 0,
-        scrollY: 0
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const pdfWidth = 210;
-      const pdfHeight = (imgHeight * pdfWidth) / imgWidth;
-      
-      const pdf = new jsPDF({ 
-        orientation: 'portrait', 
-        unit: 'mm', 
-        format: [pdfWidth, pdfHeight] 
-      });
-      
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      
-      // Filename format: Invoice [ID] [Client Name].pdf
-      const finalFileName = `Invoice ${previewData.inv.id} ${previewData.client.name}.pdf`;
-      pdf.save(finalFileName);
+  setIsProcessing('downloading');
 
-      if (googleAccessToken && state.user?.businessName) {
-        const pdfBlob = pdf.output('blob');
-        const folderName = `${state.user.businessName} Invoices`;
-        await uploadToGoogleDrive(googleAccessToken, folderName, finalFileName, pdfBlob);
-      }
-    } catch (err) { 
-      console.error(err);
-      alert("PDF Export failed."); 
-    } finally { 
-      setIsProcessing(null); 
+  await new Promise(r => setTimeout(r, 200));
+
+  try {
+    const element = docRef.current;
+
+    const canvas = await html2canvas(element, {
+      scale: 2.5,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      scrollY: -window.scrollY
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4"
+    });
+
+    const pageWidth = 210;
+    const pageHeight = 297;
+
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft > 0) {
+      position -= pageHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
     }
-  };
+
+    const fileName = `Invoice ${previewData.inv.id} ${previewData.client.name}.pdf`;
+    pdf.save(fileName);
+
+  } catch (err) {
+    console.error(err);
+    alert("PDF Export failed.");
+  } finally {
+    setIsProcessing(null);
+  }
+};
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20 px-4">
