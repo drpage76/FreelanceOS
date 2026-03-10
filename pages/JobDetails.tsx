@@ -521,13 +521,15 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                 <div className="px-4 md:px-6 py-6 bg-white">
                   {/* Printable area */}
                   <div
-                    ref={docRef}
-                    className="bg-white"
-                    style={{
-                      // ✅ Safe A4-ish padding for PDF capture
-                      padding: "28px",
-                    }}
-                  >
+  ref={docRef}
+  className="bg-white mx-auto shadow-sm text-slate-900"
+  style={{
+    width: "794px",
+    minWidth: "794px",
+    padding: "32px",
+    boxSizing: "border-box",
+  }}
+>
                     {/* Top band: logo + FROM */}
                     <div className="flex items-start justify-between gap-6">
                       <div className="flex items-start gap-5">
