@@ -150,7 +150,7 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh, googleAcce
               </div>
             </div>
             <div className="p-10 bg-slate-50 custom-scrollbar overflow-x-auto">
-               <div ref={docRef} className="bg-white p-12 pb-32 border border-slate-100 min-h-[1120px] w-[800px] mx-auto shadow-sm text-slate-900">
+               <div ref={docRef} className="bg-white p-12 pb-32 border border-slate-100 min-h-[1120px] w-[794px] mx-auto shadow-sm text-slate-900">
                  <div className="flex justify-between items-start mb-20">
                     <div>
                       {state.user?.logoUrl ? (
