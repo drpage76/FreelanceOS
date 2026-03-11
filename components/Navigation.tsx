@@ -24,11 +24,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, active }) => (
   </Link>
 );
 
-export const Navigation: React.FC<{
-  isSyncing?: boolean;
-  user?: Tenant | null;
-  onLogout?: () => void;
-}> = ({ isSyncing, user, onLogout }) => {
+export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }> = ({ isSyncing, user }) => {
   const location = useLocation();
   const [cloudActive, setCloudActive] = useState(false);
 
@@ -48,6 +44,19 @@ export const Navigation: React.FC<{
   }, []);
 
   const isPro = user?.plan === UserPlan.ACTIVE;
+
+  const feedbackHref =
+    "mailto:drpage76@gmail.com" +
+    "?subject=" +
+    encodeURIComponent("FreelanceOS Beta Feedback") +
+    "&body=" +
+    encodeURIComponent(
+      "What were you trying to do?\n\n" +
+        "What felt confusing?\n\n" +
+        "What nearly stopped you using it?\n\n" +
+        "Any bugs or odd behaviour?\n\n" +
+        "If possible, please attach a screenshot.\n"
+    );
 
   return (
     <nav className="no-print fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 md:relative md:border-t-0 md:h-screen md:w-64 md:border-r p-2 md:p-4 z-50 flex flex-col">
@@ -89,6 +98,26 @@ export const Navigation: React.FC<{
         <NavItem to="/settings" icon="fa-gear" label="Settings" active={location.pathname === "/settings"} />
       </div>
 
+      <div className="hidden md:block px-2 mt-3">
+        <a
+          href={feedbackHref}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-600 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm"
+        >
+          <i className="fa-solid fa-comment-dots text-indigo-500"></i>
+          Send Feedback
+        </a>
+      </div>
+
+      <div className="md:hidden px-1 pb-1">
+        <a
+          href={feedbackHref}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 font-black text-[9px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm"
+        >
+          <i className="fa-solid fa-comment-dots text-indigo-500"></i>
+          Feedback
+        </a>
+      </div>
+
       <div className="hidden md:block p-4 mt-auto">
         <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
           <div className="relative">
@@ -98,21 +127,14 @@ export const Navigation: React.FC<{
               }`}
             />
           </div>
-          <span className={`text-[10px] font-black uppercase tracking-widest ${cloudActive ? "text-slate-400" : "text-rose-500"}`}>
+          <span
+            className={`text-[10px] font-black uppercase tracking-widest ${
+              cloudActive ? "text-slate-400" : "text-rose-500"
+            }`}
+          >
             {isSyncing ? "Syncing..." : cloudActive ? "Cloud Active" : "Offline"}
           </span>
         </div>
-
-        {onLogout && (
-          <button
-            type="button"
-            onClick={onLogout}
-            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-rose-500 transition-all text-[10px] font-black uppercase tracking-widest"
-          >
-            <i className="fa-solid fa-right-from-bracket"></i>
-            Sign Out
-          </button>
-        )}
       </div>
     </nav>
   );
