@@ -18,7 +18,7 @@ export const Landing: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-900 text-white selection:bg-indigo-500 selection:text-white overflow-x-hidden flex flex-col relative">
+    <div className="min-h-screen w-full bg-slate-900 text-white selection:bg-indigo-500 selection:text-white overflow-hidden flex flex-col relative">
       {/* Background Decor */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-20 z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-indigo-600 rounded-full blur-[140px]" />
@@ -50,9 +50,10 @@ export const Landing: React.FC = () => {
         </div>
       )}
 
-      <nav className="relative z-50 max-w-7xl mx-auto w-full px-4 sm:px-8 py-6 sm:py-8 flex items-center justify-between">
+      {/* Top Nav */}
+      <nav className="relative z-50 max-w-7xl mx-auto w-full px-4 sm:px-8 py-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-2xl shadow-indigo-500/40">
+          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-2xl shadow-indigo-500/40 shrink-0">
             <i className="fa-solid fa-bolt text-lg" />
           </div>
           <div className="leading-tight">
@@ -76,43 +77,43 @@ export const Landing: React.FC = () => {
             onClick={() => openAuth(true)}
             className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:bg-indigo-500 transition-all"
           >
-            Register
+            Start Free Trial
           </button>
         </div>
       </nav>
 
-      <main className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-8 pt-6 pb-20 flex-1">
-        <div className="space-y-6 sm:space-y-10 mb-12 text-center lg:text-left">
-          <div className="inline-flex items-center gap-3 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400 shadow-inner">
-            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_#10b981]" />
-            Professional Business Operating System
-          </div>
-
-          <div className="space-y-4">
-            <div className="text-[10px] sm:text-xs font-black uppercase tracking-[0.35em] text-slate-500">
-              FreelanceOS by PageTech Creative Ltd
+      {/* Main */}
+      <main className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-8 flex-1 flex items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 xl:gap-16 items-center w-full">
+          {/* Left */}
+          <div className="space-y-6 text-center lg:text-left">
+            <div className="inline-flex items-center gap-3 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400 shadow-inner">
+              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_#10b981]" />
+              Professional Business Operating System
             </div>
 
-            <h1 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black tracking-tighter leading-[1.1] text-white italic drop-shadow-2xl max-w-full">
-              “Jobs, invoices, <br className="hidden sm:block" />
-              and time — <br className="lg:hidden" />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-emerald-400 to-indigo-400">
-                simplified.”
-              </span>
-            </h1>
-          </div>
-        </div>
+            <div className="space-y-3">
+              <div className="text-[10px] sm:text-xs font-black uppercase tracking-[0.35em] text-slate-500">
+                FreelanceOS by PageTech Creative Ltd
+              </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-start">
-          <div className="space-y-8">
-            <p className="text-slate-400 text-lg sm:text-2xl font-medium leading-relaxed max-w-xl">
-              The high-performance workspace for modern independent professionals. £9.99/month or{" "}
-              <span className="text-emerald-400 font-black">£99.99/year</span> (+VAT). Start your 30-day full access
-              free trial today.
+              <h1 className="text-4xl sm:text-6xl xl:text-7xl font-black tracking-tighter leading-[0.98] text-white italic">
+                Jobs, invoices,
+                <br />
+                and time —
+                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-emerald-400 to-indigo-400">
+                  simplified.
+                </span>
+              </h1>
+            </div>
+
+            <p className="text-slate-400 text-base sm:text-xl font-medium leading-relaxed max-w-2xl mx-auto lg:mx-0">
+              Built for independent professionals who want jobs, scheduling, invoices, mileage and business visibility
+              in one clean system.
             </p>
 
-            {/* Pricing / Trust Strip */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 max-w-4xl">
+            {/* Compact pricing strip */}
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 max-w-3xl mx-auto lg:mx-0">
               <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
                 <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">Monthly</p>
                 <p className="mt-2 text-2xl font-black tracking-tight text-white">£9.99</p>
@@ -138,7 +139,7 @@ export const Landing: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               <button
                 onClick={() => openAuth(true)}
                 className="px-8 py-4 bg-indigo-600 text-white rounded-[20px] font-black text-xs uppercase tracking-widest shadow-2xl shadow-indigo-500/40 hover:bg-indigo-500 transition-all text-center"
@@ -152,41 +153,19 @@ export const Landing: React.FC = () => {
                 Sign In to OS
               </button>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pt-4">
-              {[
-                { icon: "fa-cloud-arrow-up", title: "Global Sync", desc: "Secure cloud-based workspace" },
-                { icon: "fa-calendar-check", title: "Schedule", desc: "Jobs and calendar visibility" },
-                { icon: "fa-file-invoice-dollar", title: "Financials", desc: "Invoices and revenue tracking" },
-                { icon: "fa-map-location-dot", title: "Mileage", desc: "Business mileage logging" },
-              ].map((f, i) => (
-                <div
-                  key={i}
-                  className="flex gap-4 p-5 bg-white/5 border border-white/10 rounded-[24px] hover:bg-white/10 transition-all cursor-default group text-left"
-                >
-                  <div className="w-10 h-10 bg-indigo-50/10 rounded-xl flex items-center justify-center group-hover:bg-indigo-500 transition-all shrink-0">
-                    <i className={`fa-solid ${f.icon} text-indigo-400 group-hover:text-white text-lg`} />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest mb-1 truncate">{f.title}</h3>
-                    <p className="text-slate-500 text-[10px] font-bold leading-relaxed">{f.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
 
-          {/* Product Preview */}
-          <div className="relative w-full overflow-hidden">
-            <div className="relative w-full group max-w-2xl mx-auto lg:max-w-none">
+          {/* Right - generic product mock, not real data */}
+          <div className="relative w-full">
+            <div className="relative group max-w-2xl mx-auto">
               <div className="absolute inset-0 bg-indigo-500/20 blur-[60px] rounded-full group-hover:bg-indigo-500/30 transition-all duration-700 animate-pulse" />
 
-              <div className="bg-slate-800/40 border border-white/10 p-2 rounded-[32px] backdrop-blur-3xl relative z-10 shadow-2xl transition-all duration-700">
-                <div className="overflow-hidden rounded-[24px] bg-slate-950 min-h-[420px] border border-white/5">
+              <div className="bg-slate-800/40 border border-white/10 p-2 rounded-[32px] backdrop-blur-3xl relative z-10 shadow-2xl">
+                <div className="overflow-hidden rounded-[24px] bg-slate-950 border border-white/5">
                   <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-white/[0.03]">
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
-                        Dashboard Preview
+                        Workspace Preview
                       </p>
                       <p className="text-sm font-black text-white mt-1">
                         FreelanceOS <span className="text-slate-500 font-bold">by PageTech Creative Ltd</span>
@@ -202,32 +181,26 @@ export const Landing: React.FC = () => {
                   <div className="p-5 space-y-4">
                     <div className="grid grid-cols-3 gap-3">
                       <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">
-                          Accounts Receivable
-                        </p>
-                        <p className="text-xl font-black text-white mt-2">£3,611.67</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Jobs</p>
+                        <p className="text-2xl font-black text-white mt-2">24</p>
                         <p className="text-[9px] font-black uppercase tracking-widest text-indigo-400 mt-1">
-                          26 days remaining
+                          Active workflow
                         </p>
                       </div>
 
                       <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">
-                          Production Queue
-                        </p>
-                        <p className="text-xl font-black text-white mt-2">AWS</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Invoices</p>
+                        <p className="text-2xl font-black text-white mt-2">12</p>
                         <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400 mt-1">
-                          19 Apr start
+                          Sent this month
                         </p>
                       </div>
 
                       <div className="rounded-2xl bg-indigo-500/10 border border-indigo-400/20 p-4">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                          Financial Performance
-                        </p>
-                        <p className="text-xl font-black text-white mt-2">£60,241.19</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Visibility</p>
+                        <p className="text-2xl font-black text-white mt-2">Full</p>
                         <div className="w-full h-1.5 rounded-full bg-white/10 mt-3 overflow-hidden">
-                          <div className="h-full w-full bg-indigo-500 rounded-full" />
+                          <div className="h-full w-[88%] bg-indigo-500 rounded-full" />
                         </div>
                       </div>
                     </div>
@@ -235,36 +208,10 @@ export const Landing: React.FC = () => {
                     <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
                       <div className="flex items-center justify-between mb-3">
                         <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">
-                          Pipeline Value
+                          Core Tools
                         </p>
                         <p className="text-[9px] font-black uppercase tracking-widest text-slate-600">
-                          FY start 6/4
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="rounded-xl bg-slate-900/70 border border-white/5 p-3">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">FY 2025/26</p>
-                          <p className="text-lg font-black text-white mt-2">£0.00</p>
-                        </div>
-                        <div className="rounded-xl bg-slate-900/70 border border-white/5 p-3">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">FY 2026/27</p>
-                          <p className="text-lg font-black text-white mt-2">£25,935.00</p>
-                        </div>
-                        <div className="rounded-xl bg-slate-900/70 border border-white/5 p-3">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">FY 2027/28</p>
-                          <p className="text-lg font-black text-white mt-2">£0.00</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">
-                          Core Workspace Features
-                        </p>
-                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-600">
-                          Live System
+                          All Included
                         </p>
                       </div>
 
@@ -287,13 +234,37 @@ export const Landing: React.FC = () => {
                         ))}
                       </div>
                     </div>
+
+                    <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-3">
+                        Built For Independent Professionals
+                      </p>
+                      <div className="grid grid-cols-4 gap-3">
+                        {[
+                          { label: "Jobs", icon: "fa-briefcase" },
+                          { label: "Calendar", icon: "fa-calendar-check" },
+                          { label: "Invoices", icon: "fa-file-invoice-dollar" },
+                          { label: "Mileage", icon: "fa-map-location-dot" },
+                        ].map((item) => (
+                          <div
+                            key={item.label}
+                            className="rounded-xl bg-slate-900/70 border border-white/5 p-3 flex flex-col items-center justify-center text-center"
+                          >
+                            <i className={`fa-solid ${item.icon} text-indigo-400 text-sm mb-2`} />
+                            <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">
+                              {item.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div className="mt-4 text-center lg:text-left">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                  Live preview styled to reflect the FreelanceOS workspace
+                  Product preview — illustrative layout only
                 </p>
               </div>
             </div>
@@ -301,8 +272,8 @@ export const Landing: React.FC = () => {
         </div>
       </main>
 
-      <footer className="relative z-50 border-t border-white/5 bg-slate-900/80 backdrop-blur-xl py-8 px-4 mt-auto">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+      <footer className="relative z-50 border-t border-white/5 bg-slate-900/80 backdrop-blur-xl py-6 px-4">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex flex-wrap justify-center items-center gap-6">
             <span className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">
               FREELANCEOS BY PAGETECH CREATIVE LTD
