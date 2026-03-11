@@ -1,7 +1,18 @@
 // src/pages/Dashboard.tsx
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from "recharts";
 import {
   parseISO,
   isAfter,
@@ -10,6 +21,8 @@ import {
   format,
   differenceInDays,
   isSameDay,
+  startOfMonth,
+  subMonths,
 } from "date-fns";
 
 import { AppState, JobStatus, InvoiceStatus } from "../types";
@@ -235,6 +248,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
       .sort((a, b) => b.value - a.value);
   }, [clientRevenueTableData, clientValueView]);
 
+  const monthlyRevenueData = useMemo(() => {
+    const months = Array.from({ length: 12 }, (_, i) => {
+      const date = startOfMonth(subMonths(new Date(), 11 - i));
+      return {
+        key: format(date, "yyyy-MM"),
+        label: format(date, "MMM"),
+        fullLabel: format(date, "MMM yyyy"),
+        revenue: 0,
+      };
+    });
+
+    const monthMap = new Map(months.map((m) => [m.key, { ...m }]));
+
+    (state.jobs || []).forEach((job) => {
+      if (job.status === JobStatus.CANCELLED) return;
+
+      const parsedStart = parseISO(job.startDate);
+      if (!isValid(parsedStart)) return;
+
+      const monthKey = format(startOfMonth(parsedStart), "yyyy-MM");
+      const existing = monthMap.get(monthKey);
+      if (existing) {
+        existing.revenue += Number(job.totalRecharge || 0);
+      }
+    });
+
+    return Array.from(monthMap.values());
+  }, [state.jobs]);
+
   // ✅ Pipeline by upcoming fiscal year(s)
   const pipelineByFiscalYear = useMemo(() => {
     const today = startOfDay(new Date());
@@ -451,6 +493,64 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Revenue Trend */}
+      <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Revenue Trend
+            </p>
+            <p className="text-xs font-black text-slate-900">Last 12 months</p>
+          </div>
+          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+            Based on job start date
+          </div>
+        </div>
+
+        <div className="h-[260px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={monthlyRevenueData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10, fontWeight: 700, fill: "#94a3b8" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fontWeight: 700, fill: "#94a3b8" }}
+                axisLine={false}
+                tickLine={false}
+                width={80}
+                tickFormatter={(value) => {
+                  if (value >= 1000) return `£${Math.round(value / 1000)}k`;
+                  return `£${value}`;
+                }}
+              />
+              <Tooltip
+                formatter={(value: number) => formatCurrency(Number(value || 0), state.user)}
+                labelFormatter={(label, payload) => {
+                  const row = payload?.[0]?.payload;
+                  return row?.fullLabel || label;
+                }}
+                wrapperStyle={{
+                  fontSize: "10px",
+                  fontWeight: "bold",
+                  borderRadius: "8px",
+                  border: "none",
+                  boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+                }}
+              />
+              <Bar
+                dataKey="revenue"
+                radius={[8, 8, 0, 0]}
+                fill="#6366f1"
+              />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
