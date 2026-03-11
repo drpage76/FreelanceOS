@@ -27,6 +27,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, active }) => (
 export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }> = ({ isSyncing, user }) => {
   const location = useLocation();
   const [cloudActive, setCloudActive] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     const checkConnection = async () => {
@@ -45,18 +46,40 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
 
   const isPro = user?.plan === UserPlan.ACTIVE;
 
-  const feedbackHref =
-    "mailto:drpage76@gmail.com" +
-    "?subject=" +
-    encodeURIComponent("FreelanceOS Beta Feedback") +
+  const feedbackSubject = "FreelanceOS Beta Feedback";
+  const feedbackBody =
+    "What were you trying to do?\n\n" +
+    "What felt confusing?\n\n" +
+    "What nearly stopped you using it?\n\n" +
+    "Any bugs or odd behaviour?\n\n" +
+    "If possible, please attach a screenshot.\n";
+
+  const gmailFeedbackHref =
+    "https://mail.google.com/mail/?view=cm&fs=1" +
+    "&to=" +
+    encodeURIComponent("drpage76@gmail.com") +
+    "&su=" +
+    encodeURIComponent(feedbackSubject) +
     "&body=" +
-    encodeURIComponent(
-      "What were you trying to do?\n\n" +
-        "What felt confusing?\n\n" +
-        "What nearly stopped you using it?\n\n" +
-        "Any bugs or odd behaviour?\n\n" +
-        "If possible, please attach a screenshot.\n"
-    );
+    encodeURIComponent(feedbackBody);
+
+  const handleFeedbackClick = () => {
+    window.open(gmailFeedbackHref, "_blank", "noopener,noreferrer");
+  };
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+
+    setIsSigningOut(true);
+    try {
+      await DB.signOut();
+      window.location.reload();
+    } catch (err) {
+      console.error("Sign out failed:", err);
+      alert("Sign out failed. Please try again.");
+      setIsSigningOut(false);
+    }
+  };
 
   return (
     <nav className="no-print fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 md:relative md:border-t-0 md:h-screen md:w-64 md:border-r p-2 md:p-4 z-50 flex flex-col">
@@ -98,24 +121,48 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
         <NavItem to="/settings" icon="fa-gear" label="Settings" active={location.pathname === "/settings"} />
       </div>
 
-      <div className="hidden md:block px-2 mt-3">
-        <a
-          href={feedbackHref}
+      {/* Desktop action buttons */}
+      <div className="hidden md:block px-2 mt-3 space-y-2">
+        <button
+          type="button"
+          onClick={handleFeedbackClick}
           className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-600 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm"
         >
           <i className="fa-solid fa-comment-dots text-indigo-500"></i>
           Send Feedback
-        </a>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleSignOut}
+          disabled={isSigningOut}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-600 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm disabled:opacity-50"
+        >
+          <i className={`fa-solid ${isSigningOut ? "fa-spinner animate-spin" : "fa-right-from-bracket"} text-rose-500`}></i>
+          {isSigningOut ? "Signing Out" : "Sign Out"}
+        </button>
       </div>
 
-      <div className="md:hidden px-1 pb-1">
-        <a
-          href={feedbackHref}
+      {/* Mobile action buttons */}
+      <div className="md:hidden px-1 pb-1 space-y-2">
+        <button
+          type="button"
+          onClick={handleFeedbackClick}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 font-black text-[9px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm"
         >
           <i className="fa-solid fa-comment-dots text-indigo-500"></i>
           Feedback
-        </a>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleSignOut}
+          disabled={isSigningOut}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 font-black text-[9px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm disabled:opacity-50"
+        >
+          <i className={`fa-solid ${isSigningOut ? "fa-spinner animate-spin" : "fa-right-from-bracket"} text-rose-500`}></i>
+          {isSigningOut ? "Signing Out" : "Sign Out"}
+        </button>
       </div>
 
       <div className="hidden md:block p-4 mt-auto">
