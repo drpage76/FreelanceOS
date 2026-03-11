@@ -496,63 +496,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Revenue Trend */}
-      <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              Revenue Trend
-            </p>
-            <p className="text-xs font-black text-slate-900">Last 12 months</p>
-          </div>
-          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-            Based on job start date
-          </div>
-        </div>
-
-        <div className="h-[260px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthlyRevenueData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: 10, fontWeight: 700, fill: "#94a3b8" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10, fontWeight: 700, fill: "#94a3b8" }}
-                axisLine={false}
-                tickLine={false}
-                width={80}
-                tickFormatter={(value) => {
-                  if (value >= 1000) return `£${Math.round(value / 1000)}k`;
-                  return `£${value}`;
-                }}
-              />
-              <Tooltip
-                formatter={(value: number) => formatCurrency(Number(value || 0), state.user)}
-                labelFormatter={(label, payload) => {
-                  const row = payload?.[0]?.payload;
-                  return row?.fullLabel || label;
-                }}
-                wrapperStyle={{
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  borderRadius: "8px",
-                  border: "none",
-                  boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
-                }}
-              />
-              <Bar
-                dataKey="revenue"
-                radius={[8, 8, 0, 0]}
-                fill="#6366f1"
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      
 
       {/* Pipeline by Fiscal Year */}
       <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
@@ -737,6 +681,63 @@ export const Dashboard: React.FC<DashboardProps> = ({
               })}
             </div>
           </div>
+        </div>
+      </div>
+      {/* Revenue Trend */}
+      <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Revenue Trend
+            </p>
+            <p className="text-xs font-black text-slate-900">Last 12 months</p>
+          </div>
+          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+            Based on job start date
+          </div>
+        </div>
+
+        <div className="h-[260px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={monthlyRevenueData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10, fontWeight: 700, fill: "#94a3b8" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fontWeight: 700, fill: "#94a3b8" }}
+                axisLine={false}
+                tickLine={false}
+                width={80}
+                tickFormatter={(value) => {
+                  if (value >= 1000) return `£${Math.round(value / 1000)}k`;
+                  return `£${value}`;
+                }}
+              />
+              <Tooltip
+                formatter={(value: number) => formatCurrency(Number(value || 0), state.user)}
+                labelFormatter={(label, payload) => {
+                  const row = payload?.[0]?.payload;
+                  return row?.fullLabel || label;
+                }}
+                wrapperStyle={{
+                  fontSize: "10px",
+                  fontWeight: "bold",
+                  borderRadius: "8px",
+                  border: "none",
+                  boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+                }}
+              />
+              <Bar
+                dataKey="revenue"
+                radius={[8, 8, 0, 0]}
+                fill="#6366f1"
+              />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>
