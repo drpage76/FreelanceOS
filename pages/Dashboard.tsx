@@ -21,7 +21,7 @@ interface DashboardProps {
   onNewJobClick: () => void;
   onSyncCalendar: () => void;
   isSyncing: boolean;
-  googleAccessToken?: string; // ✅ added
+  googleAccessToken?: string;
 }
 
 const COLORS = [
@@ -34,11 +34,18 @@ const COLORS = [
   "#06b6d4",
 ];
 
-// --- Fiscal year helpers (uses tenant settings if present)
+// --- Fiscal year helpers
 function getFiscalYearStart(date: Date, startMonth: number, startDay: number) {
-  // startMonth: 1..12
   const y = date.getFullYear();
-  const fyStartThisYear = new Date(y, Math.max(0, startMonth - 1), Math.max(1, startDay), 0, 0, 0, 0);
+  const fyStartThisYear = new Date(
+    y,
+    Math.max(0, startMonth - 1),
+    Math.max(1, startDay),
+    0,
+    0,
+    0,
+    0
+  );
 
   if (date >= fyStartThisYear) return fyStartThisYear;
   return new Date(y - 1, Math.max(0, startMonth - 1), Math.max(1, startDay), 0, 0, 0, 0);
@@ -49,7 +56,6 @@ function addYears(d: Date, years: number) {
 }
 
 function fiscalYearLabelFromStart(fyStart: Date) {
-  // e.g. FY 2025/26 if start is 2025-04-06
   const a = fyStart.getFullYear();
   const b = (a + 1).toString().slice(-2);
   return `FY ${a}/${b}`;
@@ -68,6 +74,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const [showAllPayments, setShowAllPayments] = useState(false);
   const [showAllJobs, setShowAllJobs] = useState(false);
+  const [clientValueView, setClientValueView] = useState<"lifetime" | "previousFY" | "currentFY" | "nextFY">(
+    "currentFY"
+  );
 
   const revStats = useMemo(
     () => calculateRevenueStats(state.jobs || [], state.user, 60000),
@@ -116,22 +125,90 @@ export const Dashboard: React.FC<DashboardProps> = ({
       .sort((a, b) => b.value - a.value);
   }, [state.jobs, state.clients]);
 
+  const clientRevenueTableData = useMemo(() => {
+    const today = startOfDay(new Date());
+    const startDay = Number((state.user as any)?.fiscalYearStartDay) || 6;
+    const startMonth = Number((state.user as any)?.fiscalYearStartMonth) || 4;
+
+    const currentFYStart = getFiscalYearStart(today, startMonth, startDay);
+    const previousFYStart = addYears(currentFYStart, -1);
+    const nextFYStart = addYears(currentFYStart, 1);
+    const nextNextFYStart = addYears(currentFYStart, 2);
+
+    const clientMap: Record<
+      string,
+      {
+        name: string;
+        jobs: number;
+        lifetime: number;
+        previousFY: number;
+        currentFY: number;
+        nextFY: number;
+      }
+    > = {};
+
+    (state.jobs || []).forEach((j) => {
+      if (j.status === JobStatus.CANCELLED) return;
+
+      const client = state.clients.find((c) => c.id === j.clientId);
+      const name = client?.name || "Unknown";
+
+      if (!clientMap[name]) {
+        clientMap[name] = {
+          name,
+          jobs: 0,
+          lifetime: 0,
+          previousFY: 0,
+          currentFY: 0,
+          nextFY: 0,
+        };
+      }
+
+      clientMap[name].jobs += 1;
+      clientMap[name].lifetime += Number(j.totalRecharge || 0);
+
+      const parsedStart = parseISO(j.startDate);
+      if (!isValid(parsedStart)) return;
+
+      if (parsedStart >= previousFYStart && parsedStart < currentFYStart) {
+        clientMap[name].previousFY += Number(j.totalRecharge || 0);
+      } else if (parsedStart >= currentFYStart && parsedStart < nextFYStart) {
+        clientMap[name].currentFY += Number(j.totalRecharge || 0);
+      } else if (parsedStart >= nextFYStart && parsedStart < nextNextFYStart) {
+        clientMap[name].nextFY += Number(j.totalRecharge || 0);
+      }
+    });
+
+    const totalLifetime = Object.values(clientMap).reduce((sum, c) => sum + c.lifetime, 0);
+
+    return Object.values(clientMap)
+      .map((c) => ({
+        ...c,
+        share: totalLifetime > 0 ? (c.lifetime / totalLifetime) * 100 : 0,
+      }))
+      .sort((a, b) => b.lifetime - a.lifetime);
+  }, [state.jobs, state.clients, state.user]);
+
+  const clientValueLabel = useMemo(() => {
+    if (clientValueView === "previousFY") return "Previous FY";
+    if (clientValueView === "currentFY") return "Current FY";
+    if (clientValueView === "nextFY") return "Next FY";
+    return "Lifetime";
+  }, [clientValueView]);
+
   // ✅ Pipeline by upcoming fiscal year(s)
   const pipelineByFiscalYear = useMemo(() => {
     const today = startOfDay(new Date());
 
-    // Tenant-defined FY start (fallback = UK tax year start 6 April)
     const startDay = Number((state.user as any)?.fiscalYearStartDay) || 6;
     const startMonth = Number((state.user as any)?.fiscalYearStartMonth) || 4;
 
-    // Current FY start + next 2 FYs
     const currentFYStart = getFiscalYearStart(today, startMonth, startDay);
     const fyStarts = [currentFYStart, addYears(currentFYStart, 1), addYears(currentFYStart, 2)];
 
     const totals: Record<string, number> = {};
     fyStarts.forEach((s) => (totals[fiscalYearLabelFromStart(s)] = 0));
 
-    // Define "pipeline" as future/ongoing work that is NOT cancelled/completed
     const candidates = (state.jobs || [])
       .filter((j) => j.status !== JobStatus.CANCELLED && j.status !== JobStatus.COMPLETED)
       .filter((j) => {
@@ -237,7 +314,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
           ) : (
-            <p className="text-[10px] text-slate-300 font-black uppercase text-center py-4 tracking-widest">All settled</p>
+            <p className="text-[10px] text-slate-300 font-black uppercase text-center py-4 tracking-widest">
+              All settled
+            </p>
           )}
         </div>
 
@@ -336,7 +415,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* ✅ Pipeline by Fiscal Year */}
+      {/* Pipeline by Fiscal Year */}
       <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -355,9 +434,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div className="mt-1 text-2xl font-black text-slate-900 tracking-tighter">
                 {formatCurrency(fy.value || 0, state.user)}
               </div>
-              <div className="mt-1 text-[10px] font-bold text-slate-400">
-                Excludes Cancelled/Completed
-              </div>
+              <div className="mt-1 text-[10px] font-bold text-slate-400">Excludes Cancelled/Completed</div>
             </div>
           ))}
         </div>
@@ -369,7 +446,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           jobs={state.jobs || []}
           externalEvents={state.externalEvents || []}
           clients={state.clients || []}
-          googleAccessToken={googleAccessToken} // ✅ pass token down
+          googleAccessToken={googleAccessToken}
         />
       </div>
 
@@ -380,7 +457,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
               Market Share Portfolio
             </p>
-            <div className="h-[200px]">
+            <div className="h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -412,140 +489,126 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           <div className="w-full lg:w-2/3">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
-              Client Ranking by Lifetime Value
-            </p>
-            <div className="flex flex-col gap-2">
-              {revenueByClientData.map((client, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-white hover:shadow-md transition-all"
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Client Ranking by Value
+              </p>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setClientValueView("previousFY")}
+                  className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                    clientValueView === "previousFY"
+                      ? "bg-amber-500 text-white border-amber-500"
+                      : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                  }`}
                 >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div
-                      className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-[10px] shadow-sm"
-                      style={{ backgroundColor: COLORS[idx % COLORS.length] }}
-                    >
-                      {client.name.charAt(0)}
-                    </div>
-                    <div>
+                  Previous FY
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setClientValueView("currentFY")}
+                  className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                    clientValueView === "currentFY"
+                      ? "bg-emerald-600 text-white border-emerald-600"
+                      : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  Current FY
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setClientValueView("nextFY")}
+                  className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                    clientValueView === "nextFY"
+                      ? "bg-indigo-600 text-white border-indigo-600"
+                      : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  Next FY
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setClientValueView("lifetime")}
+                  className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                    clientValueView === "lifetime"
+                      ? "bg-slate-900 text-white border-slate-900"
+                      : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  Total
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="grid grid-cols-12 gap-3 px-3 pb-2 text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                <div className="col-span-5">Client</div>
+                <div className="col-span-2 text-center">Jobs</div>
+                <div className="col-span-3 text-right">{clientValueLabel}</div>
+                <div className="col-span-2 text-right">Share</div>
+              </div>
+
+              {clientRevenueTableData.map((client, idx) => {
+                const value =
+                  clientValueView === "previousFY"
+                    ? client.previousFY
+                    : clientValueView === "currentFY"
+                    ? client.currentFY
+                    : clientValueView === "nextFY"
+                    ? client.nextFY
+                    : client.lifetime;
+
+                const valueColor =
+                  clientValueView === "previousFY"
+                    ? "text-amber-600"
+                    : clientValueView === "currentFY"
+                    ? "text-emerald-600"
+                    : clientValueView === "nextFY"
+                    ? "text-indigo-600"
+                    : "text-slate-900";
+
+                return (
+                  <div
+                    key={idx}
+                    className="grid grid-cols-12 gap-3 items-center p-3 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-white hover:shadow-md transition-all"
+                  >
+                    <div className="col-span-5 flex items-center gap-3 min-w-0">
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-[10px] shadow-sm shrink-0"
+                        style={{ backgroundColor: COLORS[idx % COLORS.length] }}
+                      >
+                        {client.name.charAt(0)}
+                      </div>
                       <p className="text-xs font-black text-slate-900 truncate">{client.name}</p>
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Active Account</p>
+                    </div>
+
+                    <div className="col-span-2 text-center">
+                      <p className="text-[11px] font-black text-slate-600">{client.jobs}</p>
+                    </div>
+
+                    <div className="col-span-3 text-right">
+                      <p className={`text-[11px] font-black ${valueColor}`}>
+                        {formatCurrency(value, state.user)}
+                      </p>
+                    </div>
+
+                    <div className="col-span-2 text-right">
+                      <p className="text-[10px] font-black text-indigo-500 uppercase">
+                        {client.share.toFixed(0)}%
+                      </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-black text-slate-900">{formatCurrency(client.value, state.user)}</p>
-                    <p className="text-[8px] font-black text-indigo-500 uppercase">Gross Billing</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
       </div>
-      {/* Outstanding Revenue Snapshot */}
-<div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
-  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
-    Revenue Intelligence
-  </p>
-
-  {(() => {
-    const outstandingInvoices = (state.invoices || []).filter(
-      (inv) => inv.status !== InvoiceStatus.PAID
-    );
-
-    const outstandingValue = outstandingInvoices.reduce((sum, inv) => {
-      const job = state.jobs.find((j) => j.id === inv.jobId);
-      return sum + (job?.totalRecharge || 0);
-    }, 0);
-
-    const avgInvoice =
-      outstandingInvoices.length > 0
-        ? outstandingValue / outstandingInvoices.length
-        : 0;
-
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-            Outstanding Revenue
-          </p>
-          <p className="text-2xl font-black text-slate-900 tracking-tighter">
-            {formatCurrency(outstandingValue, state.user)}
-          </p>
-        </div>
-
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-            Open Invoices
-          </p>
-          <p className="text-2xl font-black text-slate-900 tracking-tighter">
-            {outstandingInvoices.length}
-          </p>
-        </div>
-
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-            Avg Invoice Value
-          </p>
-          <p className="text-2xl font-black text-slate-900 tracking-tighter">
-            {formatCurrency(avgInvoice, state.user)}
-          </p>
-        </div>
-      </div>
-    );
-  })()}
-</div>
-
-{/* Client Revenue Intelligence Table */}
-<div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
-  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
-    Client Revenue Intelligence
-  </p>
-
-  {(() => {
-    const totalRevenue = revenueByClientData.reduce((s, c) => s + c.value, 0);
-
-    const clientStats = revenueByClientData.map((c) => {
-      const client = state.clients.find((cl) => cl.name === c.name);
-      const jobCount = state.jobs.filter((j) => j.clientId === client?.id).length;
-
-      return {
-        name: c.name,
-        value: c.value,
-        jobs: jobCount,
-        share: totalRevenue ? (c.value / totalRevenue) * 100 : 0,
-      };
-    });
-
-    return (
-      <div className="space-y-2">
-        {clientStats.map((c, idx) => (
-          <div
-            key={idx}
-            className="grid grid-cols-4 items-center p-3 bg-slate-50 border border-slate-100 rounded-2xl"
-          >
-            <div className="font-black text-slate-900 text-xs truncate">
-              {c.name}
-            </div>
-
-            <div className="text-[11px] font-black text-slate-500 text-center">
-              {c.jobs} jobs
-            </div>
-
-            <div className="text-[11px] font-black text-slate-900 text-right">
-              {formatCurrency(c.value, state.user)}
-            </div>
-
-            <div className="text-[10px] font-black text-indigo-500 text-right uppercase">
-              {c.share.toFixed(0)}%
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  })()}
-</div>
     </div>
   );
 };
