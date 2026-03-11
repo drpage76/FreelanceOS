@@ -443,6 +443,109 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       </div>
+      {/* Outstanding Revenue Snapshot */}
+<div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
+  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
+    Revenue Intelligence
+  </p>
+
+  {(() => {
+    const outstandingInvoices = (state.invoices || []).filter(
+      (inv) => inv.status !== InvoiceStatus.PAID
+    );
+
+    const outstandingValue = outstandingInvoices.reduce((sum, inv) => {
+      const job = state.jobs.find((j) => j.id === inv.jobId);
+      return sum + (job?.totalRecharge || 0);
+    }, 0);
+
+    const avgInvoice =
+      outstandingInvoices.length > 0
+        ? outstandingValue / outstandingInvoices.length
+        : 0;
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+            Outstanding Revenue
+          </p>
+          <p className="text-2xl font-black text-slate-900 tracking-tighter">
+            {formatCurrency(outstandingValue, state.user)}
+          </p>
+        </div>
+
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+            Open Invoices
+          </p>
+          <p className="text-2xl font-black text-slate-900 tracking-tighter">
+            {outstandingInvoices.length}
+          </p>
+        </div>
+
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+            Avg Invoice Value
+          </p>
+          <p className="text-2xl font-black text-slate-900 tracking-tighter">
+            {formatCurrency(avgInvoice, state.user)}
+          </p>
+        </div>
+      </div>
+    );
+  })()}
+</div>
+
+{/* Client Revenue Intelligence Table */}
+<div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
+  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
+    Client Revenue Intelligence
+  </p>
+
+  {(() => {
+    const totalRevenue = revenueByClientData.reduce((s, c) => s + c.value, 0);
+
+    const clientStats = revenueByClientData.map((c) => {
+      const client = state.clients.find((cl) => cl.name === c.name);
+      const jobCount = state.jobs.filter((j) => j.clientId === client?.id).length;
+
+      return {
+        name: c.name,
+        value: c.value,
+        jobs: jobCount,
+        share: totalRevenue ? (c.value / totalRevenue) * 100 : 0,
+      };
+    });
+
+    return (
+      <div className="space-y-2">
+        {clientStats.map((c, idx) => (
+          <div
+            key={idx}
+            className="grid grid-cols-4 items-center p-3 bg-slate-50 border border-slate-100 rounded-2xl"
+          >
+            <div className="font-black text-slate-900 text-xs truncate">
+              {c.name}
+            </div>
+
+            <div className="text-[11px] font-black text-slate-500 text-center">
+              {c.jobs} jobs
+            </div>
+
+            <div className="text-[11px] font-black text-slate-900 text-right">
+              {formatCurrency(c.value, state.user)}
+            </div>
+
+            <div className="text-[10px] font-black text-indigo-500 text-right uppercase">
+              {c.share.toFixed(0)}%
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  })()}
+</div>
     </div>
   );
 };
