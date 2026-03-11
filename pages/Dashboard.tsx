@@ -139,10 +139,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
       string,
       {
         name: string;
-        jobs: number;
+        lifetimeJobs: number;
         lifetime: number;
+        previousFYJobs: number;
         previousFY: number;
+        currentFYJobs: number;
         currentFY: number;
+        nextFYJobs: number;
         nextFY: number;
       }
     > = {};
@@ -156,37 +159,36 @@ export const Dashboard: React.FC<DashboardProps> = ({
       if (!clientMap[name]) {
         clientMap[name] = {
           name,
-          jobs: 0,
+          lifetimeJobs: 0,
           lifetime: 0,
+          previousFYJobs: 0,
           previousFY: 0,
+          currentFYJobs: 0,
           currentFY: 0,
+          nextFYJobs: 0,
           nextFY: 0,
         };
       }
 
-      clientMap[name].jobs += 1;
+      clientMap[name].lifetimeJobs += 1;
       clientMap[name].lifetime += Number(j.totalRecharge || 0);
 
       const parsedStart = parseISO(j.startDate);
       if (!isValid(parsedStart)) return;
 
       if (parsedStart >= previousFYStart && parsedStart < currentFYStart) {
+        clientMap[name].previousFYJobs += 1;
         clientMap[name].previousFY += Number(j.totalRecharge || 0);
       } else if (parsedStart >= currentFYStart && parsedStart < nextFYStart) {
+        clientMap[name].currentFYJobs += 1;
         clientMap[name].currentFY += Number(j.totalRecharge || 0);
       } else if (parsedStart >= nextFYStart && parsedStart < nextNextFYStart) {
+        clientMap[name].nextFYJobs += 1;
         clientMap[name].nextFY += Number(j.totalRecharge || 0);
       }
     });
 
-    const totalLifetime = Object.values(clientMap).reduce((sum, c) => sum + c.lifetime, 0);
-
-    return Object.values(clientMap)
-      .map((c) => ({
-        ...c,
-        share: totalLifetime > 0 ? (c.lifetime / totalLifetime) * 100 : 0,
-      }))
-      .sort((a, b) => b.lifetime - a.lifetime);
+    return Object.values(clientMap).sort((a, b) => b.lifetime - a.lifetime);
   }, [state.jobs, state.clients, state.user]);
 
   const clientValueLabel = useMemo(() => {
@@ -195,6 +197,43 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (clientValueView === "nextFY") return "Next FY";
     return "Lifetime";
   }, [clientValueView]);
+
+  const selectedClientTableData = useMemo(() => {
+    const mapped = clientRevenueTableData.map((client) => {
+      const value =
+        clientValueView === "previousFY"
+          ? client.previousFY
+          : clientValueView === "currentFY"
+          ? client.currentFY
+          : clientValueView === "nextFY"
+          ? client.nextFY
+          : client.lifetime;
+
+      const jobs =
+        clientValueView === "previousFY"
+          ? client.previousFYJobs
+          : clientValueView === "currentFY"
+          ? client.currentFYJobs
+          : clientValueView === "nextFY"
+          ? client.nextFYJobs
+          : client.lifetimeJobs;
+
+      return {
+        name: client.name,
+        jobs,
+        value,
+      };
+    });
+
+    const selectedTotal = mapped.reduce((sum, client) => sum + client.value, 0);
+
+    return mapped
+      .map((client) => ({
+        ...client,
+        share: selectedTotal > 0 ? (client.value / selectedTotal) * 100 : 0,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [clientRevenueTableData, clientValueView]);
 
   // ✅ Pipeline by upcoming fiscal year(s)
   const pipelineByFiscalYear = useMemo(() => {
@@ -553,16 +592,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="col-span-2 text-right">Share</div>
               </div>
 
-              {clientRevenueTableData.map((client, idx) => {
-                const value =
-                  clientValueView === "previousFY"
-                    ? client.previousFY
-                    : clientValueView === "currentFY"
-                    ? client.currentFY
-                    : clientValueView === "nextFY"
-                    ? client.nextFY
-                    : client.lifetime;
-
+              {selectedClientTableData.map((client, idx) => {
                 const valueColor =
                   clientValueView === "previousFY"
                     ? "text-amber-600"
@@ -593,7 +623,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                     <div className="col-span-3 text-right">
                       <p className={`text-[11px] font-black ${valueColor}`}>
-                        {formatCurrency(value, state.user)}
+                        {formatCurrency(client.value, state.user)}
                       </p>
                     </div>
 
