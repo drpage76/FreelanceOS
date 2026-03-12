@@ -46,6 +46,7 @@ const FIELD_MAP: Record<string, string> = {
   trialStartDate: "trial_start_date",
   plan: "plan",
   paymentTermsDays: "payment_terms_days",
+  paymentStatus: "payment_status",
 
   // Bank details (tenants table)
   accountName: "account_name",
