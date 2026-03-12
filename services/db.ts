@@ -273,7 +273,7 @@ export const getSupabase = (): SupabaseClient => supabase;
    - Keeps your "clear auth keys" function, but only uses it on explicit signOut (below).
 ======================================================================================= */
 
-const SESSION_TIMEOUT_MS = 4500;
+const SESSION_TIMEOUT_MS = 8000;
 
 // prevents multiple concurrent session reads getting stuck together
 let sessionOp: Promise<any> | null = null;
@@ -632,27 +632,13 @@ export const DB = {
    * Prevents “ghost user” creation which causes redirect loops.
    */
   getCurrentUser: async (): Promise<Tenant | null> => {
-    const cloud = DB.isCloudConfigured();
-    const email = await DB.getTenantId();
+  const cloud = DB.isCloudConfigured();
+  const email = await DB.getTenantId();
 
-    if (cloud && !email) return null;
-    if (!email) return null;
+  if (!email) return null;
 
-    try {
-      const { data, error } = await getSupabase().from("tenants").select("*").eq("email", email).maybeSingle();
-
-      if (!error && data) return fromDb(data) as Tenant;
-
-      if (error) console.warn("[DB.getCurrentUser] tenants read failed:", formatPgError(error));
-    } catch (e) {
-      console.warn("[DB.getCurrentUser] tenants read threw:", e);
-    }
-
-    // If cloud is enabled but tenant row doesn't exist (RLS/missing seed), do NOT create a ghost user.
-    if (cloud) return null;
-
-    // Offline fallback
-    const fallback: Tenant = {
+  const buildDefaultTenant = (): Tenant =>
+    ({
       email,
       name: email.split("@")[0],
       businessName: "My Freelance Business",
@@ -669,17 +655,54 @@ export const DB = {
       invoiceNumberingType: "INCREMENTAL",
       plan: UserPlan.TRIAL,
       trialStartDate: new Date().toISOString(),
+      paymentTermsDays: 30,
       paymentStatus: "TRIALING",
-    } as any;
+    } as any);
 
-    try {
-      await DB.updateTenant(fallback);
-    } catch (e) {
-      console.warn("[DB.getCurrentUser] updateTenant failed (offline):", e);
+  try {
+    const { data, error } = await getSupabase()
+      .from("tenants")
+      .select("*")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (!error && data) {
+      return fromDb(data) as Tenant;
     }
 
-    return fallback;
-  },
+    if (error) {
+      console.warn("[DB.getCurrentUser] tenants read failed:", formatPgError(error));
+    }
+  } catch (e) {
+    console.warn("[DB.getCurrentUser] tenants read threw:", e);
+  }
+
+  // ✅ NEW: in cloud mode, create the tenant row automatically on first login
+  const fallback = buildDefaultTenant();
+
+  try {
+    await DB.updateTenant(fallback);
+
+    const { data: created, error: createdError } = await getSupabase()
+      .from("tenants")
+      .select("*")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (!createdError && created) {
+      return fromDb(created) as Tenant;
+    }
+
+    if (createdError) {
+      console.warn("[DB.getCurrentUser] tenant create/readback failed:", formatPgError(createdError));
+    }
+  } catch (e) {
+    console.warn("[DB.getCurrentUser] auto-create tenant failed:", e);
+  }
+
+  // final fallback
+  return fallback;
+},
 
   // Tenants
   updateTenant: async (t: Tenant) => DB.call("tenants", "upsert", t),
