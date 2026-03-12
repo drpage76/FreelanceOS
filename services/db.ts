@@ -670,6 +670,8 @@ export const DB = {
       paymentStatus: "TRIALING",
     } as any);
 
+  const fallback = buildDefaultTenant();
+
   try {
     const { data, error } = await getSupabase()
       .from("tenants")
@@ -688,11 +690,11 @@ export const DB = {
     console.warn("[DB.getCurrentUser] tenants read threw:", e);
   }
 
-  // ✅ NEW: in cloud mode, create the tenant row automatically on first login
-  const fallback = buildDefaultTenant();
-
   try {
-    await DB.updateTenant(fallback);
+    console.warn("[DB.getCurrentUser] attempting tenant auto-create for:", email);
+
+    const createdRows = await DB.updateTenant(fallback);
+    console.warn("[DB.getCurrentUser] updateTenant result:", createdRows);
 
     const { data: created, error: createdError } = await getSupabase()
       .from("tenants")
@@ -700,19 +702,22 @@ export const DB = {
       .eq("email", email)
       .maybeSingle();
 
-    if (!createdError && created) {
+    if (createdError) {
+      console.warn("[DB.getCurrentUser] tenant readback failed:", formatPgError(createdError));
+      return null;
+    }
+
+    if (created) {
+      console.warn("[DB.getCurrentUser] tenant auto-create success:", created);
       return fromDb(created) as Tenant;
     }
 
-    if (createdError) {
-      console.warn("[DB.getCurrentUser] tenant create/readback failed:", formatPgError(createdError));
-    }
+    console.warn("[DB.getCurrentUser] tenant auto-create returned no row after insert");
+    return null;
   } catch (e) {
     console.warn("[DB.getCurrentUser] auto-create tenant failed:", e);
+    return null;
   }
-
-  // final fallback
-  return fallback;
 },
 
   // Tenants
