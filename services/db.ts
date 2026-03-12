@@ -292,31 +292,39 @@ const withTimeout = async <T,>(p: Promise<T>, ms: number, label: string): Promis
 
 const clearSupabaseAuthStorage = () => {
   try {
-    // Clear the common Supabase auth keys (project specific + custom)
     const keys: string[] = [];
+
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (!k) continue;
 
-      // Typical supabase-js key looks like: sb-<project-ref>-auth-token
+      // Main Supabase session tokens
       if (/^sb-.*-auth-token$/.test(k)) keys.push(k);
 
-      // If you set storageKey in supabaseClient.ts
-      if (k === "freelanceos-auth") keys.push(k);
+      // PKCE verifier keys (VERY important for OAuth)
+      if (/^sb-.*-auth-token-code-verifier$/.test(k)) keys.push(k);
 
-      // some older builds may use these
+      // Custom storage key used in supabaseClient.ts
+      if (k === "freelanceos-auth") keys.push(k);
+      if (k === "freelanceos-auth-code-verifier") keys.push(k);
+
+      // legacy / fallback
       if (k.includes("supabase.auth")) keys.push(k);
+      if (k.includes("code-verifier")) keys.push(k);
+      if (k.includes("pkce")) keys.push(k);
     }
 
-    keys.forEach((k) => {
+    // Also clear app-level caches
+    keys.push("FO_TENANT_ID");
+    keys.push("FO_GOOGLE_PROVIDER_TOKEN");
+
+    [...new Set(keys)].forEach((k) => {
       try {
         localStorage.removeItem(k);
       } catch {}
     });
 
-    if (keys.length) {
-      console.warn("[Supabase] Cleared auth storage keys:", keys);
-    }
+    console.warn("[Supabase] Cleared auth storage keys:", [...new Set(keys)]);
   } catch (e) {
     console.warn("[Supabase] Failed clearing auth storage keys:", e);
   }
@@ -460,7 +468,10 @@ export const DB = {
     }
 
     // ✅ do NOT “ghost login” from cache when cloud exists
-    if (cloud) return null;
+    if (cloud) {
+  clearCachedTenantId();
+  return null;
+}
 
     const cached = getCachedTenantId();
     return cached || null;
@@ -775,15 +786,20 @@ export const DB = {
   deleteMileage: async (id: string) => DB.call("mileage", "delete", null, { id }),
 
   signOut: async () => {
-    try {
-      await getSupabase().auth.signOut();
-    } catch {}
-    clearCachedTenantId();
-    clearCachedGoogleToken();
+  try {
+    await getSupabase().auth.signOut({ scope: "local" });
+  } catch {}
 
-    // also remove stuck auth keys so next run is clean
-    try {
-      clearSupabaseAuthStorage();
-    } catch {}
-  },
+  clearCachedTenantId();
+  clearCachedGoogleToken();
+
+  try {
+    clearSupabaseAuthStorage();
+  } catch {}
+
+  // reset pending session promise
+  try {
+    sessionOp = null;
+  } catch {}
+},
 };
