@@ -13,36 +13,65 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
   const [isSignUp, setIsSignUp] = useState(initialIsSignUp);
   const [error, setError] = useState<string | null>(null);
 
-  // Keep hash routes, but strip query params like ?code=...
   const cleanUrlParams = () => {
     const cleanUrl = window.location.origin + window.location.pathname + (window.location.hash || "#/");
     window.history.replaceState({}, document.title, cleanUrl);
   };
 
-  // ✅ IMPORTANT: Always return to the SAME origin you started on
-  // localhost -> localhost, live -> live. Do NOT hardcode domains.
-  // Also: don't include hash in redirectTo because OAuth providers drop it.
   const redirectTo = useMemo(() => {
-    return window.location.origin + window.location.pathname; // e.g. http://localhost:5173/
+    return window.location.origin;
   }, []);
 
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
+    const handleOAuthReturn = async () => {
       try {
+        const url = new URL(window.location.href);
+        const code = url.searchParams.get("code");
+        const errorDescription = url.searchParams.get("error_description");
+        const errorParam = url.searchParams.get("error");
+
+        if (errorParam) {
+          if (!cancelled) {
+            setError(errorDescription || errorParam || "OAuth failed");
+            setLoading(false);
+          }
+          return;
+        }
+
+        // ✅ Explicitly exchange PKCE code for a session
+        if (code) {
+          setLoading(true);
+
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) throw error;
+
+          if (!cancelled) {
+            cleanUrlParams();
+            onSuccess();
+          }
+          return;
+        }
+
+        // Fallback: normal session check
         const { data } = await supabase.auth.getSession();
         if (!cancelled && data?.session) {
           cleanUrlParams();
           onSuccess();
         }
-      } catch {
-        // ignore
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message || "Authentication failed");
+          setLoading(false);
+        }
       }
-    })();
+    };
 
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN") {
+    handleOAuthReturn();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session) {
         cleanUrlParams();
         onSuccess();
       }
@@ -68,8 +97,6 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-
-      // onAuthStateChange will call onSuccess()
     } catch (e: any) {
       setError(e?.message || "Authentication failed");
     } finally {
@@ -102,7 +129,6 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
       });
 
       if (error) throw error;
-      // browser will redirect away
     } catch (e: any) {
       setError(e?.message || "OAuth failed");
       setLoading(false);
