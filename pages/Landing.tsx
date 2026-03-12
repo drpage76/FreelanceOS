@@ -112,19 +112,19 @@ export const Landing: React.FC = () => {
             <div className="flex flex-col gap-3 w-full max-w-[290px] xl:ml-auto">
               <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
                 <p className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">Monthly</p>
-                <p className="mt-1.5 text-xl font-black tracking-tight text-white">£9.99</p>
-                <p className="mt-0.5 text-[9px] font-bold text-slate-500">per month + VAT</p>
+                <p className="mt-1.5 text-xl font-black tracking-tight text-white">£11.99</p>
+                <p className="mt-0.5 text-[9px] font-bold text-slate-500">per month</p>
               </div>
 
               <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3">
                 <p className="text-[8px] font-black uppercase tracking-[0.2em] text-emerald-300">Annual</p>
-                <p className="mt-1.5 text-xl font-black tracking-tight text-white">£99.99</p>
-                <p className="mt-0.5 text-[9px] font-bold text-emerald-200">per year + VAT</p>
+                <p className="mt-1.5 text-xl font-black tracking-tight text-white">£119.99</p>
+                <p className="mt-0.5 text-[9px] font-bold text-emerald-200">per year</p>
               </div>
 
               <div className="rounded-2xl border border-indigo-400/20 bg-indigo-500/10 px-4 py-3">
                 <p className="text-[8px] font-black uppercase tracking-[0.2em] text-indigo-300">Beta Offer</p>
-                <p className="mt-1.5 text-lg font-black tracking-tight text-white">10% off for life</p>
+                <p className="mt-1.5 text-lg font-black tracking-tight text-white">10% Discount</p>
                 <p className="mt-0.5 text-[9px] font-bold text-indigo-200">for early adopters</p>
               </div>
 

@@ -264,10 +264,10 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
 
                 <div className="mb-10">
                   <div className="text-7xl font-black tracking-tighter">
-                    £9.99<span className="text-lg text-slate-500">/mo</span>
+                    £11.99<span className="text-lg text-slate-500">/mo</span>
                   </div>
                   <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-4 italic">
-                    + VAT where applicable
+                    
                   </p>
                 </div>
 
@@ -276,7 +276,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                     <div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center">
                       <i className="fa-solid fa-check text-[10px]" />
                     </div>
-                    Managed by PageTech Solutions Ltd
+                    Managed by PageTech Creative Ltd
                   </li>
                   <li className="flex items-center gap-3">
                     <div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center">
