@@ -85,7 +85,7 @@ export const Landing: React.FC = () => {
       {/* Main */}
       <main className="relative z-10 flex-1 flex items-center">
         <div className="max-w-7xl mx-auto w-full px-4 sm:px-8">
-          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_360px] gap-8 xl:gap-10 items-center">
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.8fr)_290px] gap-6 xl:gap-8 items-center">
             {/* Left */}
             <div className="min-w-0">
               <div className="inline-flex items-center gap-3 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400 shadow-inner mb-5">
@@ -93,43 +93,45 @@ export const Landing: React.FC = () => {
                 Professional Business Operating System
               </div>
 
-              <h1 className="text-4xl sm:text-6xl lg:text-7xl xl:text-[6.4rem] font-black tracking-tighter leading-[0.9] text-white italic max-w-[12ch]">
-                Jobs, invoices, and time —
+              <h1 className="text-4xl sm:text-6xl lg:text-7xl xl:text-[6rem] font-black tracking-tighter leading-[0.9] text-white italic max-w-[14ch]">
+                Jobs, invoices,
+                <br />
+                and time —
                 <span className="block text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-emerald-400 to-indigo-400">
                   simplified.
                 </span>
               </h1>
 
-              <p className="mt-5 text-slate-400 text-lg sm:text-xl xl:text-2xl font-medium leading-relaxed max-w-4xl">
+              <p className="mt-5 text-slate-400 text-lg sm:text-xl xl:text-[1.55rem] font-medium leading-relaxed max-w-4xl">
                 FreelanceOS helps independent professionals manage jobs, invoices, mileage and business visibility in one
                 clean system.
               </p>
             </div>
 
             {/* Right / stacked boxes */}
-            <div className="flex flex-col gap-3 w-full max-w-[360px] xl:ml-auto">
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">Monthly</p>
-                <p className="mt-2 text-2xl font-black tracking-tight text-white">£9.99</p>
-                <p className="mt-1 text-[10px] font-bold text-slate-500">per month + VAT</p>
+            <div className="flex flex-col gap-3 w-full max-w-[290px] xl:ml-auto">
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">Monthly</p>
+                <p className="mt-1.5 text-xl font-black tracking-tight text-white">£9.99</p>
+                <p className="mt-0.5 text-[9px] font-bold text-slate-500">per month + VAT</p>
               </div>
 
-              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-5 py-4">
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-300">Annual</p>
-                <p className="mt-2 text-2xl font-black tracking-tight text-white">£99.99</p>
-                <p className="mt-1 text-[10px] font-bold text-emerald-200">per year + VAT</p>
+              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3">
+                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-emerald-300">Annual</p>
+                <p className="mt-1.5 text-xl font-black tracking-tight text-white">£99.99</p>
+                <p className="mt-0.5 text-[9px] font-bold text-emerald-200">per year + VAT</p>
               </div>
 
-              <div className="rounded-2xl border border-indigo-400/20 bg-indigo-500/10 px-5 py-4">
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-300">Beta Offer</p>
-                <p className="mt-2 text-xl font-black tracking-tight text-white">10% off for life</p>
-                <p className="mt-1 text-[10px] font-bold text-indigo-200">for early adopters</p>
+              <div className="rounded-2xl border border-indigo-400/20 bg-indigo-500/10 px-4 py-3">
+                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-indigo-300">Beta Offer</p>
+                <p className="mt-1.5 text-lg font-black tracking-tight text-white">10% off for life</p>
+                <p className="mt-0.5 text-[9px] font-bold text-indigo-200">for early adopters</p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">Access</p>
-                <p className="mt-2 text-xl font-black tracking-tight text-white">No tiers</p>
-                <p className="mt-1 text-[10px] font-bold text-slate-500">all features included</p>
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">Access</p>
+                <p className="mt-1.5 text-lg font-black tracking-tight text-white">No tiers</p>
+                <p className="mt-0.5 text-[9px] font-bold text-slate-500">all features included</p>
               </div>
             </div>
           </div>
@@ -137,7 +139,7 @@ export const Landing: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-50 border-t border-white/5 bg-slate-900/80 backdrop-blur-xl py-5 px-4">
+      <footer className="relative z-50 border-t border-white/5 bg-slate-900/80 backdrop-blur-xl py-4 px-4">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex flex-wrap justify-center items-center gap-6">
             <Link
