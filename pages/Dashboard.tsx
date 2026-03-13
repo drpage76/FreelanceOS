@@ -312,9 +312,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
     <div className="flex flex-col gap-4 max-w-screen-2xl mx-auto pb-10 px-4">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight italic">Operations Hub</h2>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight italic">Dashboard</h2>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-            Real-time Financials & Scheduling
+            Business Overview
           </p>
         </div>
 
@@ -336,7 +336,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             onClick={onNewJobClick}
             className="bg-slate-900 text-white px-6 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg hover:bg-black transition-all flex items-center"
           >
-            <i className="fa-solid fa-plus mr-2"></i>Start New Project
+            <i className="fa-solid fa-plus mr-2"></i>Add Job
           </button>
         </div>
       </header>
@@ -349,7 +349,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <p className="text-slate-400 text-[8px] font-black uppercase tracking-widest">Accounts Receivable</p>
+            <p className="text-slate-400 text-[8px] font-black uppercase tracking-widest">Unpaid Invoices</p>
             <button
               onClick={() => setShowAllPayments(!showAllPayments)}
               className="text-indigo-600 text-[9px] font-black uppercase hover:underline"
@@ -407,7 +407,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <p className="text-slate-400 text-[8px] font-black uppercase tracking-widest">Production Queue</p>
+            <p className="text-slate-400 text-[8px] font-black uppercase tracking-widest">Upcoming Jobs</p>
             <button
               onClick={() => setShowAllJobs(!showAllJobs)}
               className="text-emerald-600 text-[9px] font-black uppercase hover:underline"
@@ -502,8 +502,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pipeline Value</p>
-            <p className="text-xs font-black text-slate-900">Upcoming fiscal years (from scheduled jobs)</p>
+            <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Projected Revenue</p>
+            
           </div>
           <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
             FY start: {(state.user as any)?.fiscalYearStartDay || 6}/{(state.user as any)?.fiscalYearStartMonth || 4}
