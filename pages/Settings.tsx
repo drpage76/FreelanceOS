@@ -190,7 +190,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
     <div className="space-y-8 max-w-5xl mx-auto pb-20 px-4">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="min-w-0">
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">
+          <h2 className="text-4xl font-black text-indigo-400 tracking-tight leading-none">
             Settings
           </h2>
           <p className="text-xs font-black text-slate-500 tracking-widest">

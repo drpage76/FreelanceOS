@@ -65,7 +65,7 @@ export const Clients: React.FC<ClientsProps> = ({ state, onRefresh }) => {
     <div className="space-y-6">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-900">Clients</h2>
+          <h2 className="text-3xl font-black text-indigo-400">Clients</h2>
           <p className="text-xs font-black text-slate-500 tracking-widest">High-density view of your professional billing network.</p>
         </div>
         <div className="flex flex-wrap gap-3">

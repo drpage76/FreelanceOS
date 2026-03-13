@@ -140,7 +140,7 @@ export const Jobs: React.FC<JobsProps> = ({ state, onRefresh, onNewJobClick }) =
 
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 leading-tight">Jobs</h2>
+          <h2 className="text-3xl font-black text-indigo-400 leading-tight">Jobs</h2>
           <p className="text-xs font-black text-slate-500 tracking-widest">Entry, View & Amend</p>
         </div>
         <div className="flex flex-wrap gap-3">

@@ -361,7 +361,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
   return (
     <div className="space-y-6 px-4 pb-24 md:pb-6">
       <header>
-        <h2 className="text-3xl font-black text-slate-900 leading-tight">Mileage</h2>
+        <h2 className="text-3xl font-black text-indigo-400 leading-tight">Mileage</h2>
         <p className="text-xs font-black text-slate-500 tracking-widest">
           Distance via Google Maps
         </p>

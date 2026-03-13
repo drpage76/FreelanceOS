@@ -312,8 +312,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     <div className="flex flex-col gap-4 max-w-screen-2xl mx-auto pb-10 px-4">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Dashboard</h2>
-          <p className="text-xs font-black text-slate-900 tracking-widest">
+          <h2 className="text-3xl font-black text-indigo-400 tracking-tight">Dashboard</h2>
+          <p className="text-xs font-black text-slate-500 tracking-widest">
             Business Overview
           </p>
         </div>
@@ -473,7 +473,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <div className="relative z-10">
             <p className="text-slate-500 text-xs font-black tracking-widest leading-none">
-              Financial Performance (YTD)
+              Revenue (YTD)
             </p>
             <p className="text-2xl font-black tracking-tighter mt-1">
               {formatCurrency(revStats.ytdRevenue || 0, state.user)}
