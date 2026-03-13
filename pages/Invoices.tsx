@@ -257,7 +257,7 @@ export const Invoices: React.FC<InvoicesProps> = ({ state, onRefresh, googleAcce
 
       <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
-          <h2 className="text-4xl font-black text-indigo-400 tracking-tight leading-none mb-2">Financialsr</h2>
+          <h2 className="text-4xl font-black text-indigo-600 tracking-tight leading-none mb-2">Financialsr</h2>
           <p className="text-xs font-black text-slate-500 tracking-widest">Full reporting for project lifecycle and settlements.</p>
         </div>
         <div className="flex flex-wrap gap-3">

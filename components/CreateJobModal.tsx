@@ -189,19 +189,19 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
             ) : (
               <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 bg-indigo-50/30 p-6 rounded-[24px] border border-indigo-100 shadow-inner">
                 <div className="col-span-2">
-                   <label className="text-[9px] font-black text-indigo-400 mb-1 block px-1">New Client Name</label>
+                   <label className="text-[9px] font-black text-indigo-600 mb-1 block px-1">New Client Name</label>
                    <input required placeholder="Legal Entity Name" className="w-full px-5 py-3 bg-white border border-indigo-200 rounded-xl font-bold outline-none" value={newClient.name} onChange={e => setNewClient({...newClient, name: e.target.value})} />
                 </div>
                 <div className="col-span-2">
-                   <label className="text-[9px] font-black text-indigo-400 mb-1 block px-1">Billing Address</label>
+                   <label className="text-[9px] font-black text-indigo-600 mb-1 block px-1">Billing Address</label>
                    <textarea rows={2} placeholder="Full address for invoice" className="w-full px-5 py-3 bg-white border border-indigo-200 rounded-xl font-medium outline-none text-sm" value={newClient.address} onChange={e => setNewClient({...newClient, address: e.target.value})} />
                 </div>
                 <div>
-                   <label className="text-[9px] font-black text-indigo-400 mb-1 block px-1">Billing Email</label>
+                   <label className="text-[9px] font-black text-indigo-600 mb-1 block px-1">Billing Email</label>
                    <input type="email" placeholder="billing@company.com" className="w-full px-5 py-3 bg-white border border-indigo-200 rounded-xl font-medium outline-none" value={newClient.email} onChange={e => setNewClient({...newClient, email: e.target.value})} />
                 </div>
                 <div>
-                   <label className="text-[9px] font-black text-indigo-400 mb-1 block px-1">Payment Terms (Days)</label>
+                   <label className="text-[9px] font-black text-indigo-600 mb-1 block px-1">Payment Terms (Days)</label>
                    <input type="number" className="w-full px-5 py-3 bg-white border border-indigo-200 rounded-xl font-bold outline-none" value={newClient.terms} onChange={e => setNewClient({...newClient, terms: parseInt(e.target.value) || 30})} />
                 </div>
               </div>
@@ -335,7 +335,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
               <p className="text-3xl font-black text-indigo-600">£{totalRecharge.toLocaleString()}</p>
             </div>
             <button type="submit" disabled={isSaving} className="px-12 py-4 bg-slate-900 text-white rounded-[24px] font-black text-xs tracking-widest shadow-xl flex items-center gap-3 hover:bg-black transition-all disabled:opacity-50">
-              {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-cloud-arrow-up text-indigo-400"></i>}
+              {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-cloud-arrow-up text-indigo-600"></i>}
               Create Job
             </button>
           </div>

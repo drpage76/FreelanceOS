@@ -1003,7 +1003,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
           </Link>
           <div className="min-w-0">
             <h2 className="text-2xl md:text-3xl font-black text-slate-900 truncate">{job.description}</h2>
-            <p className="text-xs font-black text-indigo-400 tracking-widest">Protocol {job.id}</p>
+            <p className="text-xs font-black text-indigo-600 tracking-widest">Protocol {job.id}</p>
           </div>
         </div>
 
@@ -1331,7 +1331,7 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ onRefresh, googleAccessT
                         } as any,
                       ])
                     }
-                    className="w-full py-4 border-2 border-dashed border-indigo-100 rounded-3xl text-xs font-black text-indigo-400"
+                    className="w-full py-4 border-2 border-dashed border-indigo-100 rounded-3xl text-xs font-black text-indigo-600"
                   >
                     + Add Session
                   </button>

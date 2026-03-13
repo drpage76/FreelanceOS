@@ -154,7 +154,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
 
       <div className="grid gap-3">
         <input
-          className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white placeholder:text-slate-500 text-sm font-semibold outline-none focus:border-indigo-400/60 focus:ring-2 focus:ring-indigo-500/20"
+          className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white placeholder:text-slate-500 text-sm font-semibold outline-none focus:border-indigo-600/60 focus:ring-2 focus:ring-indigo-500/20"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email"
@@ -163,7 +163,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
         />
 
         <input
-          className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white placeholder:text-slate-500 text-sm font-semibold outline-none focus:border-indigo-400/60 focus:ring-2 focus:ring-indigo-500/20"
+          className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white placeholder:text-slate-500 text-sm font-semibold outline-none focus:border-indigo-600/60 focus:ring-2 focus:ring-indigo-500/20"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password"
@@ -200,7 +200,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
           type="button"
           onClick={() => setIsSignUp((s) => !s)}
           disabled={loading}
-          className="text-indigo-400 hover:text-indigo-300 text-xs font-black tracking-wide text-left disabled:opacity-60"
+          className="text-indigo-600 hover:text-indigo-300 text-xs font-black tracking-wide text-left disabled:opacity-60"
         >
           {isSignUp ? "Already have an account? Sign in" : "No account? Register"}
         </button>

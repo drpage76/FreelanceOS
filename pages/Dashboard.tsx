@@ -312,7 +312,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     <div className="flex flex-col gap-4 max-w-screen-2xl mx-auto pb-10 px-4">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-indigo-400 tracking-tight">Dashboard</h2>
+          <h2 className="text-3xl font-black text-indigo-600 tracking-tight">Dashboard</h2>
           <p className="text-xs font-black text-slate-500 tracking-widest">
             Business Overview
           </p>
@@ -488,7 +488,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <p className="text-[7px] text-slate-500 font-black">
                 Run-rate: {formatCurrency(revStats.dailyRunRate || 0, state.user)}/day
               </p>
-              <p className="text-xs font-black text-indigo-400 tracking-widest">
+              <p className="text-xs font-black text-indigo-600 tracking-widest">
                 {(revStats.percentOfGoal || 0).toFixed(0)}% of Goal
               </p>
             </div>

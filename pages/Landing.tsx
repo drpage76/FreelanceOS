@@ -58,7 +58,7 @@ export const Landing: React.FC = () => {
           </div>
           <div className="leading-tight">
             <div className="text-xl font-black tracking-tighter">
-              Freelance<span className="text-indigo-400">OS</span>
+              Freelance<span className="text-indigo-600">OS</span>
             </div>
             <div className="text-[9px] font-black tracking-[0.2em] text-slate-500">
               by PageTech Creative Ltd
@@ -97,7 +97,7 @@ export const Landing: React.FC = () => {
                 Jobs, invoices,
                 <br />
                 and time —
-                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-emerald-400 to-indigo-400">
+                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-emerald-400 to-indigo-600">
                   simplified.
                 </span>
               </h1>
@@ -122,7 +122,7 @@ export const Landing: React.FC = () => {
                 <p className="mt-0.5 text-[9px] font-bold text-emerald-200">per year</p>
               </div>
 
-              <div className="rounded-2xl border border-indigo-400/20 bg-indigo-500/10 px-4 py-3">
+              <div className="rounded-2xl border border-indigo-600/20 bg-indigo-500/10 px-4 py-3">
                 <p className="text-xs font-black tracking-[0.2em] text-indigo-300">Beta Offer</p>
                 <p className="mt-1.5 text-lg font-black tracking-tight text-white">10% Discount</p>
                 <p className="mt-0.5 text-[9px] font-bold text-indigo-200">for early adopters</p>
@@ -144,13 +144,13 @@ export const Landing: React.FC = () => {
           <div className="flex flex-wrap justify-center items-center gap-6">
             <Link
               to="/privacy"
-              className="text-[9px] font-black tracking-widest text-slate-500 hover:text-indigo-400"
+              className="text-[9px] font-black tracking-widest text-slate-500 hover:text-indigo-600"
             >
               Privacy
             </Link>
             <Link
               to="/terms"
-              className="text-[9px] font-black tracking-widest text-slate-500 hover:text-indigo-400"
+              className="text-[9px] font-black tracking-widest text-slate-500 hover:text-indigo-600"
             >
               Terms
             </Link>

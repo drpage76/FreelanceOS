@@ -361,7 +361,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
   return (
     <div className="space-y-6 px-4 pb-24 md:pb-6">
       <header>
-        <h2 className="text-3xl font-black text-indigo-400 leading-tight">Mileage</h2>
+        <h2 className="text-3xl font-black text-indigo-600 leading-tight">Mileage</h2>
         <p className="text-xs font-black text-slate-500 tracking-widest">
           Distance via Google Maps
         </p>
@@ -475,7 +475,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
               </label>
               <div
                 className={`relative px-4 py-4 bg-indigo-50 border rounded-2xl flex items-center justify-between font-black text-sm h-[56px] transition-all ${
-                  isCalculating ? "border-indigo-400 animate-pulse" : "border-indigo-100 text-indigo-700"
+                  isCalculating ? "border-indigo-600 animate-pulse" : "border-indigo-100 text-indigo-700"
                 }`}
               >
                 <input
@@ -494,7 +494,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                 <button
                   type="button"
                   onClick={handleCalculateMileage}
-                  className="text-indigo-400 hover:text-indigo-600 ml-1"
+                  className="text-indigo-600 hover:text-indigo-600 ml-1"
                   title="Recalculate"
                 >
                   <i className="fa-solid fa-arrows-rotate text-xs"></i>
@@ -630,7 +630,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                       <td className="p-5 text-[11px] font-black text-slate-700">
                         <div className="leading-snug break-words">
                           <span>{record.startPostcode}</span>{" "}
-                          <i className="fa-solid fa-arrow-right-long mx-2 text-indigo-400"></i>{" "}
+                          <i className="fa-solid fa-arrow-right-long mx-2 text-indigo-600"></i>{" "}
                           <span>{record.endPostcode}</span>
                         </div>
                       </td>
@@ -707,7 +707,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                   </div>
 
                   <div className="text-[11px] font-black text-slate-700 whitespace-nowrap">
-                    {record.startPostcode} <i className="fa-solid fa-arrow-right-long mx-2 text-indigo-400"></i> {record.endPostcode}
+                    {record.startPostcode} <i className="fa-solid fa-arrow-right-long mx-2 text-indigo-600"></i> {record.endPostcode}
                   </div>
 
                   <div className="flex items-center justify-between">

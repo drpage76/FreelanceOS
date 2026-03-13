@@ -291,7 +291,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
             <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight whitespace-nowrap">
               {format(currentDate, "MMMM yyyy")}
             </h3>
-            <div className="relative overflow-hidden w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-slate-50 rounded-xl border border-slate-200 group cursor-pointer transition-all hover:border-indigo-400">
+            <div className="relative overflow-hidden w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-slate-50 rounded-xl border border-slate-200 group cursor-pointer transition-all hover:border-indigo-600">
               <i className="fa-solid fa-calendar-day text-[14px] text-slate-900 group-hover:text-indigo-600"></i>
               <input
                 type="month"

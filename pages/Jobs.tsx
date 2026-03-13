@@ -140,7 +140,7 @@ export const Jobs: React.FC<JobsProps> = ({ state, onRefresh, onNewJobClick }) =
 
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-indigo-400 leading-tight">Jobs</h2>
+          <h2 className="text-3xl font-black text-indigo-600 leading-tight">Jobs</h2>
           <p className="text-xs font-black text-slate-500 tracking-widest">Entry, View & Amend</p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -211,7 +211,7 @@ export const Jobs: React.FC<JobsProps> = ({ state, onRefresh, onNewJobClick }) =
                     <tr key={job.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="p-8">
                         <span className="font-black text-slate-900 text-sm block mb-1">{client?.name || "Private Client"}</span>
-                        <span className="text-[9px] text-indigo-400 font-black tracking-widest">ID: {job.id}</span>
+                        <span className="text-[9px] text-indigo-600 font-black tracking-widest">ID: {job.id}</span>
                       </td>
 
                       <td className="p-8">
