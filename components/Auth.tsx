@@ -141,7 +141,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
         <h2 className="text-white text-xl font-black tracking-tight">
           {isSignUp ? "Create account" : "Sign in"}
         </h2>
-        <p className="text-slate-400 text-xs font-bold mt-1">
+        <p className="text-slate-900 text-xs font-bold mt-1">
           Use email/password or Google.
         </p>
       </div>
@@ -176,14 +176,14 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
           type="button"
           onClick={handleEmailAuth}
           disabled={loading}
-          className="w-full px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20 transition-all"
+          className="w-full px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white text-xs font-black tracking-widest shadow-xl shadow-indigo-500/20 transition-all"
         >
           {loading ? "Please wait…" : isSignUp ? "Register" : "Sign In"}
         </button>
 
         <div className="flex items-center gap-3 py-1">
           <div className="flex-1 h-px bg-white/10" />
-          <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">or</span>
+          <span className="text-slate-500 text-xs font-black tracking-widest">or</span>
           <div className="flex-1 h-px bg-white/10" />
         </div>
 
@@ -191,7 +191,7 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
           type="button"
           onClick={handleGoogleLogin}
           disabled={loading}
-          className="w-full px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-60 text-white text-xs font-black uppercase tracking-widest border border-white/10 transition-all"
+          className="w-full px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-60 text-white text-xs font-black tracking-widest border border-white/10 transition-all"
         >
           Continue with Google
         </button>
@@ -206,8 +206,8 @@ export const Auth: React.FC<AuthProps> = ({ onSuccess, initialIsSignUp = false }
         </button>
       </div>
 
-      <div className="mt-4 text-[10px] text-slate-500 font-bold">
-        Redirect target: <span className="text-slate-400">{redirectTo}</span>
+      <div className="mt-4 text-xs text-slate-500 font-bold">
+        Redirect target: <span className="text-slate-900">{redirectTo}</span>
       </div>
     </div>
   );

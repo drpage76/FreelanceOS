@@ -66,7 +66,7 @@ export const Clients: React.FC<ClientsProps> = ({ state, onRefresh }) => {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-900">Clients</h2>
-          <p className="text-slate-500 font-medium">High-density view of your professional billing network.</p>
+          <p className="text-xs font-black text-slate-500 tracking-widest">High-density view of your professional billing network.</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <button 
@@ -86,7 +86,7 @@ export const Clients: React.FC<ClientsProps> = ({ state, onRefresh }) => {
 
       <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
         <div className="relative">
-          <i className="fa-solid fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <i className="fa-solid fa-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-900"></i>
           <input 
             type="text" 
             placeholder="Search clients..." 
@@ -102,23 +102,23 @@ export const Clients: React.FC<ClientsProps> = ({ state, onRefresh }) => {
           <table className="w-full text-left border-collapse table-auto">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Client Name</th>
-                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Address</th>
-                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Email</th>
-                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Phone</th>
-                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Terms</th>
-                <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                <th className="p-4 text-xs font-black text-slate-900 tracking-widest">Client Name</th>
+                <th className="p-4 text-xs font-black text-slate-900 tracking-widest">Address</th>
+                <th className="p-4 text-xs font-black text-slate-900 tracking-widest">Email</th>
+                <th className="p-4 text-xs font-black text-slate-900 tracking-widest">Phone</th>
+                <th className="p-4 text-xs font-black text-slate-900 tracking-widest text-center">Terms</th>
+                <th className="p-4 text-xs font-black text-slate-900 tracking-widest text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredClients.length === 0 ? (
-                <tr><td colSpan={6} className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">No clients in directory</td></tr>
+                <tr><td colSpan={6} className="p-20 text-center text-slate-900 font-bold tracking-widest text-xs">No clients in directory</td></tr>
               ) : (
                 filteredClients.map(client => (
                   <tr key={client.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="p-4 align-top">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center font-black text-[10px]">
+                        <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center font-black text-xs">
                           {client.name.charAt(0)}
                         </div>
                         <span className="font-black text-slate-900 text-sm whitespace-nowrap">{client.name}</span>
@@ -136,7 +136,7 @@ export const Clients: React.FC<ClientsProps> = ({ state, onRefresh }) => {
                       <span className="text-xs font-bold text-slate-700 block whitespace-nowrap">{client.phone || '—'}</span>
                     </td>
                     <td className="p-4 align-top text-center">
-                      <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-black uppercase tracking-widest">
+                      <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-black tracking-widest">
                         {client.paymentTermsDays}d
                       </span>
                     </td>
@@ -144,13 +144,13 @@ export const Clients: React.FC<ClientsProps> = ({ state, onRefresh }) => {
                       <div className="flex items-center justify-end gap-1">
                         <button 
                           onClick={() => openEditModal(client)}
-                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-900 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
                         >
                           <i className="fa-solid fa-pen text-xs"></i>
                         </button>
                         <Link 
                           to="/jobs" 
-                          className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 rounded-lg text-[10px] font-black transition-all uppercase"
+                          className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 rounded-lg text-xs font-black transition-all"
                         >
                           Archive
                         </Link>

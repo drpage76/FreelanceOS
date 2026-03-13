@@ -361,16 +361,16 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
   return (
     <div className="space-y-6 px-4 pb-24 md:pb-6">
       <header>
-        <h2 className="text-3xl font-black text-slate-900 leading-tight italic">Travel &amp; Mileage</h2>
-        <p className="text-slate-500 font-bold uppercase text-[9px] tracking-widest italic">
-          Distance via Secure Edge Function
+        <h2 className="text-3xl font-black text-slate-900 leading-tight">Mileage</h2>
+        <p className="text-xs font-black text-slate-500 tracking-widest">
+          Distance via Google Maps
         </p>
       </header>
 
       {/* LINK TO JOB */}
       <div className="bg-white p-6 rounded-[40px] border border-slate-200 shadow-sm">
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
+          <label className="text-xs font-black text-slate-900 px-1 tracking-widest">
             Link to Job (optional)
           </label>
           <select
@@ -386,7 +386,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
             ))}
           </select>
 
-          <div className="text-[10px] font-bold text-slate-400 px-1">
+          <div className="text-xs font-text-slate-500 px-1">
             Selecting a job auto-fills <span className="font-black">Project ID + Job Description</span> and dates.
           </div>
         </div>
@@ -397,7 +397,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
         <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
+              <label className="text-xs font-black text-slate-900 px-1 tracking-widest">
                 Date <span className="text-rose-500">*</span>
               </label>
               <input
@@ -420,7 +420,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
+              <label className="text-xs font-black text-slate-900 px-1 tracking-widest">
                 End Date (Range) <span className="text-rose-500">*</span>
               </label>
               <input
@@ -432,7 +432,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
+              <label className="text-xs font-black text-slate-900 px-1 tracking-widest">
                 Description (Project ID + Job)
               </label>
               <input
@@ -446,31 +446,31 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
             <div className="md:col-span-3 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
+              <label className="text-xs font-black text-slate-900 px-1 tracking-widest">
                 Start Postcode <span className="text-rose-500">*</span>
               </label>
               <input
                 placeholder="SW1..."
-                className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase"
+                className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none"
                 value={newEntry.startPostcode}
                 onChange={(e) => setNewEntry({ ...newEntry, startPostcode: e.target.value.toUpperCase() })}
               />
             </div>
 
             <div className="md:col-span-3 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
+              <label className="text-xs font-black text-slate-900 px-1 tracking-widest">
                 End Postcode <span className="text-rose-500">*</span>
               </label>
               <input
                 placeholder="E1..."
-                className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none uppercase"
+                className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none"
                 value={newEntry.endPostcode}
                 onChange={(e) => setNewEntry({ ...newEntry, endPostcode: e.target.value.toUpperCase() })}
               />
             </div>
 
             <div className="md:col-span-2 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">
+              <label className="text-xs font-black text-slate-900 px-1 tracking-widest">
                 Miles (one-way) <span className="text-rose-500">*</span>
               </label>
               <div
@@ -497,13 +497,13 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                   className="text-indigo-400 hover:text-indigo-600 ml-1"
                   title="Recalculate"
                 >
-                  <i className="fa-solid fa-arrows-rotate text-[10px]"></i>
+                  <i className="fa-solid fa-arrows-rotate text-xs"></i>
                 </button>
               </div>
             </div>
 
             <div className="md:col-span-1 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Trips</label>
+              <label className="text-xs font-black text-slate-900 px-1 tracking-widest">Trips</label>
               <input
                 type="number"
                 min="1"
@@ -519,12 +519,12 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
             </div>
 
             <div className="md:col-span-2 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Return?</label>
+              <label className="text-xs font-black text-slate-900 px-1 tracking-widest">Return?</label>
               <button
                 type="button"
                 onClick={() => setNewEntry({ ...newEntry, isReturn: !newEntry.isReturn })}
-                className={`w-full px-2 py-4 rounded-2xl font-black text-[10px] uppercase border transition-all h-[56px] ${
-                  newEntry.isReturn ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-400 border-slate-200"
+                className={`w-full px-2 py-4 rounded-2xl font-black text-xs border transition-all h-[56px] ${
+                  newEntry.isReturn ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-900 border-slate-200"
                 }`}
               >
                 {newEntry.isReturn ? "Yes" : "No"}
@@ -534,7 +534,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
             <button
               type="submit"
               disabled={!canSubmit}
-              className="md:col-span-1 h-[56px] bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50"
+              className="md:col-span-1 h-[56px] bg-slate-900 text-white rounded-2xl font-black text-xs tracking-widest hover:bg-black transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50"
               title={!canSubmit ? "Please complete required fields" : "Save mileage entry"}
             >
               {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : editingId ? "Update" : "Add"}
@@ -558,7 +558,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
               <button
                 type="button"
                 onClick={handleCancelAmend}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-500 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 w-fit"
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-500 font-black text-xs tracking-widest hover:bg-slate-50 w-fit"
               >
                 Cancel amend
               </button>
@@ -571,14 +571,14 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
       <div className="flex flex-col md:flex-row justify-end gap-4">
         <div className="bg-white border border-slate-200 p-6 rounded-[32px] shadow-sm flex items-center gap-8 w-full md:w-auto">
           <div className="text-center">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fiscal Total</p>
+            <p className="text-xs font-black text-slate-900 tracking-widest mb-1">Fiscal Total</p>
             <p className="text-2xl font-black text-slate-900">
-              {totals.miles.toFixed(1)} <span className="text-[10px] text-slate-400">mi</span>
+              {totals.miles.toFixed(1)} <span className="text-xs text-slate-900">mi</span>
             </p>
           </div>
           <div className="w-px h-10 bg-slate-100"></div>
           <div className="text-center">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Reclaim Val</p>
+            <p className="text-xs font-black text-slate-900 tracking-widest mb-1">Reclaim Val</p>
             <p className="text-2xl font-black text-indigo-600">{formatCurrency(totals.value, state.user)}</p>
           </div>
         </div>
@@ -589,7 +589,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
         <div className="hidden md:block">
           <table className="w-full table-fixed text-left border-collapse">
             <thead className="bg-slate-50/50 border-b border-slate-100">
-              <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              <tr className="text-xs font-black text-slate-900 tracking-widest">
                 <th className="p-5 w-[165px]">Date</th>
                 <th className="p-5">Description</th>
                 <th className="p-5 w-[180px]">Route</th>
@@ -603,7 +603,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
             <tbody className="divide-y divide-slate-100 font-medium">
               {recordsSorted.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest italic">
+                  <td colSpan={7} className="p-20 text-center text-slate-300 font-black text-xs tracking-widest">
                     Operational travel ledger is empty
                   </td>
                 </tr>
@@ -637,8 +637,8 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
 
                       <td className="p-5">
                         <span
-                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                            ret ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-400 border-slate-100"
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-black tracking-widest border ${
+                            ret ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-900 border-slate-100"
                           }`}
                         >
                           {ret ? "Return" : "Single"}
@@ -659,7 +659,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                           <button
                             type="button"
                             onClick={() => handleStartAmend(record)}
-                            className="px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black text-[9px] uppercase tracking-widest hover:bg-slate-50"
+                            className="px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black text-[9px] tracking-widest hover:bg-slate-50"
                           >
                             Amend
                           </button>
@@ -683,7 +683,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
 
         <div className="md:hidden divide-y divide-slate-100">
           {recordsSorted.length === 0 ? (
-            <div className="p-16 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest italic">
+            <div className="p-16 text-center text-slate-300 font-black text-xs tracking-widest">
               Operational travel ledger is empty
             </div>
           ) : (
@@ -712,8 +712,8 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
 
                   <div className="flex items-center justify-between">
                     <span
-                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border whitespace-nowrap ${
-                        ret ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-400 border-slate-100"
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-black tracking-widest border whitespace-nowrap ${
+                        ret ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-900 border-slate-100"
                       }`}
                     >
                       {ret ? "Return" : "Single"}
@@ -724,7 +724,7 @@ const Mileage: React.FC<MileageProps> = ({ state, onRefresh }) => {
                       <button
                         type="button"
                         onClick={() => handleStartAmend(record)}
-                        className="px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50"
+                        className="px-3 py-2 rounded-xl border border-slate-200 text-slate-600 font-black text-xs tracking-widest hover:bg-slate-50"
                       >
                         Amend
                       </button>

@@ -190,23 +190,23 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
     <div className="space-y-8 max-w-5xl mx-auto pb-20 px-4">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="min-w-0">
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none italic">
-            Workspace Engine
+          <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">
+            Settings
           </h2>
-          <p className="text-slate-500 font-medium mt-1 break-all">
-            Operational configuration for {resolvedUser.email}
+          <p className="text-xs font-black text-slate-500 tracking-widest">
+            {resolvedUser.email}
           </p>
         </div>
 
         <div className="flex gap-3 items-center">
           {saveSuccess && (
-            <span className="bg-emerald-50 text-emerald-600 px-4 py-3 rounded-xl text-[10px] font-black uppercase flex items-center animate-in fade-in zoom-in-95">
+            <span className="bg-emerald-50 text-emerald-600 px-4 py-3 rounded-xl text-xs font-black flex items-center animate-in fade-in zoom-in-95">
               <i className="fa-solid fa-check mr-2" /> Synced
             </span>
           )}
           <button
             onClick={onLogout}
-            className="px-6 py-3 bg-white text-rose-500 border border-slate-200 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm"
+            className="px-6 py-3 bg-white text-rose-500 border border-slate-200 rounded-xl font-black text-xs tracking-widest shadow-sm"
             type="button"
           >
             Sign Out
@@ -218,7 +218,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
         <div className="flex gap-1 p-1 bg-slate-100 rounded-2xl w-fit">
           <button
             onClick={() => setActiveTab("profile")}
-            className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            className={`px-6 py-3 rounded-xl text-xs font-black tracking-widest transition-all ${
               activeTab === "profile" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500"
             }`}
             type="button"
@@ -227,7 +227,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
           </button>
           <button
             onClick={() => setActiveTab("localization")}
-            className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            className={`px-6 py-3 rounded-xl text-xs font-black tracking-widest transition-all ${
               activeTab === "localization" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500"
             }`}
             type="button"
@@ -236,7 +236,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
           </button>
           <button
             onClick={() => setActiveTab("billing")}
-            className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            className={`px-6 py-3 rounded-xl text-xs font-black tracking-widest transition-all ${
               activeTab === "billing" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500"
             }`}
             type="button"
@@ -255,10 +255,10 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
               </div>
 
               <div>
-                <p className="text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-2">
+                <p className="text-indigo-400 text-xs font-black tracking-widest mb-2">
                   Simple Pricing. Full Access.
                 </p>
-                <h3 className="text-4xl font-black mb-10 tracking-tighter italic">
+                <h3 className="text-4xl font-black mb-10 tracking-tighter">
                   FreelanceOS <span className="text-indigo-500">ELITE</span>
                 </h3>
 
@@ -266,27 +266,27 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                   <div className="text-7xl font-black tracking-tighter">
                     £11.99<span className="text-lg text-slate-500">/mo</span>
                   </div>
-                  <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-4 italic">
+                  <p className="text-xs text-slate-900 tracking-widest mt-4">
                     
                   </p>
                 </div>
 
-                <ul className="space-y-4 text-left text-xs font-bold text-slate-400 mb-10">
+                <ul className="space-y-4 text-left text-xs font-bold text-slate-900 mb-10">
                   <li className="flex items-center gap-3">
                     <div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center">
-                      <i className="fa-solid fa-check text-[10px]" />
+                      <i className="fa-solid fa-check text-xs" />
                     </div>
                     Managed by PageTech Creative Ltd
                   </li>
                   <li className="flex items-center gap-3">
                     <div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center">
-                      <i className="fa-solid fa-check text-[10px]" />
+                      <i className="fa-solid fa-check text-xs" />
                     </div>
                     Enterprise Cloud Mirroring
                   </li>
                   <li className="flex items-center gap-3">
                     <div className="w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center">
-                      <i className="fa-solid fa-check text-[10px]" />
+                      <i className="fa-solid fa-check text-xs" />
                     </div>
                     Automated Google Maps Mileage Engine
                   </li>
@@ -298,7 +298,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                   type="button"
                   onClick={handleUpgrade}
                   disabled={isUpgrading}
-                  className={`w-full py-5 rounded-3xl font-black text-xs uppercase transition-all shadow-xl flex items-center justify-center gap-3 ${
+                  className={`w-full py-5 rounded-3xl font-black text-xs transition-all shadow-xl flex items-center justify-center gap-3 ${
                     sub.isTrialExpired
                       ? "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20"
                       : "bg-white/10 text-white border border-white/20 hover:bg-white/20"
@@ -316,7 +316,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                     : "Add Payment for Auto-Billing"}
                 </button>
               ) : (
-                <div className="w-full py-5 bg-emerald-500/10 border border-emerald-500/20 rounded-3xl font-black text-xs uppercase text-emerald-400 text-center tracking-widest">
+                <div className="w-full py-5 bg-emerald-500/10 border border-emerald-500/20 rounded-3xl font-black text-xs text-emerald-400 text-center tracking-widest">
                   <i className="fa-solid fa-check-double mr-2" /> Elite Active
                 </div>
               )}
@@ -324,21 +324,21 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
 
             <div className="bg-white p-10 rounded-[48px] border border-slate-200 shadow-sm flex flex-col justify-between">
               <div>
-                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">
+                <h4 className="text-xs font-black text-slate-900 tracking-widest mb-6">
                   Subscription Status
                 </h4>
 
                 <div className="space-y-8">
                   <div className="flex justify-between items-center">
                     <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                      <p className="text-xs font-black text-slate-900 tracking-widest mb-1">
                         Active Plan
                       </p>
                       <p className="font-black text-slate-900 text-lg">FreelanceOS Elite</p>
                     </div>
 
                     <span
-                      className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase border ${
+                      className={`px-4 py-1.5 rounded-full text-[9px] font-black border ${
                         resolvedUser.plan === UserPlan.ACTIVE
                           ? "bg-indigo-50 text-indigo-600 border-indigo-100"
                           : "bg-amber-50 text-amber-600 border-amber-100 animate-pulse"
@@ -349,7 +349,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                   </div>
 
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                    <p className="text-xs font-black text-slate-900 tracking-widest mb-2">
                       Trial Time Remaining
                     </p>
 
@@ -366,10 +366,10 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                     </div>
 
                     <div className="flex justify-between mt-3 gap-3">
-                      <p className="text-[10px] font-bold text-slate-500 italic">
+                      <p className="text-xs font-bold text-slate-500">
                         {sub?.daysLeft ?? 0} days remaining
                       </p>
-                      <p className="text-[10px] font-black text-slate-900 uppercase text-right">
+                      <p className="text-xs font-black text-slate-900 text-right">
                         Billing Starts{" "}
                         {sub?.expiryDate ? format(sub.expiryDate, "dd MMM yyyy") : "TBD"}
                       </p>
@@ -377,7 +377,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                   </div>
 
                   <div className="pt-8 border-t border-slate-50">
-                    <p className="text-[9px] text-slate-400 font-bold leading-relaxed mb-6">
+                    <p className="text-[9px] text-slate-900 font-bold leading-relaxed mb-6">
                       FreelanceOS is designed to be part of your real workflow. By adding a payment method,
                       you ensure uninterrupted service when the 30-day trial ends. All billing managed by
                       PageTech Solutions Ltd.
@@ -386,7 +386,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                     <button
                       type="button"
                       onClick={handleManageBilling}
-                      className="w-full py-4 bg-slate-50 text-slate-600 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all"
+                      className="w-full py-4 bg-slate-50 text-slate-600 border border-slate-200 rounded-2xl font-black text-xs tracking-widest hover:bg-slate-100 transition-all"
                     >
                       Access Stripe Billing Portal
                     </button>
@@ -402,7 +402,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
             <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                  <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                     Legal Entity Name
                   </label>
                   <input
@@ -413,7 +413,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                  <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                     Trading Name
                   </label>
                   <input
@@ -424,7 +424,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                  <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                     Operating Country
                   </label>
                   <select
@@ -442,7 +442,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 </div>
 
                 <div className="md:col-span-2 space-y-4">
-                  <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                  <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                     Business Logo
                   </label>
 
@@ -457,12 +457,12 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
 
                     <div className="flex-1 space-y-2 text-center md:text-left">
                       <p className="text-xs font-bold text-slate-900">Upload business identity logo</p>
-                      <p className="text-[10px] text-slate-500">
+                      <p className="text-xs text-slate-500">
                         Supports PNG, JPG (Max 2MB). Visible on all professional documents.
                       </p>
 
                       <div className="pt-2">
-                        <label className="cursor-pointer bg-white border border-slate-200 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest inline-block shadow-sm hover:border-indigo-400 transition-colors">
+                        <label className="cursor-pointer bg-white border border-slate-200 px-6 py-2.5 rounded-xl text-xs font-black tracking-widest inline-block shadow-sm hover:border-indigo-400 transition-colors">
                           Select File
                           <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
                         </label>
@@ -471,7 +471,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                           <button
                             type="button"
                             onClick={() => setLogoBase64(undefined)}
-                            className="ml-4 text-[10px] font-black text-rose-500 uppercase tracking-widest"
+                            className="ml-4 text-xs font-black text-rose-500 tracking-widest"
                           >
                             Remove
                           </button>
@@ -482,7 +482,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                  <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                     Company Reg Number (Optional)
                   </label>
                   <input
@@ -494,7 +494,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 </div>
 
                 <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                  <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                     Registered Address (Multi-line)
                   </label>
                   <textarea
@@ -505,13 +505,13 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 </div>
 
                 <div className="md:col-span-2 pt-4 border-t border-slate-50">
-                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 italic">
+                  <h4 className="text-xs font-black text-slate-900 tracking-widest mb-6">
                     Financial Remittance Protocols
                   </h4>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                      <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                         Account Name
                       </label>
                       <input
@@ -523,7 +523,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                      <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                         Account Number
                       </label>
                       <input
@@ -534,7 +534,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                      <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                         Sort Code / IBAN / SWIFT
                       </label>
                       <input
@@ -550,7 +550,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
               <button
                 type="submit"
                 disabled={isSaving}
-                className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-black transition-all"
+                className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-xs tracking-widest shadow-xl hover:bg-black transition-all"
               >
                 {isSaving ? "Synchronizing Business Core..." : "Sync Business Identity"}
               </button>
@@ -561,7 +561,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
             <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                  <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                     Trading Currency
                   </label>
                   <select
@@ -579,7 +579,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                  <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                     Tax Label (VAT/GST/Sales Tax)
                   </label>
                   <input
@@ -590,7 +590,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 </div>
 
                 <div className="md:col-span-2 pt-4 border-t border-slate-50">
-                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 italic">
+                  <h4 className="text-xs font-black text-slate-900 tracking-widest mb-6">
                     Taxation Configuration
                   </h4>
 
@@ -602,13 +602,13 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                         defaultChecked={!!resolvedUser?.isVatRegistered}
                         className="w-5 h-5 accent-indigo-600"
                       />
-                      <span className="text-[10px] font-black text-slate-900 uppercase">
+                      <span className="text-xs font-black text-slate-900">
                         Registered for Tax/VAT
                       </span>
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                      <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                         Tax Number / VAT ID
                       </label>
                       <input
@@ -619,7 +619,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                      <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                         Default Tax Rate (%)
                       </label>
                       <input
@@ -633,13 +633,13 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 </div>
 
                 <div className="md:col-span-2 pt-4 border-t border-slate-50">
-                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 italic">
+                  <h4 className="text-xs font-black text-slate-900 tracking-widest mb-6">
                     Fiscal Reporting Cycle
                   </h4>
 
                   <div className="flex gap-6 items-center">
                     <div className="flex-1 space-y-1">
-                      <label className="text-[9px] font-black text-slate-400 uppercase px-1">
+                      <label className="text-[9px] font-black text-slate-900 px-1">
                         Start Day
                       </label>
                       <input
@@ -651,7 +651,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                     </div>
 
                     <div className="flex-1 space-y-1">
-                      <label className="text-[9px] font-black text-slate-400 uppercase px-1">
+                      <label className="text-[9px] font-black text-slate-900 px-1">
                         Start Month
                       </label>
                       <select
@@ -670,19 +670,19 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                 </div>
 
                 <div className="md:col-span-2 pt-4 border-t border-slate-50">
-                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 italic">
+                  <h4 className="text-xs font-black text-slate-900 tracking-widest mb-6">
                     Invoicing Identity & Sequencing
                   </h4>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-4">
-                      <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                      <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                         Numbering Logic
                       </label>
                       <select
                         name="invoiceNumberingType"
                         defaultValue={(resolvedUser?.invoiceNumberingType as any) || "INCREMENTAL"}
-                        className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-[11px] uppercase outline-none"
+                        className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-[11px] outline-none"
                       >
                         <option value="INCREMENTAL">Incremental (e.g. INV-0042)</option>
                         <option value="DATE_BASED">Date-based (e.g. 250301)</option>
@@ -690,7 +690,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                      <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                         Prefix (Incremental only)
                       </label>
                       <input
@@ -701,7 +701,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase block tracking-widest px-1">
+                      <label className="text-xs font-black text-slate-900 block tracking-widest px-1">
                         Next sequence number
                       </label>
                       <input
@@ -718,7 +718,7 @@ export const Settings: React.FC<SettingsProps> = ({ user, onLogout, onRefresh })
               <button
                 type="submit"
                 disabled={isSaving}
-                className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-black transition-all"
+                className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-xs tracking-widest shadow-xl hover:bg-black transition-all"
               >
                 {isSaving ? "Synchronizing Localization..." : "Update Localization Protocols"}
               </button>

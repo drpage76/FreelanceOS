@@ -60,7 +60,7 @@ export const Landing: React.FC = () => {
             <div className="text-xl font-black tracking-tighter">
               Freelance<span className="text-indigo-400">OS</span>
             </div>
-            <div className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">
+            <div className="text-[9px] font-black tracking-[0.2em] text-slate-500">
               by PageTech Creative Ltd
             </div>
           </div>
@@ -69,13 +69,13 @@ export const Landing: React.FC = () => {
         <div className="flex gap-2">
           <button
             onClick={() => openAuth(false)}
-            className="px-4 py-2 bg-white/5 border border-white/10 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-all"
+            className="px-4 py-2 bg-white/5 border border-white/10 text-white rounded-xl font-black text-xs tracking-widest hover:bg-white/10 transition-all"
           >
             Sign In
           </button>
           <button
             onClick={() => openAuth(true)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:bg-indigo-500 transition-all"
+            className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-black text-xs tracking-widest shadow-xl shadow-indigo-500/20 hover:bg-indigo-500 transition-all"
           >
             Start Free Trial
           </button>
@@ -88,12 +88,12 @@ export const Landing: React.FC = () => {
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.8fr)_290px] gap-6 xl:gap-8 items-center">
             {/* Left */}
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-3 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400 shadow-inner mb-5">
+              <div className="inline-flex items-center gap-3 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[9px] font-black tracking-[0.2em] text-emerald-400 shadow-inner mb-5">
                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_#10b981]" />
                 Professional Business Operating System
               </div>
 
-              <h1 className="text-4xl sm:text-6xl lg:text-7xl xl:text-[6rem] font-black tracking-tighter leading-[0.9] text-white italic max-w-[14ch]">
+              <h1 className="text-4xl sm:text-6xl lg:text-7xl xl:text-[6rem] font-black tracking-tighter leading-[0.9] text-white max-w-[14ch]">
                 Jobs, invoices,
                 <br />
                 and time —
@@ -102,7 +102,7 @@ export const Landing: React.FC = () => {
                 </span>
               </h1>
 
-              <p className="mt-5 text-slate-400 text-lg sm:text-xl xl:text-[1.55rem] font-medium leading-relaxed max-w-4xl">
+              <p className="mt-5 text-slate-900 text-lg sm:text-xl xl:text-[1.55rem] font-medium leading-relaxed max-w-4xl">
                 FreelanceOS helps independent professionals manage jobs, invoices, mileage and business visibility in one
                 clean system.
               </p>
@@ -111,25 +111,25 @@ export const Landing: React.FC = () => {
             {/* Right / stacked boxes */}
             <div className="flex flex-col gap-3 w-full max-w-[290px] xl:ml-auto">
               <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">Monthly</p>
+                <p className="text-xs font-black tracking-[0.2em] text-slate-500">Monthly</p>
                 <p className="mt-1.5 text-xl font-black tracking-tight text-white">£11.99</p>
                 <p className="mt-0.5 text-[9px] font-bold text-slate-500">per month</p>
               </div>
 
               <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3">
-                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-emerald-300">Annual</p>
+                <p className="text-xs font-black tracking-[0.2em] text-emerald-300">Annual</p>
                 <p className="mt-1.5 text-xl font-black tracking-tight text-white">£119.99</p>
                 <p className="mt-0.5 text-[9px] font-bold text-emerald-200">per year</p>
               </div>
 
               <div className="rounded-2xl border border-indigo-400/20 bg-indigo-500/10 px-4 py-3">
-                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-indigo-300">Beta Offer</p>
+                <p className="text-xs font-black tracking-[0.2em] text-indigo-300">Beta Offer</p>
                 <p className="mt-1.5 text-lg font-black tracking-tight text-white">10% Discount</p>
                 <p className="mt-0.5 text-[9px] font-bold text-indigo-200">for early adopters</p>
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">Access</p>
+                <p className="text-xs font-black tracking-[0.2em] text-slate-500">Access</p>
                 <p className="mt-1.5 text-lg font-black tracking-tight text-white">No tiers</p>
                 <p className="mt-0.5 text-[9px] font-bold text-slate-500">all features included</p>
               </div>
@@ -144,18 +144,18 @@ export const Landing: React.FC = () => {
           <div className="flex flex-wrap justify-center items-center gap-6">
             <Link
               to="/privacy"
-              className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400"
+              className="text-[9px] font-black tracking-widest text-slate-500 hover:text-indigo-400"
             >
               Privacy
             </Link>
             <Link
               to="/terms"
-              className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400"
+              className="text-[9px] font-black tracking-widest text-slate-500 hover:text-indigo-400"
             >
               Terms
             </Link>
           </div>
-          <p className="text-slate-600 text-[9px] font-black uppercase tracking-[0.2em] text-center">
+          <p className="text-slate-600 text-[9px] font-black tracking-[0.2em] text-center">
             © 2026 PAGETECH CREATIVE LTD
           </p>
         </div>

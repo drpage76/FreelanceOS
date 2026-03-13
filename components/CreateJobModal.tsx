@@ -80,7 +80,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
     e.preventDefault();
     if (isSaving) return;
     if (!selectedClientId && !isAddingClient) {
-      alert("Please select or create a client identity first.");
+      alert("Please select or create a Client Name first.");
       return;
     }
     
@@ -167,8 +167,8 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 overflow-y-auto">
       <div className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200 my-auto">
         <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <h3 className="text-2xl font-black text-slate-900 tracking-tight italic">New Job Workspace</h3>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-rose-500 border border-slate-200 transition-all">
+          <h3 className="text-2xl font-black text-slate-900 tracking-tight">Add Job</h3>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white text-slate-900 hover:text-rose-500 border border-slate-200 transition-all">
             <i className="fa-solid fa-xmark"></i>
           </button>
         </div>
@@ -176,8 +176,8 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
         <form onSubmit={handleSubmit} className="p-8 space-y-8 max-h-[75vh] overflow-y-auto custom-scrollbar">
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Client Identity</label>
-              <button type="button" onClick={() => setIsAddingClient(!isAddingClient)} className="text-xs font-black text-indigo-600 uppercase">
+              <label className="text-xs font-black text-slate-900 tracking-widest px-1">Client Name</label>
+              <button type="button" onClick={() => setIsAddingClient(!isAddingClient)} className="text-xs font-black text-indigo-600">
                 {isAddingClient ? 'Cancel' : '+ New Client'}
               </button>
             </div>
@@ -189,19 +189,19 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
             ) : (
               <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 bg-indigo-50/30 p-6 rounded-[24px] border border-indigo-100 shadow-inner">
                 <div className="col-span-2">
-                   <label className="text-[9px] font-black text-indigo-400 uppercase mb-1 block px-1">New Client Name</label>
+                   <label className="text-[9px] font-black text-indigo-400 mb-1 block px-1">New Client Name</label>
                    <input required placeholder="Legal Entity Name" className="w-full px-5 py-3 bg-white border border-indigo-200 rounded-xl font-bold outline-none" value={newClient.name} onChange={e => setNewClient({...newClient, name: e.target.value})} />
                 </div>
                 <div className="col-span-2">
-                   <label className="text-[9px] font-black text-indigo-400 uppercase mb-1 block px-1">Billing Address</label>
+                   <label className="text-[9px] font-black text-indigo-400 mb-1 block px-1">Billing Address</label>
                    <textarea rows={2} placeholder="Full address for invoice" className="w-full px-5 py-3 bg-white border border-indigo-200 rounded-xl font-medium outline-none text-sm" value={newClient.address} onChange={e => setNewClient({...newClient, address: e.target.value})} />
                 </div>
                 <div>
-                   <label className="text-[9px] font-black text-indigo-400 uppercase mb-1 block px-1">Billing Email</label>
+                   <label className="text-[9px] font-black text-indigo-400 mb-1 block px-1">Billing Email</label>
                    <input type="email" placeholder="billing@company.com" className="w-full px-5 py-3 bg-white border border-indigo-200 rounded-xl font-medium outline-none" value={newClient.email} onChange={e => setNewClient({...newClient, email: e.target.value})} />
                 </div>
                 <div>
-                   <label className="text-[9px] font-black text-indigo-400 uppercase mb-1 block px-1">Payment Terms (Days)</label>
+                   <label className="text-[9px] font-black text-indigo-400 mb-1 block px-1">Payment Terms (Days)</label>
                    <input type="number" className="w-full px-5 py-3 bg-white border border-indigo-200 rounded-xl font-bold outline-none" value={newClient.terms} onChange={e => setNewClient({...newClient, terms: parseInt(e.target.value) || 30})} />
                 </div>
               </div>
@@ -210,54 +210,54 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
 
           <div className="grid grid-cols-2 gap-6">
             <div className="col-span-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 px-1">Project Title / Description</label>
+              <label className="text-xs font-black text-slate-900 block mb-2 px-1">Title / Description</label>
               <input required value={jobDetails.description} onChange={e => setJobDetails({...jobDetails, description: e.target.value})} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
             </div>
             
             <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 px-1">Pipeline Status</label>
-              <select value={jobDetails.status} onChange={e => setJobDetails({...jobDetails, status: e.target.value as JobStatus})} className={`w-full px-6 py-4 border rounded-2xl font-black text-[11px] uppercase outline-none appearance-none ${STATUS_COLORS[jobDetails.status]}`}>
+              <label className="text-xs font-black text-slate-900 block mb-2 px-1">Status</label>
+              <select value={jobDetails.status} onChange={e => setJobDetails({...jobDetails, status: e.target.value as JobStatus})} className={`w-full px-6 py-4 border rounded-2xl font-black text-[11px] outline-none appearance-none ${STATUS_COLORS[jobDetails.status]}`}>
                 {Object.values(JobStatus).map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
 
             <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 px-1">PO Number (Optional)</label>
+              <label className="text-xs font-black text-slate-900 block mb-2 px-1"># Purchase Order (Optional)</label>
               <input value={jobDetails.poNumber} onChange={e => setJobDetails({...jobDetails, poNumber: e.target.value})} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" placeholder="e.g. 50029" />
             </div>
 
             <div className="col-span-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase block mb-2 px-1">Venue / Location</label>
+              <label className="text-xs font-black text-slate-900 block mb-2 px-1">Venue / Location</label>
               <input required value={jobDetails.location} onChange={e => setJobDetails({...jobDetails, location: e.target.value})} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" placeholder="Event Venue Name" />
             </div>
             
             <div className="col-span-2 p-8 bg-slate-50/80 border border-slate-200 rounded-[32px] space-y-6">
                <div className="flex items-center gap-3 mb-2">
                   <i className="fa-brands fa-google text-indigo-600"></i>
-                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest italic">Production Schedule & Sync</h4>
+                  <h4 className="text-xs font-black text-slate-900 tracking-widest">Schedule</h4>
                </div>
                
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-4 border-t border-slate-200">
-                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight italic">Protocol Mode</p>
+                <p className="text-xs text-slate-500 font-bold tracking-tight">Calendar Entry Type</p>
                 <div className="flex bg-white p-1 rounded-xl border border-slate-100 shadow-sm">
                   <button 
                     type="button" 
                     onClick={() => setJobDetails({ ...jobDetails, schedulingType: SchedulingType.CONTINUOUS, syncToCalendar: true })}
-                    className={`px-5 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${jobDetails.syncToCalendar && jobDetails.schedulingType === SchedulingType.CONTINUOUS ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400'}`}
+                    className={`px-5 py-2.5 rounded-lg text-xs font-black transition-all ${jobDetails.syncToCalendar && jobDetails.schedulingType === SchedulingType.CONTINUOUS ? 'bg-slate-900 text-white shadow-md' : 'text-slate-900'}`}
                   >
                     Continuous
                   </button>
                   <button 
                     type="button" 
                     onClick={() => setJobDetails({ ...jobDetails, schedulingType: SchedulingType.SHIFT_BASED, syncToCalendar: true })}
-                    className={`px-5 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${jobDetails.syncToCalendar && jobDetails.schedulingType === SchedulingType.SHIFT_BASED ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400'}`}
+                    className={`px-5 py-2.5 rounded-lg text-xs font-black transition-all ${jobDetails.syncToCalendar && jobDetails.schedulingType === SchedulingType.SHIFT_BASED ? 'bg-slate-900 text-white shadow-md' : 'text-slate-900'}`}
                   >
                     Shift-based
                   </button>
                   <button 
                     type="button" 
                     onClick={() => setJobDetails({ ...jobDetails, syncToCalendar: false })}
-                    className={`px-5 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${!jobDetails.syncToCalendar ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400'}`}
+                    className={`px-5 py-2.5 rounded-lg text-xs font-black transition-all ${!jobDetails.syncToCalendar ? 'bg-rose-600 text-white shadow-md' : 'text-slate-900'}`}
                   >
                     None
                   </button>
@@ -270,43 +270,43 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
                     <div key={idx} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3 animate-in slide-in-from-left-1">
                       <div className="flex items-center justify-between">
                         <input className="px-3 py-2 bg-slate-50 rounded-lg text-xs font-black border-none outline-none flex-1 mr-2 text-indigo-600" placeholder="Session Title" value={s.title || ''} onChange={e => handleShiftChange(idx, 'title', e.target.value)} />
-                        <button type="button" onClick={() => handleRemoveShift(idx)} className="text-slate-300 hover:text-rose-500 transition-colors"><i className="fa-solid fa-trash-can text-[10px]"></i></button>
+                        <button type="button" onClick={() => handleRemoveShift(idx)} className="text-slate-300 hover:text-rose-500 transition-colors"><i className="fa-solid fa-trash-can text-xs"></i></button>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
-                          <span className="text-[8px] font-black text-slate-300 uppercase px-1">Start Date</span>
-                          <input type="date" className="w-full px-2 py-2 bg-slate-50 rounded-lg text-[10px] font-bold border-none outline-none" value={s.startDate || ''} onChange={e => handleShiftChange(idx, 'startDate', e.target.value)} />
+                          <span className="text-xs font-black text-slate-300 px-1">Start Date</span>
+                          <input type="date" className="w-full px-2 py-2 bg-slate-50 rounded-lg text-xs font-bold border-none outline-none" value={s.startDate || ''} onChange={e => handleShiftChange(idx, 'startDate', e.target.value)} />
                         </div>
                         <div className="space-y-1">
-                          <span className="text-[8px] font-black text-slate-300 uppercase px-1">End Date</span>
-                          <input type="date" className="w-full px-2 py-2 bg-slate-50 rounded-lg text-[10px] font-bold border-none outline-none" value={s.endDate || ''} onChange={e => handleShiftChange(idx, 'endDate', e.target.value)} />
+                          <span className="text-xs font-black text-slate-300 px-1">End Date</span>
+                          <input type="date" className="w-full px-2 py-2 bg-slate-50 rounded-lg text-xs font-bold border-none outline-none" value={s.endDate || ''} onChange={e => handleShiftChange(idx, 'endDate', e.target.value)} />
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                          <label className="flex items-center gap-1 cursor-pointer">
                            <input type="checkbox" className="w-3 h-3 rounded accent-indigo-600" checked={s.isFullDay || false} onChange={e => handleShiftChange(idx, 'isFullDay', e.target.checked)} />
-                           <span className="text-[9px] font-black text-slate-400 uppercase">Full Day</span>
+                           <span className="text-[9px] font-black text-slate-900">Full Day</span>
                          </label>
                       </div>
                     </div>
                   ))}
-                  <button type="button" onClick={handleAddShift} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-white hover:text-indigo-600 transition-all">+ Add Work Session</button>
+                  <button type="button" onClick={handleAddShift} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-xs font-black text-slate-900 tracking-widest hover:bg-white hover:text-indigo-600 transition-all">+ Add Work Session</button>
                 </div>
               ) : jobDetails.syncToCalendar ? (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <span className="text-[8px] font-black text-slate-400 uppercase px-1">Start Date</span>
+                    <span className="text-xs font-black text-slate-900 px-1">Start Date</span>
                     <input type="date" className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold shadow-sm" value={jobDetails.startDate} onChange={e => setJobDetails({...jobDetails, startDate: e.target.value})} />
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[8px] font-black text-slate-400 uppercase px-1">End Date</span>
+                    <span className="text-xs font-black text-slate-900 px-1">End Date</span>
                     <input type="date" className="w-full px-4 py-4 bg-white border border-slate-200 rounded-2xl font-bold shadow-sm" value={jobDetails.endDate} onChange={e => setJobDetails({...jobDetails, endDate: e.target.value})} />
                   </div>
                 </div>
               ) : (
                 <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-center">
-                  <p className="text-[10px] font-black text-rose-400 uppercase italic">Job will not be synced to Google Calendar</p>
+                  <p className="text-xs font-black text-rose-400">Job will not be synced to Google Calendar</p>
                 </div>
               )}
             </div>
@@ -314,8 +314,8 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
 
           <div className="space-y-4 pt-4 border-t border-slate-100">
              <div className="flex items-center justify-between px-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deliverables & Rate</label>
-                <button type="button" onClick={handleAddItem} className="text-[10px] font-black text-indigo-600 uppercase hover:underline">+ Add Entry</button>
+                <label className="text-xs font-black text-slate-900 tracking-widest">Items, Qty & Rate</label>
+                <button type="button" onClick={handleAddItem} className="text-xs font-black text-indigo-600 hover:underline">+ Add Line Item</button>
              </div>
              <div className="space-y-2">
                 {items.map((item, idx) => (
@@ -323,7 +323,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
                      <input className="col-span-7 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none" placeholder="Description..." value={item.description} onChange={e => handleItemChange(idx, 'description', e.target.value)} />
                      <input type="number" step="any" className="col-span-2 px-1 py-2 bg-white border border-slate-200 rounded-lg text-xs font-black text-center outline-none" value={item.qty} onChange={e => handleItemChange(idx, 'qty', e.target.value)} />
                      <input type="number" step="any" className="col-span-2 px-1 py-2 bg-white border border-slate-200 rounded-lg text-xs font-black text-right outline-none" value={item.unitPrice} onChange={e => handleItemChange(idx, 'unitPrice', e.target.value)} />
-                     <button type="button" onClick={() => handleRemoveItem(idx)} className="col-span-1 text-slate-300 hover:text-rose-500 flex justify-center"><i className="fa-solid fa-trash-can text-[10px]"></i></button>
+                     <button type="button" onClick={() => handleRemoveItem(idx)} className="col-span-1 text-slate-300 hover:text-rose-500 flex justify-center"><i className="fa-solid fa-trash-can text-xs"></i></button>
                   </div>
                 ))}
              </div>
@@ -331,10 +331,10 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
 
           <div className="flex justify-between items-center border-t border-slate-100 pt-8 sticky bottom-0 bg-white">
             <div className="flex flex-col">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Project Valuation</p>
+              <p className="text-xs font-black text-slate-900 tracking-widest">Job Total</p>
               <p className="text-3xl font-black text-indigo-600">£{totalRecharge.toLocaleString()}</p>
             </div>
-            <button type="submit" disabled={isSaving} className="px-12 py-4 bg-slate-900 text-white rounded-[24px] font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-3 hover:bg-black transition-all disabled:opacity-50">
+            <button type="submit" disabled={isSaving} className="px-12 py-4 bg-slate-900 text-white rounded-[24px] font-black text-xs tracking-widest shadow-xl flex items-center gap-3 hover:bg-black transition-all disabled:opacity-50">
               {isSaving ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-cloud-arrow-up text-indigo-400"></i>}
               Create Job
             </button>

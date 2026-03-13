@@ -62,16 +62,16 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
             <i className="fa-solid fa-triangle-exclamation text-3xl"></i>
           </div>
           <h1 className="text-white text-2xl font-black mb-2 tracking-tight">Workspace Crash Detected</h1>
-          <p className="text-slate-400 max-w-md mb-8 text-sm font-medium">
+          <p className="text-slate-900 max-w-md mb-8 text-sm font-medium">
             A technical protocol failure occurred. Your data is safe in the cloud, but the interface needs a hard reset.
           </p>
           <button
             onClick={this.hardReset}
-            className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 transition-all"
+            className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs tracking-widest shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 transition-all"
           >
             Re-Initialize Workspace
           </button>
-          <pre className="mt-12 text-[9px] text-slate-700 font-mono uppercase bg-black/20 p-4 rounded-xl max-w-2xl overflow-x-auto">
+          <pre className="mt-12 text-[9px] text-slate-700 font-mono bg-black/20 p-4 rounded-xl max-w-2xl overflow-x-auto">
             {this.state.error?.toString()}
           </pre>
         </div>
@@ -93,7 +93,7 @@ const AuthGate: React.FC<{
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-6 p-4">
         <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
         <div className="text-center">
-          <p className="text-white text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">
+          <p className="text-white text-xs font-black tracking-[0.4em] animate-pulse">
             Establishing Secure Workspace
           </p>
         </div>
@@ -132,7 +132,7 @@ const MainLayout: React.FC<{
       <Navigation isSyncing={isSyncing} user={currentUser} onLogout={onLogout} />
 
       {isReadOnly && (
-        <div className="fixed top-0 left-0 right-0 bg-rose-600 text-white py-2 text-center z-[200] text-[10px] font-black uppercase tracking-[0.2em] shadow-lg">
+        <div className="fixed top-0 left-0 right-0 bg-rose-600 text-white py-2 text-center z-[200] text-xs font-black tracking-[0.2em] shadow-lg">
           Trial Period Expired. Access is currently Read-Only.{" "}
           <Link to="/settings" className="underline ml-2 hover:text-rose-100 transition-colors">
             Reactivate Elite Plan

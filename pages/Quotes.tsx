@@ -141,7 +141,7 @@ export const Quotes: React.FC<QuotesProps> = ({ state, onRefresh }) => {
           <h2 className="text-3xl font-black text-slate-900 leading-none">Estimations & Quotes</h2>
           <p className="text-slate-500 font-medium mt-1">Formalize your proposals and secure new contracts.</p>
         </div>
-        <button onClick={openAddModal} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-indigo-700 transition-all flex items-center gap-2">
+        <button onClick={openAddModal} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black text-xs tracking-widest shadow-xl hover:bg-indigo-700 transition-all flex items-center gap-2">
            <i className="fa-solid fa-plus"></i> New Estimate
         </button>
       </header>
@@ -149,7 +149,7 @@ export const Quotes: React.FC<QuotesProps> = ({ state, onRefresh }) => {
       <div className="bg-white rounded-[32px] border border-slate-200 overflow-hidden shadow-sm">
         <table className="w-full text-left border-collapse">
           <thead className="bg-slate-50 border-b border-slate-100">
-            <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            <tr className="text-xs font-black text-slate-900 tracking-widest">
               <th className="p-6">Reference</th>
               <th className="p-6">Client / Project</th>
               <th className="p-6">Issue Date</th>
@@ -161,7 +161,7 @@ export const Quotes: React.FC<QuotesProps> = ({ state, onRefresh }) => {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {state.quotes.length === 0 ? (
-              <tr><td colSpan={7} className="p-20 text-center text-slate-300 font-black uppercase tracking-widest text-xs">No estimations recorded</td></tr>
+              <tr><td colSpan={7} className="p-20 text-center text-slate-300 font-black tracking-widest text-xs">No estimations recorded</td></tr>
             ) : (
               state.quotes.map(quote => {
                 const client = state.clients.find(c => c.id === quote.clientId);
@@ -170,15 +170,15 @@ export const Quotes: React.FC<QuotesProps> = ({ state, onRefresh }) => {
                     <td className="p-6 font-black text-xs text-indigo-600">{quote.id}</td>
                     <td className="p-6">
                       <p className="font-black text-slate-900 text-sm leading-tight">{quote.description}</p>
-                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-tight mt-1">{client?.name || 'Private Client'}</p>
+                      <p className="text-xs text-slate-900 font-black tracking-tight mt-1">{client?.name || 'Private Client'}</p>
                     </td>
                     <td className="p-6 text-xs font-bold text-slate-600">{formatDate(quote.date)}</td>
                     <td className="p-6 text-xs font-bold text-slate-600">{formatDate(quote.expiryDate)}</td>
                     <td className="p-6">
-                      <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase border ${
+                      <span className={`px-4 py-1.5 rounded-full text-[9px] font-black border ${
                         quote.status === QuoteStatus.ACCEPTED ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                         quote.status === QuoteStatus.SENT ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
-                        'bg-slate-50 text-slate-400 border-slate-200'
+                        'bg-slate-50 text-slate-900 border-slate-200'
                       }`}>
                         {quote.status}
                       </span>
@@ -187,11 +187,11 @@ export const Quotes: React.FC<QuotesProps> = ({ state, onRefresh }) => {
                     <td className="p-6">
                       <div className="flex items-center justify-center gap-2">
                         {quote.status !== QuoteStatus.ACCEPTED && (
-                          <button onClick={() => handleConvertToJob(quote)} disabled={isProcessing === quote.id} className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all flex items-center gap-2">
+                          <button onClick={() => handleConvertToJob(quote)} disabled={isProcessing === quote.id} className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-[9px] font-black tracking-widest hover:bg-emerald-700 transition-all flex items-center gap-2">
                             {isProcessing === quote.id ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-check"></i>} Confirm Job
                           </button>
                         )}
-                        <button onClick={() => handleDelete(quote.id)} className="w-9 h-9 flex items-center justify-center bg-slate-100 text-slate-400 rounded-xl hover:text-rose-500 transition-colors"><i className="fa-solid fa-trash-can text-xs"></i></button>
+                        <button onClick={() => handleDelete(quote.id)} className="w-9 h-9 flex items-center justify-center bg-slate-100 text-slate-900 rounded-xl hover:text-rose-500 transition-colors"><i className="fa-solid fa-trash-can text-xs"></i></button>
                       </div>
                     </td>
                   </tr>
@@ -207,11 +207,11 @@ export const Quotes: React.FC<QuotesProps> = ({ state, onRefresh }) => {
           <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200 my-auto overflow-hidden">
              <div className="p-8 border-b border-slate-100 flex items-center justify-between">
                 <h3 className="text-2xl font-black text-slate-900">Create Estimation</h3>
-                <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:text-rose-500"><i className="fa-solid fa-xmark"></i></button>
+                <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-900 hover:text-rose-500"><i className="fa-solid fa-xmark"></i></button>
              </div>
              <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase block px-1">Target Client</label>
+                  <label className="text-xs font-black text-slate-900 block px-1">Target Client</label>
                   <select required value={formData.clientId} onChange={e => setFormData({...formData, clientId: e.target.value})} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none">
                     <option value="">Select recipient...</option>
                     {state.clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -219,25 +219,25 @@ export const Quotes: React.FC<QuotesProps> = ({ state, onRefresh }) => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase block px-1">Project Description</label>
+                  <label className="text-xs font-black text-slate-900 block px-1">Project Description</label>
                   <input required placeholder="Project Name / Brief" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase block px-1">Issue Date</label>
+                    <label className="text-xs font-black text-slate-900 block px-1">Issue Date</label>
                     <input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase block px-1">Valid Until</label>
+                    <label className="text-xs font-black text-slate-900 block px-1">Valid Until</label>
                     <input type="date" value={formData.expiryDate} onChange={e => setFormData({...formData, expiryDate: e.target.value})} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black outline-none" />
                   </div>
                 </div>
 
                 <div className="space-y-4 pt-4 border-t border-slate-50">
                   <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black text-slate-400 uppercase block px-1">Line Items</label>
-                    <button type="button" onClick={handleAddItem} className="text-[9px] font-black text-indigo-600 uppercase">+ Add Row</button>
+                    <label className="text-xs font-black text-slate-900 block px-1">Line Items</label>
+                    <button type="button" onClick={handleAddItem} className="text-[9px] font-black text-indigo-600">+ Add Row</button>
                   </div>
                   <div className="space-y-2">
                     {formData.items.map((it, idx) => (
@@ -245,7 +245,7 @@ export const Quotes: React.FC<QuotesProps> = ({ state, onRefresh }) => {
                         <input className="col-span-7 px-3 py-2 bg-white rounded-lg text-xs font-bold outline-none" placeholder="Description" value={it.description} onChange={e => handleUpdateItem(idx, 'description', e.target.value)} />
                         <input type="number" className="col-span-2 px-1 py-2 bg-white rounded-lg text-xs font-black text-center outline-none" value={it.qty} onChange={e => handleUpdateItem(idx, 'qty', parseFloat(e.target.value) || 0)} />
                         <input type="number" className="col-span-2 px-1 py-2 bg-white rounded-lg text-xs font-black text-right outline-none" value={it.unitPrice} onChange={e => handleUpdateItem(idx, 'unitPrice', parseFloat(e.target.value) || 0)} />
-                        <button type="button" onClick={() => handleRemoveItem(idx)} className="col-span-1 text-slate-200 hover:text-rose-500"><i className="fa-solid fa-trash-can text-[10px]"></i></button>
+                        <button type="button" onClick={() => handleRemoveItem(idx)} className="col-span-1 text-slate-200 hover:text-rose-500"><i className="fa-solid fa-trash-can text-xs"></i></button>
                       </div>
                     ))}
                   </div>
@@ -253,10 +253,10 @@ export const Quotes: React.FC<QuotesProps> = ({ state, onRefresh }) => {
 
                 <div className="flex items-center justify-between pt-8 border-t border-slate-100 sticky bottom-0 bg-white pb-2">
                    <div className="flex flex-col">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Estimate</p>
+                      <p className="text-[9px] font-black text-slate-900 tracking-widest">Total Estimate</p>
                       <p className="text-3xl font-black text-indigo-600">{formatCurrency(totalAmount)}</p>
                    </div>
-                   <button type="submit" disabled={isProcessing === 'saving'} className="px-10 py-4 bg-slate-900 text-white rounded-[24px] font-black text-xs uppercase tracking-widest shadow-xl hover:bg-black transition-all flex items-center gap-2">
+                   <button type="submit" disabled={isProcessing === 'saving'} className="px-10 py-4 bg-slate-900 text-white rounded-[24px] font-black text-xs tracking-widest shadow-xl hover:bg-black transition-all flex items-center gap-2">
                       {isProcessing === 'saving' ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-cloud-arrow-up"></i>}
                       {editingQuote ? 'Update Estimate' : 'Issue Estimate'}
                    </button>

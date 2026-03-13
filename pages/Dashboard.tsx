@@ -312,8 +312,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     <div className="flex flex-col gap-4 max-w-screen-2xl mx-auto pb-10 px-4">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight italic">Dashboard</h2>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Dashboard</h2>
+          <p className="text-xs font-black text-slate-900 tracking-widest">
             Business Overview
           </p>
         </div>
@@ -322,7 +322,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <button
             onClick={onSyncCalendar}
             disabled={isSyncing}
-            className="bg-white text-slate-600 border border-slate-200 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center shadow-sm disabled:opacity-50"
+            className="bg-white text-slate-600 border border-slate-200 px-4 py-2 rounded-xl text-[9px] font-black tracking-widest hover:bg-slate-50 transition-all flex items-center shadow-sm disabled:opacity-50"
           >
             {isSyncing ? (
               <i className="fa-solid fa-spinner animate-spin mr-2"></i>
@@ -334,7 +334,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <button
             onClick={onNewJobClick}
-            className="bg-slate-900 text-white px-6 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg hover:bg-black transition-all flex items-center"
+            className="bg-slate-900 text-white px-6 py-2 rounded-xl text-[9px] font-black tracking-widest shadow-lg hover:bg-black transition-all flex items-center"
           >
             <i className="fa-solid fa-plus mr-2"></i>Add Job
           </button>
@@ -349,10 +349,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
           }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <p className="text-slate-400 text-[8px] font-black uppercase tracking-widest">Unpaid Invoices</p>
+            <p className="text-slate-900 text-xs font-black tracking-widest">Unpaid Invoices</p>
             <button
               onClick={() => setShowAllPayments(!showAllPayments)}
-              className="text-indigo-600 text-[9px] font-black uppercase hover:underline"
+              className="text-indigo-600 text-[9px] font-black hover:underline"
             >
               {showAllPayments ? "Collapse" : "Show All"}
             </button>
@@ -364,7 +364,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div key={p.id} className="flex items-center justify-between border-b border-slate-50 pb-2">
                   <div className="min-w-0">
                     <p className="text-[11px] font-black text-slate-900 truncate">{p.client?.name}</p>
-                    <p className="text-[9px] font-bold text-slate-400">
+                    <p className="text-[9px] font-bold text-slate-900">
                       Due {p.dueDate ? format(parseISO(p.dueDate), "dd MMM") : "-"}
                     </p>
                   </div>
@@ -372,7 +372,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <p className="text-[11px] font-black text-slate-900">
                       {formatCurrency(p.job?.totalRecharge || 0, state.user)}
                     </p>
-                    <p className="text-[8px] font-black text-indigo-500 uppercase">{p.daysRemaining} days left</p>
+                    <p className="text-xs font-black text-indigo-500">{p.daysRemaining} days left</p>
                   </div>
                 </div>
               ))}
@@ -381,7 +381,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex items-center justify-between flex-1">
               <div className="min-w-0">
                 <p className="text-[13px] font-black text-slate-900 truncate leading-tight">{nextPayment.client?.name}</p>
-                <p className="text-[10px] font-black text-indigo-500 uppercase mt-0.5">
+                <p className="text-xs font-black text-indigo-500 mt-0.5">
                   {nextPayment.daysRemaining} days remaining
                 </p>
               </div>
@@ -389,13 +389,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <p className="text-lg font-black text-slate-900 tracking-tighter">
                   {formatCurrency(nextPayment.job?.totalRecharge || 0, state.user)}
                 </p>
-                <p className="text-[9px] font-bold text-slate-400 uppercase leading-none">
+                <p className="text-[9px] font-bold text-slate-900 leading-none">
                   By {nextPayment.dueDate ? format(parseISO(nextPayment.dueDate), "dd MMM") : "-"}
                 </p>
               </div>
             </div>
           ) : (
-            <p className="text-[10px] text-slate-300 font-black uppercase text-center py-4 tracking-widest">
+            <p className="text-xs text-slate-300 font-black text-center py-4 tracking-widest">
               All settled
             </p>
           )}
@@ -407,10 +407,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
           }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <p className="text-slate-400 text-[8px] font-black uppercase tracking-widest">Upcoming Jobs</p>
+            <p className="text-slate-900 text-xs font-black tracking-widest">Upcoming Jobs</p>
             <button
               onClick={() => setShowAllJobs(!showAllJobs)}
-              className="text-emerald-600 text-[9px] font-black uppercase hover:underline"
+              className="text-emerald-600 text-[9px] font-black hover:underline"
             >
               {showAllJobs ? "Collapse" : "Show All"}
             </button>
@@ -426,11 +426,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 >
                   <div className="min-w-0">
                     <p className="text-[11px] font-black text-slate-900 truncate">{j.description}</p>
-                    <p className="text-[9px] font-bold text-slate-400">
+                    <p className="text-[9px] font-bold text-slate-900">
                       {state.clients.find((c) => c.id === j.clientId)?.name}
                     </p>
                   </div>
-                  <p className="text-[9px] font-black text-emerald-600 uppercase text-right shrink-0">
+                  <p className="text-[9px] font-black text-emerald-600 text-right shrink-0">
                     {format(parseISO(j.startDate), "dd MMM")}
                   </p>
                 </Link>
@@ -440,7 +440,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex items-center justify-between flex-1">
               <div className="min-w-0">
                 <p className="text-[13px] font-black text-slate-900 truncate leading-tight">{nextJob.description}</p>
-                <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5 truncate">
+                <p className="text-xs font-bold text-slate-900 mt-0.5 truncate">
                   {state.clients.find((c) => c.id === nextJob.clientId)?.name}
                 </p>
               </div>
@@ -449,18 +449,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <p className="text-lg font-black text-slate-900 tracking-tighter">
                     {format(parseISO(nextJob.startDate), "dd MMM")}
                   </p>
-                  <p className="text-[8px] font-black text-slate-400 uppercase leading-none">Production start</p>
+                  <p className="text-xs font-black text-slate-900 leading-none">Production start</p>
                 </div>
                 <Link
                   to={`/jobs/${nextJob.id}`}
                   className="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center hover:bg-black transition-all"
                 >
-                  <i className="fa-solid fa-arrow-right text-[10px]"></i>
+                  <i className="fa-solid fa-arrow-right text-xs"></i>
                 </Link>
               </div>
             </div>
           ) : (
-            <p className="text-[10px] text-slate-300 font-black uppercase text-center py-4 tracking-widest">
+            <p className="text-xs text-slate-300 font-black text-center py-4 tracking-widest">
               No upcoming work
             </p>
           )}
@@ -472,7 +472,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           <div className="relative z-10">
-            <p className="text-slate-500 text-[8px] font-black uppercase tracking-widest italic leading-none">
+            <p className="text-slate-500 text-xs font-black tracking-widest leading-none">
               Financial Performance (YTD)
             </p>
             <p className="text-2xl font-black tracking-tighter mt-1">
@@ -485,10 +485,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${revStats.percentOfGoal || 0}%` }} />
             </div>
             <div className="flex justify-between items-center">
-              <p className="text-[7px] text-slate-500 font-black uppercase italic">
+              <p className="text-[7px] text-slate-500 font-black">
                 Run-rate: {formatCurrency(revStats.dailyRunRate || 0, state.user)}/day
               </p>
-              <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">
+              <p className="text-xs font-black text-indigo-400 tracking-widest">
                 {(revStats.percentOfGoal || 0).toFixed(0)}% of Goal
               </p>
             </div>
@@ -502,10 +502,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Projected Revenue</p>
+            <p className="text-xs font-black text-slate-900 tracking-widest">Projected Revenue</p>
             
           </div>
-          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+          <div className="text-[9px] font-black text-slate-900 tracking-widest">
             FY start: {(state.user as any)?.fiscalYearStartDay || 6}/{(state.user as any)?.fiscalYearStartMonth || 4}
           </div>
         </div>
@@ -513,11 +513,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
           {pipelineByFiscalYear.map((fy) => (
             <div key={fy.label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{fy.label}</div>
+              <div className="text-xs font-black text-slate-900 tracking-widest">{fy.label}</div>
               <div className="mt-1 text-2xl font-black text-slate-900 tracking-tighter">
                 {formatCurrency(fy.value || 0, state.user)}
               </div>
-              <div className="mt-1 text-[10px] font-bold text-slate-400">Excludes Cancelled/Completed</div>
+              <div className="mt-1 text-xs font-bold text-slate-900">Excludes Cancelled/Completed</div>
             </div>
           ))}
         </div>
@@ -537,8 +537,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="w-full lg:w-1/3 border-r border-slate-50 pr-8">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
-              Market Share Portfolio
+            <p className="text-xs font-black text-slate-900 tracking-widest mb-4">
+              Revenue Overview
             </p>
             <div className="h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -573,7 +573,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <div className="w-full lg:w-2/3">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              <p className="text-xs font-black text-slate-900 tracking-widest">
                 Client Ranking by Value
               </p>
 
@@ -581,7 +581,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => setClientValueView("previousFY")}
-                  className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-[9px] font-black tracking-widest border transition-all ${
                     clientValueView === "previousFY"
                       ? "bg-amber-500 text-white border-amber-500"
                       : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
@@ -593,7 +593,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => setClientValueView("currentFY")}
-                  className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-[9px] font-black tracking-widest border transition-all ${
                     clientValueView === "currentFY"
                       ? "bg-emerald-600 text-white border-emerald-600"
                       : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
@@ -605,7 +605,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => setClientValueView("nextFY")}
-                  className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-[9px] font-black tracking-widest border transition-all ${
                     clientValueView === "nextFY"
                       ? "bg-indigo-600 text-white border-indigo-600"
                       : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
@@ -617,7 +617,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => setClientValueView("lifetime")}
-                  className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-[9px] font-black tracking-widest border transition-all ${
                     clientValueView === "lifetime"
                       ? "bg-slate-900 text-white border-slate-900"
                       : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
@@ -629,7 +629,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <div className="space-y-2">
-              <div className="grid grid-cols-12 gap-3 px-3 pb-2 text-[8px] font-black text-slate-400 uppercase tracking-widest">
+              <div className="grid grid-cols-12 gap-3 px-3 pb-2 text-xs font-black text-slate-900 tracking-widest">
                 <div className="col-span-5">Client</div>
                 <div className="col-span-2 text-center">Jobs</div>
                 <div className="col-span-3 text-right">{clientValueLabel}</div>
@@ -653,7 +653,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   >
                     <div className="col-span-5 flex items-center gap-3 min-w-0">
                       <div
-                        className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-[10px] shadow-sm shrink-0"
+                        className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-xs shadow-sm shrink-0"
                         style={{ backgroundColor: COLORS[idx % COLORS.length] }}
                       >
                         {client.name.charAt(0)}
@@ -672,7 +672,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     <div className="col-span-2 text-right">
-                      <p className="text-[10px] font-black text-indigo-500 uppercase">
+                      <p className="text-xs font-black text-indigo-500">
                         {client.share.toFixed(0)}%
                       </p>
                     </div>
@@ -687,12 +687,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm">
         <div className="flex items-center justify-between gap-4 mb-4">
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            <p className="text-xs font-black text-slate-900 tracking-widest">
               Revenue Trend
             </p>
             <p className="text-xs font-black text-slate-900">Last 12 months</p>
           </div>
-          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+          <div className="text-[9px] font-black text-slate-900 tracking-widest">
             Based on job start date
           </div>
         </div>

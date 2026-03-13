@@ -109,7 +109,7 @@ export const Jobs: React.FC<JobsProps> = ({ state, onRefresh, onNewJobClick }) =
             <h3 className="text-xl font-black text-slate-900 mb-2">Issue Project Invoice</h3>
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Date of Issue</label>
+                <label className="text-xs font-black text-slate-900 mb-2 block tracking-widest">Date of Issue</label>
                 <input
                   type="date"
                   value={promptDate}
@@ -120,14 +120,14 @@ export const Jobs: React.FC<JobsProps> = ({ state, onRefresh, onNewJobClick }) =
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={() => setInvoicePrompt(null)}
-                  className="flex-1 py-4 bg-slate-50 text-slate-400 rounded-2xl font-black text-[10px] uppercase border border-slate-100"
+                  className="flex-1 py-4 bg-slate-50 text-slate-900 rounded-2xl font-black text-xs border border-slate-100"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleFinalizeQuickInvoice}
                   disabled={!!isProcessing}
-                  className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2"
+                  className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs shadow-xl flex items-center justify-center gap-2"
                 >
                   {isProcessing ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-file-invoice-dollar"></i>}
                   {isProcessing ? "Handoff..." : "Create Draft"}
@@ -140,21 +140,21 @@ export const Jobs: React.FC<JobsProps> = ({ state, onRefresh, onNewJobClick }) =
 
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 leading-tight">Project Workspace</h2>
-          <p className="text-slate-400 font-bold uppercase text-[9px] tracking-[0.3em]">Operational Ledger</p>
+          <h2 className="text-3xl font-black text-slate-900 leading-tight">Jobs</h2>
+          <p className="text-xs font-black text-slate-500 tracking-widest">Entry, View & Amend</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <button
             onClick={exportJobsCSV}
-            className="px-6 py-3.5 bg-white border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all flex items-center"
+            className="px-6 py-3.5 bg-white border border-slate-200 rounded-2xl text-xs font-black tracking-widest shadow-sm hover:bg-slate-50 transition-all flex items-center"
           >
             <i className="fa-solid fa-file-csv mr-2 text-emerald-500"></i> Download Archive
           </button>
           <button
             onClick={onNewJobClick}
-            className="bg-slate-900 text-white px-8 py-3.5 rounded-2xl font-black shadow-xl hover:bg-black transition-all text-[10px] uppercase tracking-widest flex items-center justify-center"
+            className="bg-slate-900 text-white px-8 py-3.5 rounded-2xl font-black shadow-xl hover:bg-black transition-all text-xs tracking-widest flex items-center justify-center"
           >
-            <i className="fa-solid fa-plus mr-2"></i>Create New Job
+            <i className="fa-solid fa-plus mr-2"></i>Add Job
           </button>
         </div>
       </header>
@@ -175,8 +175,8 @@ export const Jobs: React.FC<JobsProps> = ({ state, onRefresh, onNewJobClick }) =
               <button
                 key={s}
                 onClick={() => setFilter(s as any)}
-                className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
-                  filter === s ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400"
+                className={`px-4 py-2 rounded-lg text-[9px] font-black tracking-widest transition-all ${
+                  filter === s ? "bg-white text-indigo-600 shadow-sm" : "text-slate-900"
                 }`}
               >
                 {s}
@@ -189,16 +189,16 @@ export const Jobs: React.FC<JobsProps> = ({ state, onRefresh, onNewJobClick }) =
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest">Client Identity</th>
-                <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest">Project & Venue</th>
-                <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Revenue</th>
-                <th className="p-8 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Manage</th>
+                <th className="p-8 text-xs font-black text-slate-900 tracking-widest">Client Name</th>
+                <th className="p-8 text-xs font-black text-slate-900 tracking-widest">Project & Venue</th>
+                <th className="p-8 text-xs font-black text-slate-900 tracking-widest text-right">Revenue</th>
+                <th className="p-8 text-xs font-black text-slate-900 tracking-widest text-center">Manage</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-32 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">
+                  <td colSpan={4} className="p-32 text-center text-slate-300 font-black text-xs tracking-widest">
                     No matching records
                   </td>
                 </tr>
@@ -211,14 +211,14 @@ export const Jobs: React.FC<JobsProps> = ({ state, onRefresh, onNewJobClick }) =
                     <tr key={job.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="p-8">
                         <span className="font-black text-slate-900 text-sm block mb-1">{client?.name || "Private Client"}</span>
-                        <span className="text-[9px] text-indigo-400 font-black uppercase tracking-widest">ID: {job.id}</span>
+                        <span className="text-[9px] text-indigo-400 font-black tracking-widest">ID: {job.id}</span>
                       </td>
 
                       <td className="p-8">
                         <Link to={`/jobs/${job.id}`} className="font-black text-slate-900 hover:text-indigo-600 transition-colors block text-[15px] mb-2">
                           {job.description}
                         </Link>
-                        <span className="text-[10px] text-slate-400 font-black uppercase flex items-center gap-2 italic">
+                        <span className="text-xs text-slate-400 font-black flex items-center gap-2">
                           {formatDate(job.startDate)} @ {job.location || "TBD"}
                         </span>
                       </td>

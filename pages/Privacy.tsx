@@ -11,17 +11,17 @@ export const Privacy: React.FC = () => {
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
               <i className="fa-solid fa-bolt text-sm"></i>
             </div>
-            <span className="text-lg font-black tracking-tighter italic">Freelance<span className="text-indigo-600">OS</span></span>
+            <span className="text-lg font-black tracking-tighter">Freelance<span className="text-indigo-600">OS</span></span>
           </Link>
-          <Link to="/" className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors">Back to Engine</Link>
+          <Link to="/" className="text-xs font-black tracking-widest text-slate-900 hover:text-indigo-600 transition-colors">Back to Engine</Link>
         </div>
       </nav>
 
       <main className="max-w-3xl mx-auto px-6 py-20">
         <header className="mb-16 border-b border-slate-200 pb-12">
-          <h1 className="text-4xl font-black tracking-tight mb-2 italic text-slate-900">Privacy Policy — FreelanceOS</h1>
-          <p className="text-indigo-600 font-bold italic text-lg mb-6">“Jobs, invoices, and time — simplified.”</p>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Effective date: 29 January 2026</p>
+          <h1 className="text-4xl font-black tracking-tight mb-2 text-slate-900">Privacy Policy — FreelanceOS</h1>
+          <p className="text-indigo-600 font-bold text-lg mb-6">“Jobs, invoices, and time — simplified.”</p>
+          <p className="text-xs font-black tracking-widest text-slate-900">Effective date: 29 January 2026</p>
         </header>
 
         <div className="prose prose-slate prose-headings:font-black prose-headings:tracking-tight prose-headings:italic prose-p:text-slate-600 prose-p:leading-relaxed space-y-12">
@@ -35,7 +35,7 @@ export const Privacy: React.FC = () => {
             <h2 className="text-xl font-black mb-4">1) Information we collect</h2>
             <div className="space-y-6">
               <div>
-                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-2">a) Google Sign-In information</h3>
+                <h3 className="text-sm font-black tracking-widest text-slate-900 mb-2">a) Google Sign-In information</h3>
                 <p>When you sign in with Google, we may receive:</p>
                 <ul className="list-disc pl-5 mt-2 space-y-1">
                   <li>Your name</li>
@@ -45,11 +45,11 @@ export const Privacy: React.FC = () => {
                 </ul>
               </div>
               <div>
-                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-2">b) Data you enter into FreelanceOS</h3>
+                <h3 className="text-sm font-black tracking-widest text-slate-900 mb-2">b) Data you enter into FreelanceOS</h3>
                 <p>This may include information you add to run your freelance business, such as jobs, clients, invoices, times, notes, and related records.</p>
               </div>
               <div>
-                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-2">c) Technical information</h3>
+                <h3 className="text-sm font-black tracking-widest text-slate-900 mb-2">c) Technical information</h3>
                 <p>We may collect basic technical data required to operate the service, such as device or browser information, log data, and IP address (typically handled by hosting providers).</p>
               </div>
             </div>
@@ -75,7 +75,7 @@ export const Privacy: React.FC = () => {
               <li>Authentication providers (e.g., Google) for sign-in</li>
               <li>Infrastructure providers (e.g., hosting and database services)</li>
             </ul>
-            <p className="mt-4 italic">We may disclose information if required by law or to protect rights, safety, and security.</p>
+            <p className="mt-4">We may disclose information if required by law or to protect rights, safety, and security.</p>
           </section>
 
           <section>
@@ -109,7 +109,7 @@ export const Privacy: React.FC = () => {
       </main>
       
       <footer className="py-12 border-t border-slate-200 text-center">
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">© 2025 Professional Business Operating System.</p>
+        <p className="text-xs font-black text-slate-900 tracking-widest">© 2025 Professional Business Operating System.</p>
       </footer>
     </div>
   );

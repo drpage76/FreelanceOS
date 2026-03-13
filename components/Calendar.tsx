@@ -292,7 +292,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
               {format(currentDate, "MMMM yyyy")}
             </h3>
             <div className="relative overflow-hidden w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-slate-50 rounded-xl border border-slate-200 group cursor-pointer transition-all hover:border-indigo-400">
-              <i className="fa-solid fa-calendar-day text-[14px] text-slate-400 group-hover:text-indigo-600"></i>
+              <i className="fa-solid fa-calendar-day text-[14px] text-slate-900 group-hover:text-indigo-600"></i>
               <input
                 type="month"
                 onChange={(e) => e.target.value && setCurrentDate(parse(`${e.target.value}-01`, "yyyy-MM-dd", new Date()))}
@@ -304,19 +304,19 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
           <div className="flex bg-slate-100 p-1 rounded-[16px] border border-slate-200 shadow-inner">
             <button
               onClick={() => setCurrentDate(subMonths(currentDate, 1))}
-              className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:bg-white rounded-lg text-slate-400 transition-all"
+              className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:bg-white rounded-lg text-slate-900 transition-all"
             >
               <i className="fa-solid fa-chevron-left text-xs"></i>
             </button>
             <button
               onClick={() => setCurrentDate(new Date())}
-              className="px-4 sm:px-6 py-1 bg-indigo-600 text-white rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-widest mx-1 sm:mx-2 shadow-sm"
+              className="px-4 sm:px-6 py-1 bg-indigo-600 text-white rounded-lg text-[9px] sm:text-xs font-black tracking-widest mx-1 sm:mx-2 shadow-sm"
             >
               Today
             </button>
             <button
               onClick={() => setCurrentDate(addMonths(currentDate, 1))}
-              className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:bg-white rounded-lg text-slate-400 transition-all"
+              className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:bg-white rounded-lg text-slate-900 transition-all"
             >
               <i className="fa-solid fa-chevron-right text-xs"></i>
             </button>
@@ -326,7 +326,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
 
       <div className="grid grid-cols-7 bg-slate-50/30 border-b border-slate-100">
         {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-          <div key={day} className="py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
+          <div key={day} className="py-4 text-center text-xs font-black text-slate-900 tracking-widest">
             {day}
           </div>
         ))}
@@ -437,7 +437,7 @@ export const Calendar: React.FC<CalendarProps> = ({ jobs, externalEvents, client
                         >
                           <div className="flex items-center gap-2 overflow-hidden w-full">
                             {entry.type === "external" && <i className="fa-brands fa-google text-[7px] opacity-70"></i>}
-                            <span className="text-[8px] font-black uppercase tracking-tight whitespace-nowrap overflow-hidden">
+                            <span className="text-xs font-black tracking-tight whitespace-nowrap overflow-hidden">
                               {entry.timeLabel ? `${entry.timeLabel} • ` : ""}
                               {entry.title}
                             </span>

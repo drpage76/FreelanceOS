@@ -36,7 +36,7 @@ export const Diag: React.FC = () => {
         <div><b>Supabase session email:</b> {sessionEmail}</div>
         <div><b>DB.getTenantId():</b> {tenantId}</div>
       </div>
-      <p className="mt-8 text-slate-400 text-xs">
+      <p className="mt-8 text-slate-900 text-xs">
         If CloudConfigured is false on live, your VITE env vars are not present at build time.
       </p>
     </div>

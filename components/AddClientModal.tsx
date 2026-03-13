@@ -83,14 +83,14 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
       <div className="bg-white w-full max-md rounded-[32px] shadow-2xl overflow-hidden border border-slate-200">
         <div className="p-8 border-b border-slate-100 flex items-center justify-between">
           <h3 className="text-2xl font-black text-slate-900">{initialData ? 'Edit Client' : 'Add New Client'}</h3>
-          <button disabled={isSaving} onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:text-rose-500 transition-colors disabled:opacity-50">
+          <button disabled={isSaving} onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 text-slate-900 hover:text-rose-500 transition-colors disabled:opacity-50">
             <i className="fa-solid fa-xmark"></i>
           </button>
         </div>
         
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Client Name</label>
+            <label className="block text-xs font-black text-slate-900 tracking-widest mb-2 px-1">Client Name</label>
             <input 
               disabled={isSaving}
               name="name" 
@@ -103,7 +103,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Email Address</label>
+              <label className="block text-xs font-black text-slate-900 tracking-widest mb-2 px-1">Email Address</label>
               <input 
                 disabled={isSaving}
                 name="email" 
@@ -115,7 +115,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
               />
             </div>
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Phone Number</label>
+              <label className="block text-xs font-black text-slate-900 tracking-widest mb-2 px-1">Phone Number</label>
               <input 
                 disabled={isSaving}
                 name="phone" 
@@ -128,7 +128,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Full Billing Address</label>
+            <label className="block text-xs font-black text-slate-900 tracking-widest mb-2 px-1">Full Billing Address</label>
             <textarea 
               disabled={isSaving}
               name="address" 
@@ -140,7 +140,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
             ></textarea>
           </div>
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Payment Terms (days)</label>
+            <label className="block text-xs font-black text-slate-900 tracking-widest mb-2 px-1">Payment Terms (days)</label>
             <input 
               disabled={isSaving}
               name="terms" 

@@ -95,11 +95,11 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
               <span className="text-indigo-600">OS</span>
             </h1>
             {isPro ? (
-              <span className="inline-block mt-2 bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest italic">
+              <span className="inline-block mt-2 bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded text-xs font-black tracking-widest">
                 Elite Pro
               </span>
             ) : (
-              <span className="inline-block mt-2 bg-slate-100 text-slate-400 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest italic">
+              <span className="inline-block mt-2 bg-slate-100 text-slate-900 px-2 py-0.5 rounded text-xs font-black tracking-widest">
                 Trial Mode
               </span>
             )}
@@ -126,7 +126,7 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
         <button
           type="button"
           onClick={handleFeedbackClick}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-600 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-600 font-black text-xs tracking-widest hover:bg-slate-50 transition-all shadow-sm"
         >
           <i className="fa-solid fa-comment-dots text-indigo-500"></i>
           Send Feedback
@@ -136,7 +136,7 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
           type="button"
           onClick={handleSignOut}
           disabled={isSigningOut}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-600 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-slate-200 bg-white text-slate-600 font-black text-xs tracking-widest hover:bg-slate-50 transition-all shadow-sm disabled:opacity-50"
         >
           <i className={`fa-solid ${isSigningOut ? "fa-spinner animate-spin" : "fa-right-from-bracket"} text-rose-500`}></i>
           {isSigningOut ? "Signing Out" : "Sign Out"}
@@ -148,7 +148,7 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
         <button
           type="button"
           onClick={handleFeedbackClick}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 font-black text-[9px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 font-black text-[9px] tracking-widest hover:bg-slate-50 transition-all shadow-sm"
         >
           <i className="fa-solid fa-comment-dots text-indigo-500"></i>
           Feedback
@@ -158,7 +158,7 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
           type="button"
           onClick={handleSignOut}
           disabled={isSigningOut}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 font-black text-[9px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 font-black text-[9px] tracking-widest hover:bg-slate-50 transition-all shadow-sm disabled:opacity-50"
         >
           <i className={`fa-solid ${isSigningOut ? "fa-spinner animate-spin" : "fa-right-from-bracket"} text-rose-500`}></i>
           {isSigningOut ? "Signing Out" : "Sign Out"}
@@ -175,8 +175,8 @@ export const Navigation: React.FC<{ isSyncing?: boolean; user?: Tenant | null }>
             />
           </div>
           <span
-            className={`text-[10px] font-black uppercase tracking-widest ${
-              cloudActive ? "text-slate-400" : "text-rose-500"
+            className={`text-xs font-black tracking-widest ${
+              cloudActive ? "text-slate-900" : "text-rose-500"
             }`}
           >
             {isSyncing ? "Syncing..." : cloudActive ? "Cloud Active" : "Offline"}
